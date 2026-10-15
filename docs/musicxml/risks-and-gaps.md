@@ -1,12 +1,12 @@
 # Risks, gaps and decision log
 
-Status: open design risks, 2026-10-13. Review against the [MusicXML 4.0 reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/) when implementing each feature. `spec-coverage.md` records support separately from tests.
+Status: open design risks, audited 2026-10-15 for MX-00. Review against the [MusicXML 4.0 reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/) when implementing each feature. `spec-coverage.md` records support separately from tests.
 
 | Risk | Mitigation and test |
 |---|---|
 | Public model loses format details | Keep written pitch, performed duration, notation and playback fields separate; log unsupported data with source location. Round-trip is not promised. Test accidentals, print hints and notes with different notated/performed values. |
 | Timing drift with changing divisions, backup/forward and tuplets | Rational quarter-note offsets; measure-local cursor; explicit state timeline. Assert exact onset/duration across changes and overlapping voices. |
-| Chord children can have different durations | Store noteheads independently at one onset; test heterogeneous chord durations against [4.0 clarification](https://www.w3.org/2021/06/musicxml40/version-history/40/). |
+| Chord children can have different durations | Store noteheads independently at one onset; a chord tone may be shorter but cannot be longer than its reference note per the [chord definition](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/chord/). Test shorter/equal members and diagnose a longer member. |
 | Written versus sounding pitch confusion | Preserve written pitch and transposition separately; derive sounding pitch only when possible. Test transposing and concert-score cases. |
 | Spans missing an endpoint or crossing measures | Stable event IDs and a resolver with explicit unmatched-span diagnostics; test ties, slurs and endings across boundaries. |
 | Valid XML but inconsistent music | Separate XSD validation, semantic validation and tolerant import. Test overfilled/underfilled measures, orphaned part IDs and conflicting attributes with documented policy. |
@@ -19,3 +19,24 @@ Status: open design risks, 2026-10-13. Review against the [MusicXML 4.0 referenc
 | MusicXML 4.1 may change semantics | Pin 4.0 references and version in tests; catalogue 4.1 changes only after publication. |
 
 Open questions to close in MX-01/MX-02: precise parser input API across all targets; secure entity handling in the chosen xmlutil mode; ZIP library with iOS support; whether renderer adoption uses migration or an adapter; exact unsupported-data retention budget. Decisions should be recorded here with test evidence.
+
+## MX-00 audit findings and diagnostic obligations
+
+Evidence is in the pinned method links in [reference-analysis.md](reference-analysis.md); the [element inventory](element-inventory.md) and S22–S27 cover newly enumerated groups. **There is no importer or diagnostic API yet.** The records below specify future outcomes for MX-03 and feature owners; they do not claim runtime handling. All fixture references are planned. Unsupported content must not be silently accepted just because its parent element is recognized.
+
+Proposed record shape: `UnsupportedFeature(featureId, sourceLocation, retention)`, with feature IDs from S01–S27, a location identifying the element/attribute path and available part/measure/line/column, and retention `discarded`, `opaque` or `converted`. For example, an unmapped harmony is `UnsupportedFeature("S22", path="/score-partwise/part[@id='P1']/measure[@number='1']/harmony", retention="discarded")`. This is illustrative field notation, not a Kotlin signature. `converted` requires an explicit description of the conversion/loss; opaque retention needs bounded size. Until a retention mechanism exists, report `discarded` honestly. Fatal root rejection returns failure with no score; unsupported feature handling is observable in tolerant mode and rejects under a strict unsupported-content policy. MX-03 must finalize stable code names, severity and limits.
+
+| Case / evidence | Required structured outcome (proposed) | Owner / independent check |
+|---|---|---|
+| Timewise root is valid in 4.0 but rejected by both inspected music21 entry points | `UnsupportedRoot(rootName, sourceLocation)` until MX-10; thereafter normalize, not an unsupported warning | MX-05,MX-10; F12 pair. Source guards verified; music21 runtime not executed. |
+| Missing/unknown/duplicate part ID is repaired, skipped or overwritten in reference source | `MissingPartId`, `UnknownPartId`, `DuplicatePartId`; any tolerant repair also records what was changed/lost | MX-06; F02/F22 variants |
+| Backup before measure start is clamped in reference; forward overfill allowed locally | `InvalidCursorMove` / `InconsistentMeasureDuration`, not silent clamp or inferred notation | MX-09; F05/F23; also divisions-boundary moves |
+| Numbered tuplet state uses fixed lists although 4.0 number-level permits 1–16 | Support valid labels through 16; if temporarily limited, `UnsupportedFeature("S11", location, retention)`. Never an indexing exception | MX-12,MX-20; F11 numbers 7,8,16 and invalid 17. Index failure is a source-based inference, not a reproduced crash. |
+| Sound tie and notation-only tied mark collapse in the inspected tie helper | Preserve both; until notation-only support, `UnsupportedFeature("S09", location, retention)`; orphan relationships use `UnmatchedSpan` | MX-11; F10 notation-only, stop-before-start and orphan cases |
+| Harmony/figured bass and tablature/technical variants exceed initial parser scope; figured bass dispatch is explicitly skipped in reference | `UnsupportedFeature("S22" / "S23", location, retention)` for each unsupported subtree/attribute | MX-08,MX-13,MX-20,MX-21; F24,F25 |
+| Beat/measure repeat and slash measure styles are TODOs in reference | `UnsupportedFeature("S24", location, retention)`; retain actual events even when style cannot be represented | MX-17,MX-21; F26 |
+| Link/bookmark/grouping dispatch is skipped; editorial preservation needs explicit scope | `UnsupportedFeature("S25", location, retention)` for unmapped content; no network dereference | MX-03,MX-06,MX-18,MX-21; F27 |
+| Listening lacks measure dispatch; delegated sound parser leaves swing/instrument-change and controls as TODOs | `UnsupportedFeature("S26", location, retention)`, including unmapped attributes under recognized sound/direction containers | MX-13,MX-16,MX-20,MX-21; F21,F28 |
+| Opus/sound-definition roots are schema-defined but outside the current score input API | Fatal `UnsupportedRoot` with document kind/location; do not treat as malformed XML or return empty score | MX-05,MX-19,MX-21; F29 |
+
+No new runtime unsupported branch was introduced in MX-00. Diagnostic emission and assertions remain unimplemented and must land with the parser; the separate implementation/test statuses in the matrix stay unchanged. The audit does not settle XML/ZIP security or model/API choices reserved for MX-01/MX-02.
