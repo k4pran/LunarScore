@@ -18,7 +18,35 @@ Status: open design risks, audited 2026-10-15 for MX-00. Review against the [Mus
 | Licensing of borrowed code and fixtures | Do not copy music21 code mechanically; keep its BSD notice if code is adapted. Carry MIT notice for imported test-suite fixtures. Verify each real-world score's redistribution rights. |
 | MusicXML 4.1 may change semantics | Pin 4.0 references and version in tests; catalogue 4.1 changes only after publication. |
 
-Open questions to close in MX-01/MX-02: precise parser input API across all targets; secure entity handling in the chosen xmlutil mode; ZIP library with iOS support; whether renderer adoption uses migration or an adapter; exact unsupported-data retention budget. Decisions should be recorded here with test evidence.
+The initial XML/ZIP dependency decisions are recorded below. Public parser input policy,
+renderer adoption and unsupported-data retention still need MX-02/MX-03/MX-05 decisions;
+the raw ZIP safety layer remains MX-19 work.
+
+## MX-01 dependency decisions and runtime limitations
+
+MX-01 closes the initial dependency/API investigation; see [dependency evidence](dependency-spike.md).
+The renderer migration and unsupported-data retention budget remain MX-02/MX-03 decisions.
+
+These are actual internal spike outcomes; they do not finalize the public MX-03 diagnostic contract.
+Every failing probe returns one typed `ProbeDiagnostic` and clears partial output.
+
+| Case | Current structured outcome / evidence | Remaining work |
+|---|---|---|
+| DTD, external/internal entity declarations | `UNSAFE_XML` before reader creation; network/file/parameter/expansion smoke tests pass | MX-05: decide whether to accept safe MusicXML DTD headers without resolution |
+| Literal declaration token in comments/CDATA | Conservative `UNSAFE_XML`; comment regression test | MX-05: refine lexical policy if needed |
+| Undeclared entity or malformed XML | `MALFORMED_XML`, no partial events | MX-03/MX-05: source locations and stable public error codes |
+| Non-UTF-8/invalid UTF-8/NUL-bearing input | `UNSUPPORTED_ENCODING` | MX-05: encoding detection and bounded streaming policy |
+| Namespace-bearing score root | `UNSUPPORTED_NAMESPACE`; prefixed/default namespace tests | MX-05: finalize compatibility policy; foreign child namespaces are event evidence only |
+| Auxiliary/unknown root | `UNSUPPORTED_ROOT`; opus/sounds tests | MX-05/MX-19: document-kind handling; no automatic reference fetching |
+| XML byte/depth/element bound | `INPUT_LIMIT` / `DEPTH_LIMIT` / `ELEMENT_LIMIT`; boundary tests | MX-03/MX-05: cancellation/time/retention policy |
+| ZIP entry exceeds expanded-byte bound | `ARCHIVE_ENTRY_LIMIT`; DEFLATE boundary test | MX-19: global entry count, bytes and ratio bounds |
+| Missing entry / invalid ZIP | `ARCHIVE_READ_FAILED`; tests also check source cleanup | MX-19: stable detailed archive diagnostics |
+| Unsafe ZIP names/duplicates and hidden compressed sizes | No untrusted archive API exists; Okio source inspection shows normalized/collapsed metadata | MX-19 must validate raw directory metadata before using Okio, or replace it; do not ship the probe as an MXL reader |
+| iOS runtime differences | Main/test klibs compile for both iOS targets; no runtime claim | macOS/Xcode simulator/device smoke runs required |
+
+ZIP CRC/encryption/container/mimetype/rootfile validation and semantic feature diagnostics remain
+unimplemented. The probes do not import any musical content. JS/Wasm are intentionally deferred
+for this module; the existing rendering targets are unaffected.
 
 ## MX-00 audit findings and diagnostic obligations
 

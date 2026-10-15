@@ -1,6 +1,9 @@
 # MusicXML 4.0 importer architecture
 
-Status: design proposal, 2026-10-13. No parser has been implemented.
+Status: design proposal, updated 2026-10-15. MX-01 adds an internal dependency spike;
+no semantic score importer has been implemented. See [dependency evidence](dependency-spike.md)
+for selected APIs, pins, security limitations and target verification. The XML/ZIP choices below
+are superseded by that evidence where they differ.
 
 ## Scope and sources
 

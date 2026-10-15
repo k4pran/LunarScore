@@ -16,6 +16,7 @@ breaking yet.
 | `sheetmusic-core` | Score model (`Score`, `Measure`, `Note`, …), SMuFL glyph metrics and the layout engine. Pure Kotlin with no Compose dependency. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser, Node.js), Wasm (browser, Node.js) |
 | `sheetmusic-compose` | The `SheetMusic` composable. It bundles the Bravura font. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser), Wasm (browser) |
 | `sample` | The example score as a desktop app and as a web page (JS and Wasm), with one shared screen | JVM desktop, JS, Wasm |
+| `musicxml-parser` | Internal XML/ZIP dependency spike; no score import API yet. See [MX-01 evidence](docs/musicxml/dependency-spike.md). | Android, JVM, iosArm64, iosSimulatorArm64 |
 
 ## Using it from another KMP project
 

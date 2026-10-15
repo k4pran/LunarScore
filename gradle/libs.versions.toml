@@ -2,11 +2,16 @@
 agp = "9.3.3"
 kotlin = "2.4.21"
 compose-multiplatform = "1.12.1"
+xmlutil = "1.0.2"
+okio = "3.9.1"
 
 android-compileSdk = "37"
 android-minSdk = "24"
 
 [libraries]
+xmlutil-core = { module = "io.github.pdvrieze.xmlutil:core", version.ref = "xmlutil" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+okio-fakefilesystem = { module = "com.squareup.okio:okio-fakefilesystem", version.ref = "okio" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
