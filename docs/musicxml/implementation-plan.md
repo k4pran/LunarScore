@@ -1,8 +1,13 @@
 # MusicXML 4.0 Kotlin Multiplatform parser: implementation plan
 
-Prepared 2026-10-13. **Planning only; no parser implementation is included.** This plan is for the local LunarScore workspace and GitHub issues in `k4pran/LunarScore`. The authoritative [MusicXML 4.0 report](https://www.w3.org/2021/06/musicxml40/), [XSD](https://www.w3.org/2021/06/musicxml40/listings/musicxml.xsd/) and [4.0 version history](https://www.w3.org/2021/06/musicxml40/version-history/40/) outrank behaviour of other importers. See [architecture](architecture.md), [coverage matrix](spec-coverage.md), [test plan](test-plan.md), [reference analysis](reference-analysis.md) and [risks](risks-and-gaps.md). These documents form the design baseline; implementation issues should update them when evidence changes.
+Prepared 2026-10-13; updated 2026-10-15 for the MX-01 dependency spike. **No semantic score importer is implemented.** This plan is for the local LunarScore workspace and GitHub issues in `k4pran/LunarScore`. The authoritative [MusicXML 4.0 report](https://www.w3.org/2021/06/musicxml40/), [XSD](https://www.w3.org/2021/06/musicxml40/listings/musicxml.xsd/) and [4.0 version history](https://www.w3.org/2021/06/musicxml40/version-history/40/) outrank behaviour of other importers. See [architecture](architecture.md), [coverage matrix](spec-coverage.md), [test plan](test-plan.md), [reference analysis](reference-analysis.md) and [risks](risks-and-gaps.md). These documents form the design baseline; implementation issues should update them when evidence changes.
 
 ## Decisions
+
+MX-01 evidence (2026-10-15): `:musicxml-parser` now contains internal XML/ZIP probes. See
+[dependency-spike.md](dependency-spike.md) for pinned dependencies, selected interfaces, passing
+JVM/Android host smoke tests and iOS cross-compilation. Native runtime verification still needs
+macOS/Xcode. No semantic importer or public model/result API has been added.
 
 - Build a standalone `:musicxml-parser` with a format-neutral semantic model, rational timing, stable event IDs and structured diagnostics. Keep Compose, Android XML types and music21 out of the model.
 - Use a small ordered parse representation for cursor/state and unresolved spans, then emit immutable score objects. Start with xmlutil core as the XML reader candidate; validate its security and KMP behaviour before adoption. Keep `.mxl` ZIP decoding as a separate adapter.

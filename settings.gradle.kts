@@ -21,5 +21,6 @@ dependencyResolutionManagement {
 rootProject.name = "LunarScore"
 
 include(":sheetmusic-core")
+include(":musicxml-parser")
 include(":sheetmusic-compose")
 include(":sample")
