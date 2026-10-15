@@ -1,0 +1,24 @@
+# Gradle and Kotlin build output
+.gradle/
+.kotlin/
+**/build/
+
+# Local Android SDK configuration
+/local.properties
+
+# IDE settings and project files generated on each developer's machine
+/.idea/
+*.iml
+
+# Local Claude launch configuration
+/.claude/
+
+# Native build output
+.externalNativeBuild/
+.cxx/
+
+# OS and local capture files
+.DS_Store
+Thumbs.db
+/captures/
+xcuserdata/
