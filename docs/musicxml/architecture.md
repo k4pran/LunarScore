@@ -15,7 +15,16 @@ Add `:musicxml-parser` depending on a new, format-neutral `:sheetmusic-model` mo
 
 `parseMusicXml(input, options): ParseResult<Score>` should expose a score plus ordered diagnostics. Input should support text/bytes and bounded streams where the chosen XML library permits. `parseMxl` is a separate archive adapter using the same XML parser. Fatal syntax/security errors return failure; unsupported valid material returns a structured diagnostic and, when possible, retained source information. Never imply that successful parsing equals full 4.0 coverage.
 
-## Model proposal
+## Model contract (MX-02)
+
+The initial neutral vocabulary is implemented in `:sheetmusic-model`, package
+`com.ryanjames.sheetmusic.score`; see [model.md](model.md) for bounds, ID scopes,
+diagnostics and the renderer migration. The table below remains the broader target design:
+metadata, directions, presentation and other later feature domains are not yet implemented.
+`sheetmusic-core` now exposes the model through an API dependency and provides a lossless
+legacy-to-neutral adapter. XML/Compose dependencies are absent from the neutral module.
+
+## Broader model proposal
 
 | Concept | Proposed representation |
 |---|---|
