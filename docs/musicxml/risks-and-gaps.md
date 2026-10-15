@@ -18,14 +18,15 @@ Status: open design risks, audited 2026-10-15 for MX-00. Review against the [Mus
 | Licensing of borrowed code and fixtures | Do not copy music21 code mechanically; keep its BSD notice if code is adapted. Carry MIT notice for imported test-suite fixtures. Verify each real-world score's redistribution rights. |
 | MusicXML 4.1 may change semantics | Pin 4.0 references and version in tests; catalogue 4.1 changes only after publication. |
 
-The initial XML/ZIP dependency decisions are recorded below. Public parser input policy,
-renderer adoption and unsupported-data retention still need MX-02/MX-03/MX-05 decisions;
-the raw ZIP safety layer remains MX-19 work.
+The XML/ZIP dependency decisions and neutral model contract are recorded below. Public parser
+input policy and unsupported-data retention still need MX-03/MX-05 decisions; the raw ZIP safety
+layer remains MX-19 work. MX-02 chooses a staged renderer adapter.
 
 ## MX-01 dependency decisions and runtime limitations
 
 MX-01 closes the initial dependency/API investigation; see [dependency evidence](dependency-spike.md).
-The renderer migration and unsupported-data retention budget remain MX-02/MX-03 decisions.
+The renderer migration is recorded under MX-02 below; the unsupported-data retention budget
+remains an MX-03 decision.
 
 These are actual internal spike outcomes; they do not finalize the public MX-03 diagnostic contract.
 Every failing probe returns one typed `ProbeDiagnostic` and clears partial output.
@@ -47,6 +48,25 @@ Every failing probe returns one typed `ProbeDiagnostic` and clears partial outpu
 ZIP CRC/encryption/container/mimetype/rootfile validation and semantic feature diagnostics remain
 unimplemented. The probes do not import any musical content. JS/Wasm are intentionally deferred
 for this module; the existing rendering targets are unaffected.
+
+## MX-02 model decisions and remaining limits
+
+The [neutral model contract](model.md) records the implemented vocabulary and renderer adapter.
+Model-only F01/F05/F10/F17 projections now exist; no XML importer or source diagnostic API is added.
+
+| Case | Current structured outcome / evidence | Remaining work |
+|---|---|---|
+| Exact rational exceeds reduced Int component bounds | `RationalException(OVERFLOW)`; reduction/boundary tests, no wrap or rounding | MX-03/MX-07 must translate numeric failures to source-located diagnostics; wider numeric support is not promised |
+| Invalid fraction or division by zero | `ZERO_DENOMINATOR` / `DIVISION_BY_ZERO`; independent codes tested | Parser must distinguish malformed input from a resource/numeric limit |
+| Orphan or forward relationship endpoints | Retained IDs/nulls; `MISSING_ENDPOINT` / `UNKNOWN_EVENT` model diagnostics; F10 projection | MX-11 source resolution, tie pitch checks, locations and strict/tolerant policy |
+| Duplicate IDs, unknown staff/instrument | `DUPLICATE_ID`, `UNKNOWN_STAFF`, `UNKNOWN_INSTRUMENT` with neutral paths; graph tests | MX-03 source locations; MX-06/MX-09 importer policies |
+| Simple meter/state vocabulary only | No source import or implicit loss; additive meters/keys/other domains remain unimplemented | Their feature adapters must retain data or emit structured unsupported diagnostics before claiming support |
+| Rich model cannot yet be rendered | Existing renderer-to-neutral adapter preserves its complete current subset; legacy tests retained | Later neutral-to-layout adapter must report each unsupported case; no reverse adapter is exposed now |
+| Transposition, spans and chord consistency | Separate fields represent facts exactly; model does not infer sounding pitches or repair spans | MX-09/MX-11/MX-16 semantic validation and derivation remain |
+
+No new source-content discard branch is introduced. `ModelDiagnostic` is a neutral graph check,
+not the MX-03 importer diagnostic/provenance contract. The model has no dependency on the
+MX-01 XML/ZIP probes; their implementation and test evidence are preserved separately above.
 
 ## MX-00 audit findings and diagnostic obligations
 

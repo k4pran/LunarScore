@@ -13,6 +13,7 @@ breaking yet.
 
 | Module | Contents | Targets |
 |---|---|---|
+| `sheetmusic-model` | Format-neutral score hierarchy, exact rational time, written/sounding pitch, notation and relationships. No XML or Compose dependency. See the [model contract](docs/musicxml/model.md). | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser, Node.js), Wasm (browser, Node.js) |
 | `sheetmusic-core` | Score model (`Score`, `Measure`, `Note`, …), SMuFL glyph metrics and the layout engine. Pure Kotlin with no Compose dependency. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser, Node.js), Wasm (browser, Node.js) |
 | `sheetmusic-compose` | The `SheetMusic` composable. It bundles the Bravura font. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser), Wasm (browser) |
 | `sample` | The example score as a desktop app and as a web page (JS and Wasm), with one shared screen | JVM desktop, JS, Wasm |
@@ -106,6 +107,9 @@ SheetMusic(
 ### Public API
 
 - `com.ryanjames.sheetmusic.model`: `Score`, `Measure`, `Note`, `Pitch`, `Duration`, `Clef`
+- `com.ryanjames.sheetmusic.score`: the richer neutral model in `sheetmusic-model`.
+  `com.ryanjames.sheetmusic.model.Score.toNeutralScore()` lifts the existing renderer model into it;
+  the layout and Compose entry points continue to accept the existing renderer model.
 - `com.ryanjames.sheetmusic.compose`: `SheetMusic`
 - `com.ryanjames.sheetmusic.layout`: `layoutScore(score, minWidth, settings)` returns a `ScoreLayout`.
   This contains every staff line, glyph, stem, ledger line and barline, positioned in staff spaces.

@@ -34,6 +34,9 @@ kotlin {
     }
 
     sourceSets {
+        commonMain.dependencies {
+            api(project(":sheetmusic-model"))
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
         }

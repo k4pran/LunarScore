@@ -9,6 +9,17 @@ and `ZipDependencyProbeTest`. Their original inline inputs cover roots/namespace
 limits and ZIP access; they do not replace independent F01–F29 semantic fixtures or XSD checks.
 See [dependency-spike.md](dependency-spike.md) for exact test scope and target evidence.
 
+MX-02 adds original Kotlin **model-only** projections of F01, F05, F10 and F17 in
+`sheetmusic-model/src/commonTest/kotlin/com/ryanjames/sheetmusic/score/ScoreProjectionTest.kt`.
+These define expected meter/note/rest facts, overlapping voices and gaps, independent cross-measure
+sound/notation spans (including missing endpoints), and transposition/percussion fields. Additional
+checks cover unequal cross-staff chord durations, grace, tuplets, exact arithmetic and graph errors.
+`RationalTest` covers reduction, signs, Int boundary values, reducible large intermediates and
+typed overflow/zero failures. `NeutralScoreAdapterTest` checks the existing renderer vocabulary's
+migration. These do not parse XML, perform XSD validation, calculate transposition or resolve spans;
+the independent source fixtures and importer assertions remain MX-04 and later feature work.
+Target evidence is recorded in [model.md](model.md).
+
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.
 3. Compare exact musical semantics using reduced rational values; compare presentation fields only where the fixture calls for them.
