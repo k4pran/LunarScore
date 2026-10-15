@@ -23,6 +23,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            api(project(":sheetmusic-model"))
             implementation(libs.xmlutil.core)
             implementation(libs.okio)
         }
