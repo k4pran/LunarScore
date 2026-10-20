@@ -19,7 +19,7 @@ Status: open design risks, audited 2026-10-15 for MX-00. Review against the [Mus
 | MusicXML 4.1 may change semantics | Pin 4.0 references and version in tests; catalogue 4.1 changes only after publication. |
 
 The XML/ZIP dependency decisions, neutral model and MX-03 diagnostics contract are recorded below.
-Public policy and retention budgets are defined; reader enforcement remains MX-05, and the raw
+Public policy and retention budgets are defined; MX-05 implements reader enforcement, and the raw
 ZIP safety layer remains MX-19 work. MX-02 chooses a staged renderer adapter.
 
 ## MX-01 dependency decisions and runtime limitations
@@ -87,10 +87,34 @@ following outcomes are tested by supplying findings to the collector, not by par
 | Unsupported document kinds, encoding, namespace and archives | Stable fatal codes defined; no new input acceptance | MX-05/MX-19 finalize input/namespace/archive policy and emission; auxiliary documents stay unsupported |
 
 Defaults are strict, 1,000 diagnostics, 65,536 retained UTF-8 source bytes and 100,000 provenance
-entries. Input byte/depth/element limits are configuration only until MX-05. Deadline/cancellation
-hooks and global ZIP safety budgets remain adapter work. `CANCELLED` defines the outcome, not a
-new cancellation runtime. Locations may lack unavailable coordinates; they never fabricate them.
+entries. MX-05 enforces input byte/depth/element limits and supplies cooperative cancellation.
+Deadlines, bounded stream acquisition and global ZIP safety budgets remain adapter work.
+Locations may lack unavailable coordinates; they never fabricate them.
 No new source discard path is exposed by MX-03, and tests do not upgrade parser feature coverage.
+
+## MX-05 reader decisions and remaining gaps
+
+The internal [secure ordered reader](xml-reader.md) now emits the public diagnostic contract.
+It provides no semantic score importer, XSD validator or archive adapter. These decisions supersede
+MX-01's provisional reader-policy entries above; the original probes remain unchanged.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| All DTD/entity declarations, including benign MusicXML DTD headers | Fatal `UNSAFE_XML` before reader construction; external network/file, parameter and expansion fixtures under both policies | Supporting selected headers without resolution is deliberately deferred |
+| Declaration tokens inside comments/CDATA/PIs | Conservative fatal `UNSAFE_XML`; comment/CDATA regressions | Lexically relaxing this compatibility restriction is deferred |
+| Non-UTF-8, invalid UTF-8, NUL-bearing source | Fatal `UNSUPPORTED_ENCODING`; optional UTF-8 BOM accepted | Broader encoding support / bounded stream acquisition deferred |
+| XML version other than 1.0 | New fatal `UNSUPPORTED_XML_VERSION`, tested in both policies | XML 1.1 deliberately unsupported |
+| Namespace-bearing score root; opus/sounds/unknown root | Fatal `UNSUPPORTED_NAMESPACE` / `UNSUPPORTED_ROOT` with available source coordinates | No namespace rewriting, auxiliary-document import or reference fetching |
+| Foreign child names/attributes | Expanded names preserved in ordered snapshots; prefix/default scope tests | Semantic adapters must report unsupported meaningful content; reader success is not musical support |
+| Malformed syntax/character references/namespaces | Fatal `MALFORMED_XML`; dependency EOF exception translation and lexical/namespace guards have regression fixtures | Broader exporter/security corpus remains MX-21 |
+| Byte/depth/element excess; cancelled parse | Fatal `INPUT_LIMIT` / `DEPTH_LIMIT` / `ELEMENT_LIMIT` / `CANCELLED`; exact/excess, deep/wide and tail-drain tests | Caller bytes are already materialized; cancellation is cooperative between bounded scans/tokens; deadlines deferred |
+| Long nested names or namespace URIs amplify parent-prefixed source paths | Fatal `PATH_LIMIT` before exceeding the cumulative 8,388,608 UTF-16 code-unit budget; exact/excess/root/sibling/Unicode and default-budget adversarial tests | Larger legitimate scores can configure `maxSourcePathCharacters`; frames are not allowed to bypass the cumulative budget when closed |
+| Fatal reader finding after consumer warnings/provenance | Ordered diagnostics, null value and empty model mappings; diagnostic-cap and malformed-tail tests | Semantic adapters must continue using shared context |
+| F22 missing part-list / illegal duration | Well-formed XML reaches later adapters; explicit reader test | MX-06/MX-07 semantic detection and MX-04 XSD assertions still required |
+
+JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md](xml-reader.md).
+Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
+MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
 ## MX-00 audit findings and diagnostic obligations
 
@@ -111,4 +135,6 @@ Proposed record shape: `UnsupportedFeature(featureId, sourceLocation, retention)
 | Listening lacks measure dispatch; delegated sound parser leaves swing/instrument-change and controls as TODOs | `UnsupportedFeature("S26", location, retention)`, including unmapped attributes under recognized sound/direction containers | MX-13,MX-16,MX-20,MX-21; F21,F28 |
 | Opus/sound-definition roots are schema-defined but outside the current score input API | Fatal `UnsupportedRoot` with document kind/location; do not treat as malformed XML or return empty score | MX-05,MX-19,MX-21; F29 |
 
-No new runtime unsupported branch was introduced in MX-00. XML diagnostic emission and source fixture assertions remain unimplemented and must land with the parser; MX-03 contract assertions are recorded separately above. The audit does not settle XML/ZIP security or model/API choices reserved for subsequent tasks.
+No new runtime unsupported branch was introduced in MX-00. MX-05 now emits fatal XML reader diagnostics;
+semantic feature emission and independent source fixtures remain later work. MX-03 contract assertions
+are recorded separately above. The historical audit did not settle XML/ZIP security or model/API choices.

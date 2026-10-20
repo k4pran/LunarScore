@@ -8,6 +8,8 @@ public enum class DiagnosticCode {
     UNSAFE_XML,
     /** Input encoding cannot be decoded safely. */
     UNSUPPORTED_ENCODING,
+    /** Only XML 1.0 syntax is supported by the secure input boundary. */
+    UNSUPPORTED_XML_VERSION,
     /** The document kind is outside the score input API. */
     UNSUPPORTED_ROOT,
     /** A score namespace is not supported. */
@@ -34,6 +36,8 @@ public enum class DiagnosticCode {
     DEPTH_LIMIT,
     /** XML element budget exceeded. */
     ELEMENT_LIMIT,
+    /** Cumulative source path character budget exceeded. */
+    PATH_LIMIT,
     /** More findings exist than can be returned; parsing must stop. */
     DIAGNOSTIC_LIMIT,
     /** Opaque source retention byte budget exceeded. */

@@ -28,6 +28,13 @@ parse source XML, classify it against XSD, resolve spans or interpret cursors. I
 F22/F23 fixtures remain MX-04 and actual diagnostic emission remains MX-05/feature work.
 See [diagnostics.md](diagnostics.md) for the contract and target evidence.
 
+MX-05 adds original inline reader fixtures in `ScoreXmlReaderTest`: actual F22 wrong-root and
+malformed-syntax diagnostics, DTD/entity/encoding attacks, namespace expansion, source locations,
+ordered mixed content, exact/excess resource limits, cancellation and failure finalization.
+Missing part-list and illegal duration are explicitly accepted as well-formed at this layer;
+their schema/semantic rejection remains future work. These tests do not replace MX-04's independent
+corpus or offline XSD harness. See [reader policy and target evidence](xml-reader.md).
+
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.
 3. Compare exact musical semantics using reduced rational values; compare presentation fields only where the fixture calls for them.
