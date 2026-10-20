@@ -3,9 +3,9 @@
 Issue [#4](https://github.com/k4pran/LunarScore/issues/4) adds public common Kotlin types in
 `com.ryanjames.sheetmusic.musicxml`, in `:musicxml-parser`. It exposes `:sheetmusic-model` through
 an API dependency, without adding source/XML concerns to the neutral model. `ParseResult<Score>`
-is the intended score result. There is **no parse entry point or semantic XML reader yet**.
-MX-01's internal dependency probes keep their original API and tests; MX-05 will connect the
-reader to this contract. This change does not claim XSD validation or new MusicXML feature support.
+is the intended score result. There is **no public score parse entry point or semantic importer yet**.
+MX-05 connects the internal [secure ordered reader](xml-reader.md) to this contract.
+MX-01's dependency probes keep their original API/tests. No XSD validation is claimed.
 The [4.0 XSD](https://www.w3.org/2021/06/musicxml40/listings/musicxml.xsd/) defines valid source
 structure; schema validity and supported musical interpretation remain separate questions.
 
@@ -24,12 +24,12 @@ truncated score. Failure codes and their meaning are stable; message prose is no
 
 | Codes | Strict | Tolerant | Adapter obligation |
 |---|---|---|---|
-| `MALFORMED_XML`, `UNSAFE_XML`, `UNSUPPORTED_ENCODING`, `UNSUPPORTED_ROOT`, `UNSUPPORTED_NAMESPACE` | Error/failure, stop | Error/failure, stop | Supply available coordinates; do not invent line/column before reader creation |
+| `MALFORMED_XML`, `UNSAFE_XML`, `UNSUPPORTED_ENCODING`, `UNSUPPORTED_XML_VERSION`, `UNSUPPORTED_ROOT`, `UNSUPPORTED_NAMESPACE` | Error/failure, stop | Error/failure, stop | Supply available coordinates; do not invent line/column before reader creation |
 | `INVALID_STRUCTURE`, `INVALID_VALUE`, `NUMERIC_OVERFLOW` | Error/failure, stop | Error/failure, stop | Missing required structure/references or uninterpretable required values cannot yield an accepted score |
 | `UNMATCHED_SPAN`, `INVALID_CURSOR_MOVE`, `INCONSISTENT_MEASURE_DURATION` | Error/failure | Warning/accepted candidate | Preserve unresolved facts where representable; describe any repair/discard explicitly; do not silently clamp a cursor |
 | `UNSUPPORTED_FEATURE` | Error/failure | Warning/accepted candidate | Include coverage feature ID, location and explicit retention outcome for each meaningful unmapped subtree/attribute |
 | `RECOVERED_VALUE` | Error/failure | Warning/accepted candidate | Message describes the actual repair; use unsupported-content records as well when meaningful source material is lost |
-| `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |
+| `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `PATH_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |
 | `CANCELLED`, `ARCHIVE_READ_FAILED`, `ARCHIVE_ENTRY_LIMIT` | Error/failure, stop | Error/failure, stop | Cancellation and detailed archive detection remain reader/archive adapter work |
 
 Semantic findings may be collected after strict rejection to provide useful ordered diagnostics;
@@ -69,9 +69,10 @@ but schema-valid `grouping` (S25) is the contract test example; there is no grou
 
 | Budget | Default | Current enforcement |
 |---|---|---|
-| Input bytes | 8,388,608 | Public configuration; MX-05 reader must enforce before materialization |
-| XML depth | 128 | Public configuration; MX-05 reader must enforce while consuming |
-| XML element count | 100,000 | Public configuration; MX-05 reader must enforce while consuming |
+| Input bytes | 8,388,608 | MX-05 boundary before UTF-8 decoding/reader creation; caller supplies bytes |
+| XML depth | 128 | MX-05 cursor before event snapshots |
+| XML element count | 100,000 | MX-05 cursor before start-event snapshots |
+| Cumulative source path UTF-16 code units | 8,388,608 | MX-05 cursor before full-path concatenation; `PATH_LIMIT` reuses an existing parent location |
 | Diagnostics | 1,000 | Internal shared `ParseContext` |
 | Opaque retained source UTF-8 bytes | 65,536 total | Internal shared `ParseContext`; zero disables opaque retention |
 | Provenance entries | 100,000 | Internal shared `ParseContext`; zero prohibits mappings |
@@ -90,8 +91,9 @@ bound capture before constructing a fragment; this collector alone is not a stre
 Provenance overflow is fatal `PROVENANCE_LIMIT`. Returned snapshots stay within their budgets.
 The collector is internal so public callers cannot manufacture accepted parse results directly.
 
-Archive count/ratio/global expansion budgets remain MX-19 work. Wall-clock deadlines and actual
-cancellation hooks remain MX-05/MX-19 input-adapter work; `CANCELLED` reserves their failure outcome.
+Archive count/ratio/global expansion budgets remain MX-19 work. MX-05 implements cooperative
+cancellation before decoding, during preflight and between events. Wall-clock deadlines and bounded
+stream acquisition remain input-adapter work; a dependency token read cannot be interrupted.
 The old dependency probes do not automatically inherit these public option defaults.
 
 ## Verification scope

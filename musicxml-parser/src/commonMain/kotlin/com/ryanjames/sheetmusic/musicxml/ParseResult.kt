@@ -4,8 +4,8 @@ package com.ryanjames.sheetmusic.musicxml
 public enum class ParsePolicy { STRICT, TOLERANT }
 
 /**
- * Per-parse resource budgets. Positive XML limits are enforced by the future reader, before
- * materialization. Diagnostic count includes a terminal limit marker; zero retained bytes disables
+ * Per-parse resource budgets. XML byte limits precede decoding; depth/element limits precede
+ * event snapshots. Diagnostic count includes a terminal limit marker; zero retained bytes disables
  * opaque retention. Provenance count is independent of XML element count.
  */
 public data class ParseLimits(
@@ -15,10 +15,13 @@ public data class ParseLimits(
     val maxDiagnostics: Int = 1_000,
     val maxRetainedSourceBytes: Int = 65_536,
     val maxProvenanceEntries: Int = 100_000,
+    /** Cumulative source path UTF-16 code units; checked before each full path is allocated. */
+    val maxSourcePathCharacters: Int = 8_388_608,
 ) {
     init {
         require(maxInputBytes > 0 && maxDepth > 0 && maxElements > 0 && maxDiagnostics > 0)
         require(maxRetainedSourceBytes >= 0 && maxProvenanceEntries >= 0)
+        require(maxSourcePathCharacters > 0)
     }
 }
 

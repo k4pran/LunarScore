@@ -28,8 +28,9 @@ legacy-to-neutral adapter. XML/Compose dependencies are absent from the neutral 
 
 MX-03 implements the public [diagnostic/result/provenance contract](diagnostics.md) in
 `:musicxml-parser`, with an internal collector for policy and diagnostic/retention/provenance
-budgets. Source concerns stay outside the neutral model. No parse entry point is exposed yet;
-MX-05 and semantic adapters must emit findings through this contract.
+budgets. Source concerns stay outside the neutral model. MX-05 implements the internal
+[secure ordered XML reader](xml-reader.md) using this contract. No public score parse entry point
+is exposed yet; semantic adapters remain future work.
 
 | Concept | Proposed representation |
 |---|---|
