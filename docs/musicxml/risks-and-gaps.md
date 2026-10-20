@@ -18,15 +18,15 @@ Status: open design risks, audited 2026-10-15 for MX-00. Review against the [Mus
 | Licensing of borrowed code and fixtures | Do not copy music21 code mechanically; keep its BSD notice if code is adapted. Carry MIT notice for imported test-suite fixtures. Verify each real-world score's redistribution rights. |
 | MusicXML 4.1 may change semantics | Pin 4.0 references and version in tests; catalogue 4.1 changes only after publication. |
 
-The XML/ZIP dependency decisions and neutral model contract are recorded below. Public parser
-input policy and unsupported-data retention still need MX-03/MX-05 decisions; the raw ZIP safety
-layer remains MX-19 work. MX-02 chooses a staged renderer adapter.
+The XML/ZIP dependency decisions, neutral model and MX-03 diagnostics contract are recorded below.
+Public policy and retention budgets are defined; reader enforcement remains MX-05, and the raw
+ZIP safety layer remains MX-19 work. MX-02 chooses a staged renderer adapter.
 
 ## MX-01 dependency decisions and runtime limitations
 
 MX-01 closes the initial dependency/API investigation; see [dependency evidence](dependency-spike.md).
-The renderer migration is recorded under MX-02 below; the unsupported-data retention budget
-remains an MX-03 decision.
+The renderer migration is recorded under MX-02 below; the public retention budget is now defined
+by [MX-03](diagnostics.md). Existing probes still use their original internal types and limits.
 
 These are actual internal spike outcomes; they do not finalize the public MX-03 diagnostic contract.
 Every failing probe returns one typed `ProbeDiagnostic` and clears partial output.
@@ -35,11 +35,11 @@ Every failing probe returns one typed `ProbeDiagnostic` and clears partial outpu
 |---|---|---|
 | DTD, external/internal entity declarations | `UNSAFE_XML` before reader creation; network/file/parameter/expansion smoke tests pass | MX-05: decide whether to accept safe MusicXML DTD headers without resolution |
 | Literal declaration token in comments/CDATA | Conservative `UNSAFE_XML`; comment regression test | MX-05: refine lexical policy if needed |
-| Undeclared entity or malformed XML | `MALFORMED_XML`, no partial events | MX-03/MX-05: source locations and stable public error codes |
+| Undeclared entity or malformed XML | `MALFORMED_XML`, no partial events | MX-03 defines the public code/location contract; MX-05 must populate it from the reader |
 | Non-UTF-8/invalid UTF-8/NUL-bearing input | `UNSUPPORTED_ENCODING` | MX-05: encoding detection and bounded streaming policy |
 | Namespace-bearing score root | `UNSUPPORTED_NAMESPACE`; prefixed/default namespace tests | MX-05: finalize compatibility policy; foreign child namespaces are event evidence only |
 | Auxiliary/unknown root | `UNSUPPORTED_ROOT`; opus/sounds tests | MX-05/MX-19: document-kind handling; no automatic reference fetching |
-| XML byte/depth/element bound | `INPUT_LIMIT` / `DEPTH_LIMIT` / `ELEMENT_LIMIT`; boundary tests | MX-03/MX-05: cancellation/time/retention policy |
+| XML byte/depth/element bound | `INPUT_LIMIT` / `DEPTH_LIMIT` / `ELEMENT_LIMIT`; boundary tests | MX-03 defines public budgets; MX-05 enforces input/cancellation/deadline policy |
 | ZIP entry exceeds expanded-byte bound | `ARCHIVE_ENTRY_LIMIT`; DEFLATE boundary test | MX-19: global entry count, bytes and ratio bounds |
 | Missing entry / invalid ZIP | `ARCHIVE_READ_FAILED`; tests also check source cleanup | MX-19: stable detailed archive diagnostics |
 | Unsafe ZIP names/duplicates and hidden compressed sizes | No untrusted archive API exists; Okio source inspection shows normalized/collapsed metadata | MX-19 must validate raw directory metadata before using Okio, or replace it; do not ship the probe as an MXL reader |
@@ -68,9 +68,33 @@ No new source-content discard branch is introduced. `ModelDiagnostic` is a neutr
 not the MX-03 importer diagnostic/provenance contract. The model has no dependency on the
 MX-01 XML/ZIP probes; their implementation and test evidence are preserved separately above.
 
+## MX-03 diagnostic and provenance decisions
+
+The [public contract](diagnostics.md) now exists, with an internal policy/budget collector and
+contract-level F22/F23 tests. There is no semantic importer or production XML reader yet. The
+following outcomes are tested by supplying findings to the collector, not by parsing XML.
+
+| Case | Structured contract outcome / evidence | Remaining work |
+|---|---|---|
+| Unknown-to-adapter but valid element/attribute, including S25 grouping | `UNSUPPORTED_FEATURE` with feature ID, source location and `DISCARDED`, `OPAQUE` or `CONVERTED`; all reject strict, warn tolerant; grouping contract test | MX-05/feature owners must emit for every unmapped meaningful subtree/attribute, including children of recognized parents |
+| Missing required structure/value or invalid root/syntax (F22) | Fatal `INVALID_STRUCTURE`, `INVALID_VALUE`, `UNSUPPORTED_ROOT`, `MALFORMED_XML` under both policies; null result value | MX-04 source fixtures; MX-05/MX-06/MX-07 actual classification, not blanket XSD validation |
+| Orphan span, invalid cursor, incompatible measure extent (F23) | `UNMATCHED_SPAN`, `INVALID_CURSOR_MOVE`, `INCONSISTENT_MEASURE_DURATION`; errors strict, warnings tolerant | MX-09/MX-11 detect and explicitly describe repair/loss; no silent cursor clamp |
+| Exact rational overflow / invalid rational value | Stable fatal `NUMERIC_OVERFLOW` / `INVALID_VALUE`; fatal code policy tests | MX-07 must translate `RationalException` and attach real source coordinates; no approximation |
+| Opaque source exceeds aggregate retention budget | Fatal `RETENTION_LIMIT`; cumulative multibyte UTF-8 and zero-budget tests | Reader must bound capture before allocating a fragment; no round-trip or unlimited opaque storage promise |
+| Findings exceed cap | Fatal `DIAGNOSTIC_LIMIT` replaces last finding within hard cap; cap=1/2/3 tests; no accepted partial score | Reader/semantic adapters must stop consumption when collector stops |
+| Too many source mappings | Fatal `PROVENANCE_LIMIT`; zero/exact/excess tests | Feature adapters supply neutral paths and actual source coordinates |
+| Fatal after warnings or strict rejection | Failure retains ordered diagnostics but no score/model provenance; snapshot tests | Wire reader cleanup/cancellation to same result contract in MX-05 |
+| Unsupported document kinds, encoding, namespace and archives | Stable fatal codes defined; no new input acceptance | MX-05/MX-19 finalize input/namespace/archive policy and emission; auxiliary documents stay unsupported |
+
+Defaults are strict, 1,000 diagnostics, 65,536 retained UTF-8 source bytes and 100,000 provenance
+entries. Input byte/depth/element limits are configuration only until MX-05. Deadline/cancellation
+hooks and global ZIP safety budgets remain adapter work. `CANCELLED` defines the outcome, not a
+new cancellation runtime. Locations may lack unavailable coordinates; they never fabricate them.
+No new source discard path is exposed by MX-03, and tests do not upgrade parser feature coverage.
+
 ## MX-00 audit findings and diagnostic obligations
 
-Evidence is in the pinned method links in [reference-analysis.md](reference-analysis.md); the [element inventory](element-inventory.md) and S22–S27 cover newly enumerated groups. **There is no importer or diagnostic API yet.** The records below specify future outcomes for MX-03 and feature owners; they do not claim runtime handling. All fixture references are planned. Unsupported content must not be silently accepted just because its parent element is recognized.
+Evidence is in the pinned method links in [reference-analysis.md](reference-analysis.md); the [element inventory](element-inventory.md) and S22–S27 cover newly enumerated groups. **There is no importer yet.** MX-03 now supplies the [diagnostic API](diagnostics.md); the historical proposed outcomes below remain feature-owner obligations, not runtime handling. Source fixture references are planned. Unsupported content must not be silently accepted just because its parent element is recognized.
 
 Proposed record shape: `UnsupportedFeature(featureId, sourceLocation, retention)`, with feature IDs from S01–S27, a location identifying the element/attribute path and available part/measure/line/column, and retention `discarded`, `opaque` or `converted`. For example, an unmapped harmony is `UnsupportedFeature("S22", path="/score-partwise/part[@id='P1']/measure[@number='1']/harmony", retention="discarded")`. This is illustrative field notation, not a Kotlin signature. `converted` requires an explicit description of the conversion/loss; opaque retention needs bounded size. Until a retention mechanism exists, report `discarded` honestly. Fatal root rejection returns failure with no score; unsupported feature handling is observable in tolerant mode and rejects under a strict unsupported-content policy. MX-03 must finalize stable code names, severity and limits.
 
@@ -87,4 +111,4 @@ Proposed record shape: `UnsupportedFeature(featureId, sourceLocation, retention)
 | Listening lacks measure dispatch; delegated sound parser leaves swing/instrument-change and controls as TODOs | `UnsupportedFeature("S26", location, retention)`, including unmapped attributes under recognized sound/direction containers | MX-13,MX-16,MX-20,MX-21; F21,F28 |
 | Opus/sound-definition roots are schema-defined but outside the current score input API | Fatal `UnsupportedRoot` with document kind/location; do not treat as malformed XML or return empty score | MX-05,MX-19,MX-21; F29 |
 
-No new runtime unsupported branch was introduced in MX-00. Diagnostic emission and assertions remain unimplemented and must land with the parser; the separate implementation/test statuses in the matrix stay unchanged. The audit does not settle XML/ZIP security or model/API choices reserved for MX-01/MX-02.
+No new runtime unsupported branch was introduced in MX-00. XML diagnostic emission and source fixture assertions remain unimplemented and must land with the parser; MX-03 contract assertions are recorded separately above. The audit does not settle XML/ZIP security or model/API choices reserved for subsequent tasks.

@@ -20,6 +20,14 @@ migration. These do not parse XML, perform XSD validation, calculate transpositi
 the independent source fixtures and importer assertions remain MX-04 and later feature work.
 Target evidence is recorded in [model.md](model.md).
 
+MX-03 adds `ParseContractTest` in `musicxml-parser/src/commonTest`, with original **contract-only**
+F22/F23 projections: supplied fatal/semantic findings, source coordinates, both policies, an
+unmapped but valid S25 grouping, discarded/opaque/converted outcomes, ordered fatal-after-warning
+results, cap=1/2/3 overflow, cumulative UTF-8 retention and provenance bounds. These tests do not
+parse source XML, classify it against XSD, resolve spans or interpret cursors. Independent XML
+F22/F23 fixtures remain MX-04 and actual diagnostic emission remains MX-05/feature work.
+See [diagnostics.md](diagnostics.md) for the contract and target evidence.
+
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.
 3. Compare exact musical semantics using reduced rational values; compare presentation fields only where the fixture calls for them.
