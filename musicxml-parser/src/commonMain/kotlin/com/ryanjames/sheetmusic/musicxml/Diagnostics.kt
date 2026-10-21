@@ -38,6 +38,8 @@ public enum class DiagnosticCode {
     ELEMENT_LIMIT,
     /** Cumulative source path character budget exceeded. */
     PATH_LIMIT,
+    /** Per-element or cumulative XML attribute budget exceeded, including namespace declarations. */
+    ATTRIBUTE_LIMIT,
     /** More findings exist than can be returned; parsing must stop. */
     DIAGNOSTIC_LIMIT,
     /** Opaque source retention byte budget exceeded. */

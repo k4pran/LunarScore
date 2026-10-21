@@ -214,7 +214,7 @@ class ParseContractTest {
     @Test
     fun testResourceNumericAndCancellationErrorsAlwaysStop() {
         for (code in listOf(DiagnosticCode.INPUT_LIMIT, DiagnosticCode.DEPTH_LIMIT, DiagnosticCode.ELEMENT_LIMIT, DiagnosticCode.PATH_LIMIT,
-            DiagnosticCode.NUMERIC_OVERFLOW, DiagnosticCode.CANCELLED, DiagnosticCode.ARCHIVE_READ_FAILED,
+            DiagnosticCode.ATTRIBUTE_LIMIT, DiagnosticCode.NUMERIC_OVERFLOW, DiagnosticCode.CANCELLED, DiagnosticCode.ARCHIVE_READ_FAILED,
             DiagnosticCode.ARCHIVE_ENTRY_LIMIT, DiagnosticCode.UNSUPPORTED_ENCODING, DiagnosticCode.UNSUPPORTED_NAMESPACE)) {
             val context = ParseContext(ParseOptions(ParsePolicy.TOLERANT))
             context.report(code, SourceLocation(), "Fatal failure")
@@ -246,6 +246,10 @@ class ParseContractTest {
         assertFailsWith<IllegalArgumentException> { ParseLimits(maxProvenanceEntries = -1) }
         assertFailsWith<IllegalArgumentException> { ParseLimits(maxSourcePathCharacters = 0) }
         assertFailsWith<IllegalArgumentException> { ParseLimits(maxSourcePathCharacters = -1) }
+        assertFailsWith<IllegalArgumentException> { ParseLimits(maxAttributesPerElement = 0) }
+        assertFailsWith<IllegalArgumentException> { ParseLimits(maxAttributesPerElement = -1) }
+        assertFailsWith<IllegalArgumentException> { ParseLimits(maxTotalAttributes = 0) }
+        assertFailsWith<IllegalArgumentException> { ParseLimits(maxTotalAttributes = -1) }
         assertFailsWith<IllegalArgumentException> { SourceLocation(line = 0) }
         assertFailsWith<IllegalArgumentException> { SourceLocation(column = 0) }
         assertFailsWith<IllegalArgumentException> { SourceLocation(measureIndex = -1) }

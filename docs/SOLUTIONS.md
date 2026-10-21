@@ -28,3 +28,17 @@ quadratically with nesting depth; limiting source bytes did not bound these deri
 before allocating each full path. Count expanded names, separators and sibling indices, never
 refund closed frames, and report fatal `PATH_LIMIT` using an already allocated parent path.
 Regression tests cover default-budget long names/namespaces, exact limits, Unicode and draining.
+
+## Small XML attributes amplify token and snapshot allocations (PR #26)
+
+**Symptom**: A root with thousands of tiny attributes remained under the byte limit and reached
+the consumer, allowing large dependency token buffers and per-attribute objects/sets/lists.
+
+**Cause**: Depth, element and path limits did not bound attribute count; checking after xmlutil
+read the token would still leave the dependency's own attribute materialization unbounded.
+
+**Fix**: Enforce `maxAttributesPerElement` and `maxTotalAttributes` in lexical preflight before
+reader creation, counting namespace declarations and XML declaration fields. Skip literal text
+and quoted equals. Report fatal `ATTRIBUTE_LIMIT` before the consumer runs, and repeat the
+per-element check before snapshot allocation. The wide-root regression failed before the fix;
+boundary, namespace/declaration and pre-reader entity-order regressions now cover the guard.

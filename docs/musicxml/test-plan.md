@@ -31,6 +31,8 @@ See [diagnostics.md](diagnostics.md) for the contract and target evidence.
 MX-05 adds original inline reader fixtures in `ScoreXmlReaderTest`: actual F22 wrong-root and
 malformed-syntax diagnostics, DTD/entity/encoding attacks, namespace expansion, source locations,
 ordered mixed content, exact/excess resource limits, cancellation and failure finalization.
+PR #26 regressions also exercise preflight attribute budgets (per element and cumulative), counting
+namespace/XML declaration fields and excluding literal or quoted equals before dependency reads.
 Missing part-list and illegal duration are explicitly accepted as well-formed at this layer;
 their schema/semantic rejection remains future work. These tests do not replace MX-04's independent
 corpus or offline XSD harness. See [reader policy and target evidence](xml-reader.md).

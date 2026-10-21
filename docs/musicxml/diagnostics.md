@@ -29,7 +29,7 @@ truncated score. Failure codes and their meaning are stable; message prose is no
 | `UNMATCHED_SPAN`, `INVALID_CURSOR_MOVE`, `INCONSISTENT_MEASURE_DURATION` | Error/failure | Warning/accepted candidate | Preserve unresolved facts where representable; describe any repair/discard explicitly; do not silently clamp a cursor |
 | `UNSUPPORTED_FEATURE` | Error/failure | Warning/accepted candidate | Include coverage feature ID, location and explicit retention outcome for each meaningful unmapped subtree/attribute |
 | `RECOVERED_VALUE` | Error/failure | Warning/accepted candidate | Message describes the actual repair; use unsupported-content records as well when meaningful source material is lost |
-| `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `PATH_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |
+| `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `PATH_LIMIT`, `ATTRIBUTE_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |
 | `CANCELLED`, `ARCHIVE_READ_FAILED`, `ARCHIVE_ENTRY_LIMIT` | Error/failure, stop | Error/failure, stop | Cancellation and detailed archive detection remain reader/archive adapter work |
 
 Semantic findings may be collected after strict rejection to provide useful ordered diagnostics;
@@ -72,6 +72,8 @@ but schema-valid `grouping` (S25) is the contract test example; there is no grou
 | Input bytes | 8,388,608 | MX-05 boundary before UTF-8 decoding/reader creation; caller supplies bytes |
 | XML depth | 128 | MX-05 cursor before event snapshots |
 | XML element count | 100,000 | MX-05 cursor before start-event snapshots |
+| Attributes per element/declaration | 256 | MX-05 preflight before reader creation; includes namespace declarations; fatal `ATTRIBUTE_LIMIT` |
+| Total attributes | 100,000 | MX-05 preflight across all tags, namespace declarations and XML declaration fields; fatal `ATTRIBUTE_LIMIT` |
 | Cumulative source path UTF-16 code units | 8,388,608 | MX-05 cursor before full-path concatenation; `PATH_LIMIT` reuses an existing parent location |
 | Diagnostics | 1,000 | Internal shared `ParseContext` |
 | Opaque retained source UTF-8 bytes | 65,536 total | Internal shared `ParseContext`; zero disables opaque retention |
