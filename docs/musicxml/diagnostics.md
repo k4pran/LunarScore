@@ -3,8 +3,9 @@
 Issue [#4](https://github.com/k4pran/LunarScore/issues/4) adds public common Kotlin types in
 `com.ryanjames.sheetmusic.musicxml`, in `:musicxml-parser`. It exposes `:sheetmusic-model` through
 an API dependency, without adding source/XML concerns to the neutral model. `ParseResult<Score>`
-is the intended score result. There is **no public score parse entry point or semantic importer yet**.
-MX-05 connects the internal [secure ordered reader](xml-reader.md) to this contract.
+is now returned by MX-06's public [partwise skeleton importer](partwise-import.md).
+MX-05 connects the internal [secure ordered reader](xml-reader.md) to this contract; MX-06 adds
+actual structural/reference and unsupported-content emission without changing the policy.
 MX-01's dependency probes keep their original API/tests. No XSD validation is claimed.
 The [4.0 XSD](https://www.w3.org/2021/06/musicxml40/listings/musicxml.xsd/) defines valid source
 structure; schema validity and supported musical interpretation remain separate questions.

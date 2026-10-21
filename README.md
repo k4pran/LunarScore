@@ -6,8 +6,9 @@ Multiplatform and the [Bravura](https://github.com/steinbergmedia/bravura) SMuFL
 ![C major scale rendered by the library](docs/example.png)
 
 **Milestone 1 (current):** a single treble-clef staff with whole, half and quarter notes, stems,
-ledger lines, barlines and a final barline. There is no parsing, playback, editing, beaming or system
-breaking yet.
+ledger lines, barlines and a final barline. A separate MusicXML importer now reads partwise headers
+and empty measure structures; musical event import, playback, editing, beaming and system breaking
+remain future work. See the [importer scope](docs/musicxml/partwise-import.md).
 
 ## Modules
 
@@ -17,7 +18,7 @@ breaking yet.
 | `sheetmusic-core` | Score model (`Score`, `Measure`, `Note`, …), SMuFL glyph metrics and the layout engine. Pure Kotlin with no Compose dependency. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser, Node.js), Wasm (browser, Node.js) |
 | `sheetmusic-compose` | The `SheetMusic` composable. It bundles the Bravura font. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser), Wasm (browser) |
 | `sample` | The example score as a desktop app and as a web page (JS and Wasm), with one shared screen | JVM desktop, JS, Wasm |
-| `musicxml-parser` | Public diagnostic/result/provenance contract, internal secure ordered XML reader and XML/ZIP dependency probes; no score import entry point yet. See [reader policy](docs/musicxml/xml-reader.md) and [diagnostic contract](docs/musicxml/diagnostics.md). | Android, JVM, iosArm64, iosSimulatorArm64 |
+| `musicxml-parser` | Public partwise score skeleton importer with metadata, ID/reference diagnostics and provenance; secure XML reader and XML/ZIP probes. See [importer scope](docs/musicxml/partwise-import.md) and [diagnostic contract](docs/musicxml/diagnostics.md). | Android, JVM, iosArm64, iosSimulatorArm64 |
 
 ## Using it from another KMP project
 

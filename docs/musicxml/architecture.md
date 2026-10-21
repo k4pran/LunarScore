@@ -1,7 +1,7 @@
 # MusicXML 4.0 importer architecture
 
 Status: design proposal, updated 2026-10-15. MX-01 adds an internal dependency spike;
-no semantic score importer has been implemented. See [dependency evidence](dependency-spike.md)
+MX-06 now adds a public [partwise skeleton importer](partwise-import.md). See [dependency evidence](dependency-spike.md)
 for selected APIs, pins, security limitations and target verification. The XML/ZIP choices below
 are superseded by that evidence where they differ.
 
@@ -20,7 +20,8 @@ Add `:musicxml-parser` depending on a new, format-neutral `:sheetmusic-model` mo
 The initial neutral vocabulary is implemented in `:sheetmusic-model`, package
 `com.ryanjames.sheetmusic.score`; see [model.md](model.md) for bounds, ID scopes,
 diagnostics and the renderer migration. The table below remains the broader target design:
-metadata, directions, presentation and other later feature domains are not yet implemented.
+MX-06 adds descriptive metadata; directions, presentation and other later feature domains remain
+unimplemented.
 `sheetmusic-core` now exposes the model through an API dependency and provides a lossless
 legacy-to-neutral adapter. XML/Compose dependencies are absent from the neutral module.
 
@@ -30,7 +31,8 @@ MX-03 implements the public [diagnostic/result/provenance contract](diagnostics.
 `:musicxml-parser`, with an internal collector for policy and diagnostic/retention/provenance
 budgets. Source concerns stay outside the neutral model. MX-05 implements the internal
 [secure ordered XML reader](xml-reader.md) using this contract. No public score parse entry point
-is exposed yet; semantic adapters remain future work.
+is exposed by MX-05 itself; MX-06 adds `parseMusicXml(ByteArray, options, sourceName, isCancelled)`
+for the partwise header/part/empty-measure subset. Musical event adapters remain future work.
 
 | Concept | Proposed representation |
 |---|---|

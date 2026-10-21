@@ -5,6 +5,7 @@ public data class Score(
     val parts: List<Part> = emptyList(),
     val relationships: List<Relationship> = emptyList(),
     val title: String? = null,
+    val metadata: List<MetadataEntry> = emptyList(),
 )
 
 /** Ordered measures and staff/instrument definitions; IDs are stable, not display names. */
@@ -14,6 +15,8 @@ public data class Part(
     val measures: List<Measure> = emptyList(),
     val name: String? = null,
     val instruments: List<Instrument> = emptyList(),
+    val abbreviation: String? = null,
+    val metadata: List<MetadataEntry.Text> = emptyList(),
 ) {
     init {
         require(id.isNotBlank())
