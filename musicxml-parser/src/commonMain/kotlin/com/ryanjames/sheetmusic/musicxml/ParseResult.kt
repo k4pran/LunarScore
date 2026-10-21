@@ -5,8 +5,9 @@ public enum class ParsePolicy { STRICT, TOLERANT }
 
 /**
  * Per-parse resource budgets. XML byte limits precede decoding; depth/element limits precede
- * event snapshots. Diagnostic count includes a terminal limit marker; zero retained bytes disables
- * opaque retention. Provenance count is independent of XML element count.
+ * event snapshots. Attribute counts are bounded before reader creation. Diagnostic count includes
+ * a terminal limit marker; zero retained bytes disables opaque retention. Provenance count is
+ * independent of XML element count.
  */
 public data class ParseLimits(
     val maxInputBytes: Int = 8_388_608,
@@ -17,11 +18,16 @@ public data class ParseLimits(
     val maxProvenanceEntries: Int = 100_000,
     /** Cumulative source path UTF-16 code units; checked before each full path is allocated. */
     val maxSourcePathCharacters: Int = 8_388_608,
+    /** Attributes per element or XML declaration, including namespace declarations; checked in preflight. */
+    val maxAttributesPerElement: Int = 256,
+    /** Attributes across the whole input, including namespace and XML declaration attributes. */
+    val maxTotalAttributes: Int = 100_000,
 ) {
     init {
         require(maxInputBytes > 0 && maxDepth > 0 && maxElements > 0 && maxDiagnostics > 0)
         require(maxRetainedSourceBytes >= 0 && maxProvenanceEntries >= 0)
         require(maxSourcePathCharacters > 0)
+        require(maxAttributesPerElement > 0 && maxTotalAttributes > 0)
     }
 }
 

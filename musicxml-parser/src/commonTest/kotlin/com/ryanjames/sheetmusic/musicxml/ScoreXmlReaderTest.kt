@@ -225,6 +225,98 @@ class ScoreXmlReaderTest {
     }
 
     @Test
+    fun testDefaultAttributeLimitRejectsWideStartTagBeforeConsumer() {
+        val attributes = (0 until 4096).joinToString("") { " a$it=''" }
+        val input = "<score-partwise$attributes/>".encodeToByteArray()
+        assertTrue(input.size < ParseLimits().maxInputBytes)
+        for (policy in ParsePolicy.entries) {
+            var consumed = false
+            val result = readScoreXml(input, ParseOptions(policy)) { consumed = true; Unit }
+            assertIs<ParseResult.Failure>(result)
+            assertEquals(DiagnosticCode.ATTRIBUTE_LIMIT, result.diagnostics.single().code)
+            assertTrue(!consumed)
+        }
+    }
+
+    @Test
+    fun testAttributeBudgetsExactBoundaryAndOverflow() {
+        val xml = "<score-partwise version='4.0'><note a = '1' b\n=\t\"2\"/></score-partwise>"
+        for (policy in ParsePolicy.entries) {
+            assertIs<ParseResult.Success<List<ScoreXmlEvent>>>(events(xml,
+                ParseOptions(policy, ParseLimits(maxAttributesPerElement = 2, maxTotalAttributes = 3))))
+            for (limits in listOf(
+                ParseLimits(maxAttributesPerElement = 1),
+                ParseLimits(maxTotalAttributes = 2),
+            )) {
+                val failure = assertFailure(DiagnosticCode.ATTRIBUTE_LIMIT, xml, ParseOptions(policy, limits))
+                // Preflight failures occur before the dependency can provide coordinates.
+                assertNull(failure.diagnostics.single().location.path)
+                assertNull(failure.diagnostics.single().location.line)
+            }
+        }
+    }
+
+    @Test
+    fun testNamespaceDeclarationsUseAttributeBudgets() {
+        val xml = "<score-partwise xmlns:e='urn:e' xmlns:f='urn:f'><e:note e:id='x' id='y'/></score-partwise>"
+        assertIs<ParseResult.Success<List<ScoreXmlEvent>>>(events(xml,
+            ParseOptions(limits = ParseLimits(maxAttributesPerElement = 2, maxTotalAttributes = 4))))
+        assertFailure(DiagnosticCode.ATTRIBUTE_LIMIT, xml, ParseOptions(limits = ParseLimits(maxAttributesPerElement = 1)))
+        assertFailure(DiagnosticCode.ATTRIBUTE_LIMIT, xml, ParseOptions(limits = ParseLimits(maxTotalAttributes = 3)))
+    }
+
+    @Test
+    fun testXmlDeclarationUsesAttributeBudgets() {
+        val xml = "<?xml version='1.0' encoding='UTF-8' standalone='yes'?><score-partwise version='4.0'/>"
+        assertIs<ParseResult.Success<List<ScoreXmlEvent>>>(events(xml,
+            ParseOptions(limits = ParseLimits(maxAttributesPerElement = 3, maxTotalAttributes = 4))))
+        assertFailure(DiagnosticCode.ATTRIBUTE_LIMIT, xml, ParseOptions(limits = ParseLimits(maxAttributesPerElement = 2)))
+        assertFailure(DiagnosticCode.ATTRIBUTE_LIMIT, xml, ParseOptions(limits = ParseLimits(maxTotalAttributes = 3)))
+    }
+
+    @Test
+    fun testAttributeLikeTextAndQuotedEqualsDoNotUseBudgets() {
+        val xml = """<?xml-stylesheet a='x' b="y"?><score-partwise value="= &#61; &#x3D; &quot;="><!-- a='x' b="y" --><words><![CDATA[<note a='x' b="y"/>]]>a='x' b="y"</words></score-partwise>"""
+        val result = events(xml, ParseOptions(limits = ParseLimits(maxAttributesPerElement = 1, maxTotalAttributes = 1)))
+        assertIs<ParseResult.Success<List<ScoreXmlEvent>>>(result)
+        assertTrue(result.diagnostics.isEmpty())
+    }
+
+    @Test
+    fun testDefaultTotalAttributeLimitRejectsManySmallTagsBeforeConsumer() {
+        val tag = "<note" + (0 until 100).joinToString("") { " a$it=''" } + "/>"
+        val input = ("<score-partwise>" + tag.repeat(1000) + "<note a=''/></score-partwise>").encodeToByteArray()
+        assertTrue(input.size < ParseLimits().maxInputBytes)
+        for (policy in ParsePolicy.entries) {
+            var consumed = false
+            val result = readScoreXml(input, ParseOptions(policy)) { consumed = true; Unit }
+            assertIs<ParseResult.Failure>(result)
+            assertEquals(DiagnosticCode.ATTRIBUTE_LIMIT, result.diagnostics.single().code)
+            assertTrue(!consumed)
+            assertNull(result.value)
+            assertTrue(result.provenance.isEmpty())
+        }
+    }
+
+    @Test
+    fun testAttributeLimitPrecedesDependencyEntityResolution() {
+        // If xmlutil read the token first, this would fail with MALFORMED_XML for the entity.
+        for (xml in listOf(
+            "<score-partwise a='&unknown;' b=''/>",
+            "<score-partwise><note a='&unknown;' b=''/></score-partwise>",
+            "<?xml version='1.0' a='&unknown;'?><score-partwise/>",
+        )) {
+            var consumed = false
+            val result = readScoreXml(xml.encodeToByteArray(), ParseOptions(limits = ParseLimits(maxAttributesPerElement = 1))) {
+                consumed = true
+                Unit
+            }
+            assertEquals(DiagnosticCode.ATTRIBUTE_LIMIT, assertIs<ParseResult.Failure>(result).diagnostics.single().code)
+            assertTrue(!consumed)
+        }
+    }
+
+    @Test
     fun testPathLimitDuringDrainRespectsDiagnosticCap() {
         val result = readScoreXml(
             "<score-partwise><note/></score-partwise>".encodeToByteArray(),

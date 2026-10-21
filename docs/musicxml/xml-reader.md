@@ -33,6 +33,16 @@ siblings whose frames have already closed; text/end events reuse their frame's p
 reports `PATH_LIMIT` at the nearest existing parent location without constructing the rejected
 path. This bounds retained path payload even for long nested names or reused namespace URIs.
 
+Attributes are bounded separately by `maxAttributesPerElement` (default 256) and
+`maxTotalAttributes` (default 100,000). Preflight counts unquoted assignment operators in markup
+before reader creation, including namespace declarations and XML declaration fields. Counts do
+not include quoted `=`, comments, CDATA, other processing instructions or ordinary text.
+Both budgets are positive and accept exact limits; the total never resets when tags close.
+The cursor also checks the per-element count before allocating snapshots and name sets.
+Excess yields fatal `ATTRIBUTE_LIMIT` under both policies; preflight locations have the source
+name but no fabricated reader coordinates. Because preflight covers the whole input, a late
+oversized tag rejects before the consumer runs or any dependency attribute token is materialized.
+
 After the consumer returns, the boundary drains the unread tail through the same guards. Only
 complete, accepted input produces `ParseResult.Success<T>`. Fatal syntax/security/resource
 findings stop consumption, discard the consumer value and all model provenance, and preserve
@@ -55,6 +65,7 @@ consumer exceptions propagate unchanged rather than becoming XML diagnostics.
 | Namespace-bearing score root | Fatal `UNSUPPORTED_NAMESPACE`; no compatibility namespace rewriting |
 | Depth or start-element count exceeds budget | Fatal `DEPTH_LIMIT` / `ELEMENT_LIMIT` before producing an event snapshot; exact limits accepted |
 | Cumulative source paths exceed `maxSourcePathCharacters` | Fatal `PATH_LIMIT` before concatenation; exact budget accepted; parent path reused for the failure location |
+| Per-element/declaration or cumulative attribute count exceeds its budget | Fatal `ATTRIBUTE_LIMIT` in preflight before xmlutil reads the input; includes namespace declarations and XML declaration fields |
 | Cancellation callback returns true | Fatal `CANCELLED` before decoding, during preflight or between reader events, including tail draining |
 
 Bytes are already materialized by the caller. The byte guard bounds subsequent decoding and
@@ -80,16 +91,19 @@ cases, exact/excess byte/depth/element/path budgets, deep/wide input, cancellati
 warning/error ordering, diagnostic caps and consumer exceptions.
 Path regressions cover long nested names/namespaces under all other default limits, UTF-16
 expanded-name accounting, multi-digit sibling indices, root overflow and diagnostic caps.
+Attribute regressions cover a wide root, many small tags, exact/excess per-element and cumulative
+limits, namespace and XML declaration fields, literal/quoted equals, and rejection before consumer
+invocation and dependency entity handling. The wide-root regression failed before the guard.
 
 F22 wrong-root and malformed-syntax variants now exercise the actual reader. Missing part-list
 and illegal duration remain well-formed at this layer: a test records that semantic/XSD detection
 is still pending. The independent MX-04 corpus and offline XSD harness are separate work.
 
-Windows verification on 2026-10-20:
+Windows verification on 2026-10-21:
 
 | Target/check | Result |
 |---|---|
-| JVM / Android host tests | 52 tests passed per target: 24 reader, 15 contract, 13 dependency probes |
+| JVM / Android host tests | 59 tests passed per target: 31 reader, 15 contract, 13 dependency probes |
 | Parser build / common metadata / Android AAR / JVM jar | Passed |
 | iosArm64 / iosSimulatorArm64 main and test klibs | Cross-compiled |
 | iOS linking/runtime | Skipped on Windows; macOS/Xcode required |

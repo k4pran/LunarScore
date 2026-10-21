@@ -66,9 +66,16 @@ internal fun <T : Any> readScoreXml(
     if (encoding != null && !encoding.equals("UTF-8", ignoreCase = true)) {
         return fail(DiagnosticCode.UNSUPPORTED_ENCODING, "Only UTF-8 declarations are supported")
     }
-    if (!passesXmlPreflight(xml, ::cancellationRequested)) {
-        return if (wasCancelled) fail(DiagnosticCode.CANCELLED, "XML reading cancelled")
-        else fail(DiagnosticCode.MALFORMED_XML, "Invalid XML character or character reference")
+    val preflightFailure = preflightXml(xml, options.limits, ::cancellationRequested)
+    if (preflightFailure != null) {
+        return fail(
+            preflightFailure,
+            when (preflightFailure) {
+                DiagnosticCode.CANCELLED -> "XML reading cancelled"
+                DiagnosticCode.ATTRIBUTE_LIMIT -> "XML per-element or total attribute limit exceeded"
+                else -> "Invalid XML character or lexical structure"
+            },
+        )
     }
     if (cancellationRequested()) return fail(DiagnosticCode.CANCELLED, "XML reading cancelled")
 
@@ -208,6 +215,11 @@ internal class ScoreXmlReader(
         if (stack.size >= limits.maxDepth) return stop(DiagnosticCode.DEPTH_LIMIT, startLocation, "XML depth limit exceeded")
         if (elements >= limits.maxElements) return stop(DiagnosticCode.ELEMENT_LIMIT, startLocation, "XML element limit exceeded")
         elements++
+        // Preflight bounds the dependency's token allocation; repeat the per-element check here
+        // before building attribute snapshots or namespace/expanded-name sets.
+        if (reader.attributeCount.toLong() + reader.namespaceDecls.size > limits.maxAttributesPerElement) {
+            return stop(DiagnosticCode.ATTRIBUTE_LIMIT, startLocation, "XML per-element attribute limit exceeded")
+        }
         val declaredPrefixes = mutableSetOf<String>()
         for (namespace in reader.namespaceDecls) {
             if (!declaredPrefixes.add(namespace.prefix) || namespace.prefix == "xmlns" ||
@@ -304,26 +316,31 @@ internal class ScoreXmlReader(
 
 /**
  * xmlutil 1.0.2 does not reject every XML 1.0 character and may overflow numeric references.
- * Validate scalars and lexical gaps before it sees them. References in comments/CDATA/PIs are literal.
+ * Validate scalars/lexical gaps and bound attributes before it sees them. References in
+ * comments/CDATA/PIs are literal. Namespace/declaration attributes count toward the same budgets.
  * This is a linear preflight over bounded input, not a replacement XML grammar parser.
  */
-private fun passesXmlPreflight(xml: String, isCancelled: () -> Boolean): Boolean {
+private fun preflightXml(xml: String, limits: ParseLimits, isCancelled: () -> Boolean): DiagnosticCode? {
     for (index in xml.indices) {
-        if (index % 4096 == 0 && isCancelled()) return false
+        if (index % 4096 == 0 && isCancelled()) return DiagnosticCode.CANCELLED
         val character = xml[index]
-        if ((character.code < 0x20 && character !in "\t\r\n") || character == '\uFFFE' || character == '\uFFFF') return false
+        if ((character.code < 0x20 && character !in "\t\r\n") || character == '\uFFFE' || character == '\uFFFF') {
+            return DiagnosticCode.MALFORMED_XML
+        }
     }
     var index = 0
     var inTag = false
     var quote: Char? = null
+    var attributesInTag = 0
+    var totalAttributes = 0
     while (index < xml.length) {
-        if (isCancelled()) return false
+        if (isCancelled()) return DiagnosticCode.CANCELLED
         val character = xml[index]
         if (quote != null) {
-            if (character == '<') return false
+            if (character == '<') return DiagnosticCode.MALFORMED_XML
             if (character == quote) {
                 quote = null
-                if (index + 1 < xml.length && xml[index + 1] !in " \t\r\n/>?") return false
+                if (index + 1 < xml.length && xml[index + 1] !in " \t\r\n/>?") return DiagnosticCode.MALFORMED_XML
                 index++
                 continue
             }
@@ -343,8 +360,8 @@ private fun passesXmlPreflight(xml: String, isCancelled: () -> Boolean): Boolean
                 else -> 2
             }
             val end = xml.indexOf(terminator, contentStart)
-            if (end < 0) return false
-            if (terminator == "-->" && xml.indexOf("--", contentStart) != end) return false
+            if (end < 0) return DiagnosticCode.MALFORMED_XML
+            if (terminator == "-->" && xml.indexOf("--", contentStart) != end) return DiagnosticCode.MALFORMED_XML
             index = end + terminator.length
         } else if (xml.startsWith("&#", index)) {
             index += 2
@@ -357,34 +374,45 @@ private fun passesXmlPreflight(xml: String, isCancelled: () -> Boolean): Boolean
             val start = index
             var codePoint = 0
             while (index < xml.length && xml[index] != ';') {
-                if (index % 4096 == 0 && isCancelled()) return false
+                if (index % 4096 == 0 && isCancelled()) return DiagnosticCode.CANCELLED
                 val digitCharacter = xml[index]
                 if (digitCharacter !in '0'..'9' &&
                     !(radix == 16 && (digitCharacter in 'a'..'f' || digitCharacter in 'A'..'F'))
-                ) return false
+                ) return DiagnosticCode.MALFORMED_XML
                 val digit = digitCharacter.digitToInt(radix)
-                if (codePoint > (0x10FFFF - digit) / radix) return false
+                if (codePoint > (0x10FFFF - digit) / radix) return DiagnosticCode.MALFORMED_XML
                 codePoint = codePoint * radix + digit
                 index++
             }
-            if (index == start || index == xml.length || !isXml10CodePoint(codePoint)) return false
+            if (index == start || index == xml.length || !isXml10CodePoint(codePoint)) return DiagnosticCode.MALFORMED_XML
             index++
         } else {
             if (quote == null) {
                 when {
                     character == '<' -> {
-                        if (inTag) return false
+                        if (inTag) return DiagnosticCode.MALFORMED_XML
                         inTag = true
+                        attributesInTag = 0
                     }
                     character == '>' -> inTag = false
                     inTag && (character == '\'' || character == '"') -> quote = character
-                    !inTag && xml.startsWith("]]>", index) -> return false
+                    inTag && character == '=' -> {
+                        // In well-formed markup each unquoted '=' starts one attribute value.
+                        // Count namespace and declaration attributes too, without allocating
+                        // names/values or invoking xmlutil. Check before increment to avoid overflow.
+                        if (attributesInTag >= limits.maxAttributesPerElement || totalAttributes >= limits.maxTotalAttributes) {
+                            return DiagnosticCode.ATTRIBUTE_LIMIT
+                        }
+                        attributesInTag++
+                        totalAttributes++
+                    }
+                    !inTag && xml.startsWith("]]>", index) -> return DiagnosticCode.MALFORMED_XML
                 }
             }
             index++
         }
     }
-    return true
+    return null
 }
 
 private fun isXml10CodePoint(codePoint: Int): Boolean =
