@@ -9,6 +9,9 @@ does not depend on that module.
 
 ## Data and units
 
+- MX-06 adds ordered `MetadataEntry.Text` fields and grouped `MetadataEntry.Credit` values to
+  `Score.metadata`, plus `Part.metadata` identification text and `Part.abbreviation`. These semantic
+  types have no XML/source dependency. See [partwise mapping and limitations](partwise-import.md).
 - `Score` contains ordered `Part`s, each with staff/instrument definitions and ordered `Measure`s.
   Empty scores and measures are allowed. Measure IDs differ from printed measure numbers;
   pickups and nonnumeric/repeated display numbers are legal.

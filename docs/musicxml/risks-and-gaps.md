@@ -118,6 +118,30 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-06 partwise skeleton decisions and remaining gaps
+
+The public [partwise skeleton importer](partwise-import.md) now parses metadata and ordered
+part/measure structures. This supersedes earlier statements that no semantic importer exists.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Missing/blank/duplicate declaration/body IDs, unknown references, declared parts without bodies | Fatal `INVALID_STRUCTURE` in both policies; no repair, score or provenance; F02 variants | Full XSD ID lexical/document-wide optional-ID validation remains deferred |
+| Body order differs from part-list order; repeated measure numbers | Part-list defines neutral part order, body references retain the correct measures; generated part-local measure IDs and source indices disambiguate numbers | Cross-part temporal alignment and staff state remain MX-08/MX-09 |
+| Missing/duplicate part-list, missing part-name/measure number, duplicate header fields | Fatal `INVALID_STRUCTURE`; actual missing-part-list F22 semantic detection now exists | Complete nested ordering/cardinality and XSD validation remain separate work |
+| Zero-measure bodies | Accepted neutral empty parts; explicit test and documentation | Not an XSD-conformance claim |
+| Invalid measure implicit flag or nonpositive/out-of-Int credit page | Fatal `INVALID_VALUE` | General schema value validation remains separate work |
+| Timewise root through public score API | Fatal `UNSUPPORTED_ROOT` in both policies; reader recognition remains intact | MX-10 normalization |
+| Credit images/symbols, text typography/language, encoding supports and unknown header content | S03 `UNSUPPORTED_FEATURE` / `DISCARDED`; plain supported text still retained; strict rejects, tolerant warns | Rich credit/layout and encoding capability semantics remain unimplemented |
+| Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations | Layout MX-18; source IDs/display text/multimetric measure semantics need explicit model mappings |
+| Part groups, part links, grouping, links/bookmarks | S25 discarded-content findings; actual grouping/link importer tests; no targets fetched | Group/editorial/link semantics and full F27 remain pending |
+| Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
+| Foreign subtrees or namespaced attributes resemble supported names | Expanded-name lookup prevents aliasing; `foreign-extension` subtree or owner-group attribute finding | No namespace rewriting or extension semantics |
+| Work/identification/encoding source containers | Flattened ordered semantic text metadata; credits remain grouped; source sidecar retains original leaf locations | No source-container round-trip, empty-container preservation or formatting promise |
+| F02 and implementation-authored variants | 18 common semantic tests on JVM/Android host; iOS cross-compiles | Independent MX-04 fixtures/XSD validation and macOS runtime evidence still required |
+
+All new unsupported paths use the shared policy, diagnostics cap and source/provenance limits.
+No opaque capture is introduced. See [target results and exact scope](partwise-import.md).
+
 ## MX-00 audit findings and diagnostic obligations
 
 Evidence is in the pinned method links in [reference-analysis.md](reference-analysis.md); the [element inventory](element-inventory.md) and S22–S27 cover newly enumerated groups. **There is no importer yet.** MX-03 now supplies the [diagnostic API](diagnostics.md); the historical proposed outcomes below remain feature-owner obligations, not runtime handling. Source fixture references are planned. Unsupported content must not be silently accepted just because its parent element is recognized.
