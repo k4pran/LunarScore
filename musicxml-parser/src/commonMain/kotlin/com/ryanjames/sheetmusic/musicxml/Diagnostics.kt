@@ -48,6 +48,8 @@ public enum class DiagnosticCode {
     RETENTION_LIMIT,
     /** Model-to-source mapping budget exceeded. */
     PROVENANCE_LIMIT,
+    /** Declared staff budget exceeded. */
+    STAFF_LIMIT,
     /** The caller cancelled parsing. */
     CANCELLED,
     /** An archive could not be read safely. */

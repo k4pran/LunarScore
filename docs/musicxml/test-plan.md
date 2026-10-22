@@ -58,11 +58,11 @@ printed accidentals untouched, invalid values and staff-scoped/unsupported attri
 `AttributeStateTest` checks the model resolver directly. These are implementation-authored and
 not XSD-validated. See [attribute state](attribute-state.md).
 
-MX-09 adds original F05, F06 and F08 XML in `PolyphonyFixtures.kt` and 10 `PolyphonyImportTest`
+MX-09 adds original F05, F06 and F08 XML in `PolyphonyFixtures.kt` and 11 `PolyphonyImportTest`
 assertions for backup/forward onsets and voice gaps, chord tones with shorter, equal, longer and
 cross-staff durations, two parts with a two-staff piano, backup before zero under both policies,
-invalid cursor moves and staff numbers beyond the declared staves. These are implementation-authored
-and not XSD-validated. See [polyphony](polyphony.md).
+invalid cursor moves, staff numbers beyond the declared staves and the declared staff limit. These
+are implementation-authored and not XSD-validated. See [polyphony](polyphony.md).
 
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.
