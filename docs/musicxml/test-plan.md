@@ -51,6 +51,13 @@ accidental, zero/negative/malformed/overflow durations, missing structure, unsup
 and cursor-move discarding. These are implementation-authored, not the independent MX-04 corpus,
 and have not been XSD-validated. See [note/rest scope](note-import.md).
 
+MX-08 adds original F07 XML in `AttributeFixtures.kt` and 7 `AttributeImportTest` assertions for
+key/time/clef/staff-line changes at exact offsets (including mid-measure and end-of-measure),
+effective state per event, missing state left unknown, key changes that leave written alter and
+printed accidentals untouched, invalid values and staff-scoped/unsupported attribute content.
+`AttributeStateTest` checks the model resolver directly. These are implementation-authored and
+not XSD-validated. See [attribute state](attribute-state.md).
+
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.
 3. Compare exact musical semantics using reduced rational values; compare presentation fields only where the fixture calls for them.

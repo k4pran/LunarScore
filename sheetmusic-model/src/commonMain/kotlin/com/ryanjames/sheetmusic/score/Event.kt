@@ -76,8 +76,24 @@ public sealed interface Attribute {
         }
     }
 
-    /** Clef sign and staff line counted from the bottom; octaveChange is in octaves. */
-    public data class Clef(val sign: ClefSign, val line: Int, val octaveChange: Int = 0) : Attribute
+    /**
+     * Clef sign and staff line counted from the bottom; octaveChange is in octaves. A null [line]
+     * means no line was given for a sign without a standard line (for example percussion).
+     */
+    public data class Clef(val sign: ClefSign, val line: Int?, val octaveChange: Int = 0) : Attribute
+
+    /**
+     * A traditional key signature: [fifths] counts sharps (positive) or flats (negative) around the
+     * circle of fifths. A null [mode] is unspecified. Keys never change a note's written alter.
+     */
+    public data class KeySignature(val fifths: Int, val mode: KeyMode? = null) : Attribute
+
+    /** Number of staff lines in effect; zero is legal. */
+    public data class StaffLines(val count: Int) : Attribute {
+        init {
+            require(count >= 0)
+        }
+    }
 
     /** Written-to-sounding displacement effective on this staff. */
     public data class Transpose(val transposition: Transposition) : Attribute
@@ -87,7 +103,10 @@ public sealed interface Attribute {
 }
 
 /** Conventional and non-pitched clef signs. */
-public enum class ClefSign { G, F, C, PERCUSSION, TAB, NONE }
+public enum class ClefSign { G, F, C, PERCUSSION, TAB, JIANPU, NONE }
+
+/** Key modes named by MusicXML 4.0; [NONE] means explicitly modeless. */
+public enum class KeyMode { MAJOR, MINOR, DORIAN, PHRYGIAN, LYDIAN, MIXOLYDIAN, AEOLIAN, IONIAN, LOCRIAN, NONE }
 
 private fun validateEvent(id: String, onset: Rational, staff: Int) {
     require(id.isNotBlank())

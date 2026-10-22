@@ -186,17 +186,18 @@ class NoteImportTest {
     }
 
     @Test
-    fun testUnsupportedAttributesAndTimeFormsAreDiscarded() {
+    fun testUnsupportedTimeFormsAreDiscarded() {
         val xml = document(
             "<attributes><key><fifths>0</fifths></key><time symbol='common'><beats>4</beats><beat-type>4</beat-type></time>" +
                 "<time><beats>3+2</beats><beat-type>8</beat-type></time><time><senza-misura/></time>" +
                 "<clef><sign>G</sign><line>2</line></clef></attributes><note><rest/><duration>1</duration></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S07", "S07", "S07", "S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S07", "S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
         val events = events(result)
-        assertEquals(Attribute.TimeSignature(4, 4), assertIs<AttributeEvent>(events[0]).attribute)
-        assertIs<RestEvent>(events[1])
+        assertEquals(Attribute.TimeSignature(4, 4), assertIs<AttributeEvent>(events[1]).attribute)
+        assertEquals(4, events.size)
+        assertIs<RestEvent>(events[3])
     }
 
     @Test
@@ -219,7 +220,7 @@ class NoteImportTest {
                 "<time number='1'><beats>2</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>1</duration></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S07"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S08"), result.diagnostics.map { it.unsupported?.featureId })
         val events = events(result)
         assertEquals(2, events.size)
         assertEquals(Attribute.TimeSignature(2, 4), assertIs<AttributeEvent>(events[0]).attribute)
