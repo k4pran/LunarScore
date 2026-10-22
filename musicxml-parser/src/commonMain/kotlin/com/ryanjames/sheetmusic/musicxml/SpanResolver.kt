@@ -79,6 +79,11 @@ internal class SpanResolver(
         }
     }
 
+    /** Records a span whose endpoints are already paired, such as a tuplet on a single note. */
+    fun pair(start: SpanEndpoint, end: SpanEndpoint) {
+        spans += PendingSpan(start.kind, start = start, end = end)
+    }
+
     /** Checks a mid-span point such as a slur `continue`; it is not an endpoint. */
     fun continuePoint(endpoint: SpanEndpoint) {
         if (openStarts[endpoint.spanKey()].isNullOrEmpty()) {

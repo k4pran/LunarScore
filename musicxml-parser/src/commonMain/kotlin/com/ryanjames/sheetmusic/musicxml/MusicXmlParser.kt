@@ -739,7 +739,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /**
      * Passes an event's span marks to the part's resolver: stops (and the stop half of a tied
      * `continue`) first, then slur continue points, then starts, so a span can end and another
-     * begin on one note. Ties pair by written pitch; a tie on a rest is discarded. Slurs and
+     * begin on one note. A tuplet that starts and then stops on one note in document order is
+     * paired on that note. Ties pair by written pitch; a tie on a rest is discarded. Slurs and
      * tuplets pair by number and may start or stop on a rest.
      */
     private fun registerSpans(event: Event, marks: List<SpanMark>, measure: Int) {
@@ -761,12 +762,37 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             mark to SpanEndpoint(mark.kind, key, event.id, voice, SpanPosition(measure, event.onset), mark.location)
         }
         val resolver = body.spans
+        val paired = pairSameNoteTuplets(endpoints)
+        val remaining = endpoints.filterNot { (mark, _) -> mark in paired }
         fun splitsContinue(mark: SpanMark) = mark.type == SpanType.CONTINUE && mark.kind != RelationshipKind.SLUR
-        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.STOP || splitsContinue(mark)) resolver.stop(endpoint) }
-        endpoints.forEach { (mark, endpoint) ->
+        remaining.forEach { (mark, endpoint) -> if (mark.type == SpanType.STOP || splitsContinue(mark)) resolver.stop(endpoint) }
+        remaining.forEach { (mark, endpoint) ->
             if (mark.type == SpanType.CONTINUE && mark.kind == RelationshipKind.SLUR) resolver.continuePoint(endpoint)
         }
-        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.START || splitsContinue(mark)) resolver.start(endpoint) }
+        remaining.forEach { (mark, endpoint) -> if (mark.type == SpanType.START || splitsContinue(mark)) resolver.start(endpoint) }
+    }
+
+    /**
+     * Pairs each tuplet stop with a start of the same number earlier on the same note, in document
+     * order, since MusicXML orders same-tag elements on one note that way. Such a pair is a
+     * one-note tuplet rather than the stop of an earlier tuplet. Returns the paired marks.
+     */
+    private fun pairSameNoteTuplets(endpoints: List<Pair<SpanMark, SpanEndpoint>>): Set<SpanMark> {
+        val openStarts = mutableMapOf<String, Pair<SpanMark, SpanEndpoint>>()
+        val paired = mutableSetOf<SpanMark>()
+        endpoints.filter { (mark, _) -> mark.kind == RelationshipKind.TUPLET }.forEach { endpoint ->
+            val (mark, end) = endpoint
+            when (mark.type) {
+                SpanType.START -> openStarts[mark.number] = endpoint
+                SpanType.STOP -> openStarts.remove(mark.number)?.let { (startMark, start) ->
+                    body.spans.pair(start, end)
+                    paired += startMark
+                    paired += mark
+                }
+                else -> Unit
+            }
+        }
+        return paired
     }
 
     /** A sound `tie`; one restricted by `time-only` to some repeat passes is discarded. */

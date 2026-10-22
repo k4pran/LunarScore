@@ -117,6 +117,26 @@ class TupletImportTest {
     }
 
     @Test
+    fun testTupletStartAndStopOnOneNoteFollowDocumentOrder() {
+        val result = success(
+            document(
+                note("C", "<tuplet type='start'/>") +
+                    note("D", "<tuplet type='stop'/><tuplet type='start'/>") +
+                    note("E", "<tuplet type='start' number='2'/><tuplet type='stop' number='2'/><tuplet type='stop'/>"),
+            ),
+        )
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(
+            listOf(
+                Relationship("P1:tuplet-1", RelationshipKind.TUPLET, event(1), event(2)),
+                Relationship("P1:tuplet-2", RelationshipKind.TUPLET, event(2), event(3)),
+                Relationship("P1:tuplet-3", RelationshipKind.TUPLET, event(3), event(3)),
+            ).sortedBy { it.id },
+            result.value.relationships.sortedBy { it.id },
+        )
+    }
+
+    @Test
     fun testInvalidBeamStemTupletAndTimeModificationValuesAreFatal() {
         for (policy in ParsePolicy.entries) {
             val options = ParseOptions(policy)
