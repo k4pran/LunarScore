@@ -15,6 +15,9 @@ Comments and processing instructions are ignored without following links or exec
 Expanded element/attribute names preserve namespace URI and local name. Default namespaces do
 not apply to unqualified attributes. Foreign children reach semantic adapters as distinct names,
 never as same-named MusicXML elements; adapters must diagnose meaningful unsupported content.
+The wrapper explicitly rejects empty URI bindings for nonempty prefixes with `MALFORMED_XML`,
+including unused declarations and nested rebinding. Empty default namespace resets (`xmlns=""`)
+remain valid. These rules follow [Namespaces in XML 1.0](https://www.w3.org/TR/REC-xml-names/#nsc-NoPrefixUndecl).
 
 No document-sized event list or DOM is built. The cursor stores the open-element stack and
 sibling counters, bounded by depth/element budgets. Each snapshot survives advancement. Paths
@@ -94,16 +97,20 @@ expanded-name accounting, multi-digit sibling indices, root overflow and diagnos
 Attribute regressions cover a wide root, many small tags, exact/excess per-element and cumulative
 limits, namespace and XML declaration fields, literal/quoted equals, and rejection before consumer
 invocation and dependency entity handling. The wide-root regression failed before the guard.
+Empty namespace URI regressions cover both roots, child elements, attributes, unused declarations
+and nested rebinding under both policies; positive fixtures verify default namespace reset and
+scope restoration. These already passed with xmlutil 1.0.2 before the explicit wrapper check;
+the review's claimed input-acceptance bypass was not reproduced.
 
 F22 wrong-root and malformed-syntax variants now exercise the actual reader. Missing part-list
 and illegal duration remain well-formed at this layer: a test records that semantic/XSD detection
 is still pending. The independent MX-04 corpus and offline XSD harness are separate work.
 
-Windows verification on 2026-10-21:
+Windows verification on 2026-10-22:
 
 | Target/check | Result |
 |---|---|
-| JVM / Android host tests | 59 tests passed per target: 31 reader, 15 contract, 13 dependency probes |
+| JVM / Android host tests | 61 tests passed per target: 33 reader, 15 contract, 13 dependency probes |
 | Parser build / common metadata / Android AAR / JVM jar | Passed |
 | iosArm64 / iosSimulatorArm64 main and test klibs | Cross-compiled |
 | iOS linking/runtime | Skipped on Windows; macOS/Xcode required |

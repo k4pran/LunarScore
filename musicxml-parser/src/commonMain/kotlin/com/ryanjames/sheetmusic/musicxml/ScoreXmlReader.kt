@@ -223,6 +223,7 @@ internal class ScoreXmlReader(
         val declaredPrefixes = mutableSetOf<String>()
         for (namespace in reader.namespaceDecls) {
             if (!declaredPrefixes.add(namespace.prefix) || namespace.prefix == "xmlns" ||
+                (namespace.prefix.isNotEmpty() && namespace.namespaceURI.isEmpty()) ||
                 (namespace.prefix == "xml") != (namespace.namespaceURI == "http://www.w3.org/XML/1998/namespace") ||
                 namespace.namespaceURI == "http://www.w3.org/2000/xmlns/"
             ) {
