@@ -67,6 +67,28 @@ public data class AttributeEvent(
     }
 }
 
+/**
+ * A direction such as words, a dynamic, a metronome mark or a hairpin endpoint at an exact
+ * measure-local [onset] on one staff. [marks] are the printed components in source order; [sound]
+ * holds separate playback semantics and [display] presentation only. A direction may have no
+ * printed marks when it only carries sound. [voice] is null when the direction applies to all voices.
+ */
+public data class DirectionEvent(
+    override val id: String,
+    override val onset: Rational,
+    val marks: List<DirectionMark>,
+    override val staff: Int = 1,
+    val voice: String? = null,
+    val sound: DirectionSound? = null,
+    val display: DirectionDisplay = DirectionDisplay(),
+) : Event {
+    init {
+        validateEvent(id, onset, staff)
+        require(voice == null || voice.isNotBlank())
+        require(marks.isNotEmpty() || sound != null)
+    }
+}
+
 /** Initial neutral state vocabulary; additional domains can be added without XML/UI types. */
 public sealed interface Attribute {
     /** A simple meter; additive/interchangeable meters remain future model work. */

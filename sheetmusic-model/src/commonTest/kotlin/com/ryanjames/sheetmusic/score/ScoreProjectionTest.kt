@@ -156,6 +156,28 @@ class ScoreProjectionTest {
         }
     }
 
+    @Test
+    fun testDirectionsKeepSoundAndDisplaySeparately() {
+        val crescendo = DirectionEvent("d1", Rational.ZERO, listOf(DirectionMark.Wedge(WedgeType.CRESCENDO)))
+        val stop = DirectionEvent(
+            "d2",
+            Rational.of(2),
+            listOf(DirectionMark.Wedge(WedgeType.STOP), Dynamics(listOf("f"))),
+            sound = DirectionSound(dynamics = Rational.of(106)),
+            display = DirectionDisplay(Placement.BELOW, offset = Rational.of(-1, 2)),
+        )
+        val tempoOnly = DirectionEvent("d3", Rational.ZERO, emptyList(), sound = DirectionSound(tempo = Rational.of(120)))
+        val score = score(Measure("m1", "1", Rational.of(2), listOf(crescendo, stop, tempoOnly)))
+            .copy(relationships = listOf(Relationship("w1", RelationshipKind.WEDGE, "d1", "d2")))
+        assertTrue(score.validate().isEmpty())
+        assertEquals(Rational.ZERO, stop.sound?.offset)
+        assertFailsWith<IllegalArgumentException> { DirectionEvent("d", Rational.ZERO, emptyList()) }
+        assertFailsWith<IllegalArgumentException> { DirectionEvent("d", Rational.ZERO, listOf(DirectionMark.Words("a")), voice = " ") }
+        assertFailsWith<IllegalArgumentException> { Dynamics(emptyList()) }
+        assertFailsWith<IllegalArgumentException> { DirectionSound(tempo = Rational.of(-1)) }
+        assertFailsWith<IllegalArgumentException> { DirectionMark.Metronome(NoteValue.QUARTER, "60", beatUnitDots = -1) }
+    }
+
     private fun score(vararg measures: Measure): Score = Score(listOf(Part("P1", listOf(Staff(1)), measures.toList())))
 
     private fun note(
