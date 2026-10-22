@@ -209,8 +209,12 @@ class NoteImportTest {
         assertEquals(Rational.of(Int.MAX_VALUE), parseDecimal("0002147483647.000"))
         assertEquals(Rational.of(Int.MIN_VALUE), parseDecimal("-2147483648"))
         assertEquals(Rational.of(Int.MIN_VALUE), parseDecimal("-0002147483648.000"))
+        assertEquals(Rational.of(1, 9_765_625), parseDecimal("0.0000001024"))
+        assertEquals(Rational.of(-1, 1 shl 30), parseDecimal("-0.000000000931322574615478515625"))
+        assertEquals(Rational.of(Int.MAX_VALUE, 2), parseDecimal("1073741823.5"))
         listOf("", ".", "-", "1e3", "1,5", "0x10", "1 2").forEach { assertNull(parseDecimal(it), it) }
-        listOf("2147483648", "-2147483649", "-2147483648.5", "0.0000000001", "12345678901").forEach {
+        listOf("2147483648", "-2147483649", "-2147483648.5", "0.0000000001", "12345678901", "2147483647.5",
+            "0.0000000004656612873077392578125", "0.00000000000001",).forEach {
             assertEquals(RationalError.OVERFLOW, assertFailsWith<RationalException> { parseDecimal(it) }.code)
         }
     }
