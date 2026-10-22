@@ -56,6 +56,7 @@ All of these are `UNSUPPORTED_FEATURE` with `DISCARDED` retention: strict reject
 | `instrument`; `footnote`/`level`; `play`/`listen` | S16; S25; S26 | Child discarded |
 | `notehead`, rest display-step/octave, dot attributes | S17 | Child/attribute discarded |
 | Note attributes (`default-x`, `dynamics`, `print-object`, …), unknown note children | S04 | Discarded |
+| `time` with `number` other than 1 | S07 | Whole time signature discarded so a meter scoped to another staff is never applied to staff 1; a non-positive `number` is `INVALID_VALUE` |
 | `key`, `clef`, `staves` and other attributes children; time attributes (`symbol`, …); additive, multiple, interchangeable or `senza-misura` time | S07 | Discarded (a simple time with an unmapped attribute still yields its signature) |
 
 Measure fullness against the time signature is not checked. Key, clef, staff details and

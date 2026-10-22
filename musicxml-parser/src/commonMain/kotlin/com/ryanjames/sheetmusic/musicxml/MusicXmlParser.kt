@@ -349,9 +349,24 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         }
     }
 
-    /** Interprets one simple beats/beat-type pair; other time forms are reported as discarded. */
+    /**
+     * Interprets one simple beats/beat-type pair for staff 1; other time forms, and meters scoped
+     * by `number` to another staff, are reported as discarded.
+     */
     private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
-        attributes(start, feature = "S07")
+        attributes(start, setOf("number"), "S07")
+        var otherStaff = false
+        start.attribute("number")?.let { number ->
+            when (val staff = positiveInt(number)) {
+                null -> context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"),
+                    "Time number must be a positive Int")
+                1 -> Unit
+                else -> {
+                    unsupported(start.location, "S07", "Time signature for staff $staff is not interpreted; time discarded")
+                    otherStaff = true
+                }
+            }
+        }
         val beats = mutableListOf<String>()
         val beatTypes = mutableListOf<String>()
         var simple = true
@@ -365,7 +380,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 }
             }
         }
-        if (!context.canContinue) return null
+        if (!context.canContinue || otherStaff) return null
         val beatCount = beats.singleOrNull()?.let(::positiveInt)
         val beatUnit = beatTypes.singleOrNull()?.let(::positiveInt)
         if (!simple || beatCount == null || beatUnit == null) {
