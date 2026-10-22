@@ -1,17 +1,33 @@
 package com.ryanjames.sheetmusic.musicxml
 
+import com.ryanjames.sheetmusic.score.Accidental
+import com.ryanjames.sheetmusic.score.Attribute
+import com.ryanjames.sheetmusic.score.AttributeEvent
+import com.ryanjames.sheetmusic.score.Event
 import com.ryanjames.sheetmusic.score.Measure
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
+import com.ryanjames.sheetmusic.score.NotatedValue
+import com.ryanjames.sheetmusic.score.NoteEvent
+import com.ryanjames.sheetmusic.score.NotePitch
+import com.ryanjames.sheetmusic.score.NoteRole
+import com.ryanjames.sheetmusic.score.NoteValue
 import com.ryanjames.sheetmusic.score.Part
 import com.ryanjames.sheetmusic.score.Rational
+import com.ryanjames.sheetmusic.score.RationalError
+import com.ryanjames.sheetmusic.score.RationalException
+import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
+import com.ryanjames.sheetmusic.score.Staff
+import com.ryanjames.sheetmusic.score.Step
+import com.ryanjames.sheetmusic.score.WrittenPitch
 
 /**
- * Imports a UTF-8 partwise score skeleton with ordered metadata, parts and measures.
- * Musical events and staff state are not implemented yet: meaningful unmapped content rejects
- * strict parsing, or is discarded with warnings under tolerant policy. Measures then have zero
- * extent and no events; parts have no staff definitions. This is not an XSD validator.
+ * Imports a UTF-8 partwise score with ordered metadata, parts and measures, plus one sequential
+ * voice of pitched notes and rests on staff 1 with exact onsets and durations from divisions,
+ * and simple time signatures. Other musical content is not implemented yet: meaningful unmapped
+ * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
+ * events define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
  * limits and cooperative [isCancelled] checks are shared with the ordered XML reader.
  */
@@ -30,6 +46,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     private val definitions = linkedMapOf<String, PartDefinition>()
     private val bodies = mutableMapOf<String, List<Measure>>()
     private var declaredPartId: String? = null
+    private var divisions: Rational? = null
 
     fun parse(): Score {
         val root = checkNotNull(reader.current)
@@ -89,10 +106,11 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         }
         return Score(
             parts = definitions.values.map { definition ->
+                val measures = bodies[definition.id].orEmpty().toList()
                 Part(
                     id = definition.id,
-                    staves = emptyList(),
-                    measures = bodies[definition.id].orEmpty().toList(),
+                    staves = if (measures.any { it.events.isNotEmpty() }) listOf(Staff(1)) else emptyList(),
+                    measures = measures,
                     name = definition.name,
                     abbreviation = definition.abbreviation,
                     metadata = definition.metadata.toList(),
@@ -252,6 +270,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         val path = "parts[${definition.index}]"
         val measures = mutableListOf<Measure>()
         bodies[id] = measures
+        divisions = null
         provenance(path, start)
         children { event ->
             if (event.localName() == "measure") {
@@ -269,13 +288,284 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                     }
                 }
                 attributes(event, setOf("number", "implicit"), "S01")
-                provenance("$path.measures[${measures.size}]", event)
-                measures += Measure("measure-${measures.size + 1}", number, Rational.ZERO, implicit = implicit)
-                children(::unsupportedTree)
+                val measurePath = "$path.measures[${measures.size}]"
+                provenance(measurePath, event)
+                measures += measure(id, measurePath, measures.size + 1, number, implicit)
             } else {
                 unsupportedTree(event)
             }
         }
+    }
+
+    /**
+     * Interprets one voice of sequential notes/rests at a measure-local quarter-note cursor.
+     * Divisions persist across the measures of the current part. After an uninterpreted
+     * backup/forward, later timed content in the measure is discarded rather than mistimed.
+     */
+    private fun measure(partId: String, path: String, number: Int, displayNumber: String, implicit: Boolean): Measure {
+        val events = mutableListOf<Event>()
+        var cursor = Rational.ZERO
+        var extent = Rational.ZERO
+        var cursorLost = false
+        fun eventId() = "$partId:measure-$number:event-${events.size + 1}"
+        fun add(event: Event, source: ScoreXmlEvent) {
+            provenance("$path.events[${events.size}]", source)
+            events += event
+        }
+        children { event ->
+            when (event.localName()) {
+                "note" -> if (cursorLost) {
+                    unsupportedTree(event, "S06", "Note after an uninterpreted cursor move is discarded")
+                } else {
+                    val note = note(event, cursor, eventId()) ?: return@children
+                    note.event?.let { add(it, event) }
+                    cursor = note.end
+                    if (cursor > extent) extent = cursor
+                }
+                "attributes" -> attributesElement(event, cursorLost) { attribute, source ->
+                    add(AttributeEvent(eventId(), cursor, attribute), source)
+                }
+                "backup", "forward" -> {
+                    unsupportedTree(event, "S06", "Cursor move is not interpreted; later timed content in this measure is discarded")
+                    cursorLost = true
+                }
+                else -> unsupportedTree(event)
+            }
+        }
+        return Measure("measure-$number", displayNumber, extent, events.toList(), implicit)
+    }
+
+    private fun attributesElement(start: ScoreXmlEvent, cursorLost: Boolean, add: (Attribute, ScoreXmlEvent) -> Unit) {
+        attributes(start, feature = "S07")
+        children { event ->
+            when (event.localName()) {
+                "divisions" -> positiveDecimal(event, "S05", "Divisions")?.let { divisions = it }
+                "time" -> time(event)?.let {
+                    if (cursorLost) unsupported(event.location, "S06", "Time signature after an uninterpreted cursor move is discarded")
+                    else add(it, event)
+                }
+                else -> unsupportedTree(event, "S07")
+            }
+        }
+    }
+
+    /** Interprets one simple beats/beat-type pair; other time forms are reported as discarded. */
+    private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
+        attributes(start, feature = "S07")
+        val beats = mutableListOf<String>()
+        val beatTypes = mutableListOf<String>()
+        var simple = true
+        children { event ->
+            when (event.localName()) {
+                "beats" -> beats += text(event, feature = "S07")
+                "beat-type" -> beatTypes += text(event, feature = "S07")
+                else -> {
+                    simple = false
+                    skipTree()
+                }
+            }
+        }
+        if (!context.canContinue) return null
+        val beatCount = beats.singleOrNull()?.let(::positiveInt)
+        val beatUnit = beatTypes.singleOrNull()?.let(::positiveInt)
+        if (!simple || beatCount == null || beatUnit == null) {
+            unsupported(start.location, "S07", "Only one positive integer beats/beat-type pair is interpreted; time discarded")
+            return null
+        }
+        return Attribute.TimeSignature(beatCount, beatUnit)
+    }
+
+    /**
+     * Parses a note in the current voice. A null result means it cannot be timed (an error, or an
+     * untimed chord/grace note that was reported as discarded). A timed but discarded note keeps
+     * its end cursor without an event, so later onsets stay exact.
+     */
+    private fun note(start: ScoreXmlEvent, onset: Rational, id: String): TimedNote? {
+        attributes(start, feature = "S04")
+        val seen = mutableSetOf<String>()
+        var content: NoteContent? = null
+        var duration: Rational? = null
+        var durationEvent: ScoreXmlEvent? = null
+        var role = NoteRole.NORMAL
+        var voice = "1"
+        var value: NoteValue? = null
+        var dots = 0
+        var accidental: Accidental? = null
+        var discarded = false
+        var untimed = false
+        children { event ->
+            // An untimed note's diagnostic covers its remaining children.
+            if (untimed) {
+                skipTree()
+                return@children
+            }
+            when (val name = event.localName()) {
+                "chord", "grace" -> {
+                    val feature = if (name == "chord") "S06" else "S18"
+                    unsupportedTree(event, feature, "A $name note is not interpreted; the note is discarded")
+                    untimed = true
+                }
+                "cue" -> if (once(seen, name, event)) {
+                    attributes(event, feature = "S18")
+                    skipTree()
+                    role = NoteRole.CUE
+                }
+                "pitch", "unpitched", "rest" -> if ("content" in seen) {
+                    invalid(event, "A note has exactly one of pitch, unpitched or rest")
+                } else {
+                    seen += "content"
+                    when (name) {
+                        "pitch" -> content = pitch(event)
+                        "rest" -> content = rest(event)
+                        else -> {
+                            unsupportedTree(event, "S16", "Unpitched notes are not interpreted; the note is discarded")
+                            discarded = true
+                        }
+                    }
+                }
+                "duration" -> if (once(seen, name, event)) {
+                    durationEvent = event
+                    duration = positiveDecimal(event, "S05", "Duration")
+                }
+                "voice" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S06").trim { it in WHITESPACE }
+                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Voice must be nonblank")
+                    else voice = text
+                }
+                "type" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S05").trim { it in WHITESPACE }
+                    value = NOTE_TYPES[text]
+                    if (value == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown note type: $text")
+                }
+                "dot" -> {
+                    attributes(event, feature = "S17")
+                    skipTree()
+                    dots++
+                }
+                "accidental" -> if (once(seen, name, event)) accidental = accidental(event)
+                "staff" -> if (once(seen, name, event)) {
+                    when (val staff = positiveInt(text(event, feature = "S06"))) {
+                        null -> context.report(DiagnosticCode.INVALID_VALUE, event.location, "Staff must be a positive Int")
+                        1 -> Unit
+                        else -> {
+                            unsupported(event.location, "S06", "Staff $staff is not interpreted; the note is discarded")
+                            discarded = true
+                        }
+                    }
+                }
+                else -> unsupportedTree(event, NOTE_CHILD_FEATURES[name] ?: "S04")
+            }
+        }
+        if (untimed || !context.canContinue) return null
+        if ("content" !in seen) {
+            invalid(start, "A note requires pitch, unpitched or rest")
+            return null
+        }
+        val durationSource = durationEvent ?: run {
+            invalid(start, "A non-grace note requires a duration")
+            return null
+        }
+        val currentDivisions = divisions ?: run {
+            invalid(durationSource, "A duration requires preceding divisions")
+            return null
+        }
+        val sourceDuration = duration ?: return null
+        val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
+        val end = exact(durationSource.location) { onset + quarters } ?: return null
+        if (discarded) return TimedNote(null, end)
+        val notation = NotatedValue(value, dots, accidental = accidental)
+        val event = when (val noteContent = content ?: return null) {
+            is NoteContent.Rest -> RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
+            is NoteContent.Pitch -> NoteEvent(id, onset, quarters, noteContent.pitch, voice = voice, notation = notation, role = role)
+        }
+        return TimedNote(event, end)
+    }
+
+    private fun pitch(start: ScoreXmlEvent): NoteContent? {
+        attributes(start, feature = "S04")
+        val seen = mutableSetOf<String>()
+        var step: Step? = null
+        var octave: Int? = null
+        var alter = Rational.ZERO
+        children { event ->
+            when (val name = event.localName()) {
+                "step" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S04").trim { it in WHITESPACE }
+                    step = Step.entries.firstOrNull { it.name == text }
+                    if (step == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Step must be A to G")
+                }
+                "alter" -> if (once(seen, name, event)) decimal(event, "S04", "Alter")?.let { alter = it }
+                "octave" -> if (once(seen, name, event)) {
+                    octave = text(event, feature = "S04").trim { it in WHITESPACE }.toIntOrNull()?.takeIf { it in 0..9 }
+                    if (octave == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Octave must be 0 to 9")
+                }
+                else -> unsupportedTree(event, "S04")
+            }
+        }
+        if (!context.canContinue) return null
+        val writtenStep = step
+        val writtenOctave = octave
+        if (writtenStep == null || writtenOctave == null) {
+            invalid(start, "A pitch requires step and octave")
+            return null
+        }
+        return NoteContent.Pitch(NotePitch.Pitched(WrittenPitch(writtenStep, writtenOctave, alter)))
+    }
+
+    private fun rest(start: ScoreXmlEvent): NoteContent? {
+        attributes(start, setOf("measure"), "S04")
+        val wholeMeasure = yesNo(start, "measure") ?: return null
+        children { event -> unsupportedTree(event, "S17", "Rest display position is not interpreted") }
+        return NoteContent.Rest(wholeMeasure)
+    }
+
+    private fun accidental(start: ScoreXmlEvent): Accidental? {
+        val cautionary = yesNo(start, "cautionary") ?: return null
+        val editorial = yesNo(start, "editorial") ?: return null
+        val name = text(start, setOf("cautionary", "editorial"), "S04").trim { it in WHITESPACE }
+        if (name.isEmpty()) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "Accidental must be nonblank")
+            return null
+        }
+        return Accidental(name, cautionary, editorial)
+    }
+
+    private fun yesNo(start: ScoreXmlEvent, name: String): Boolean? = when (start.attribute(name)) {
+        null, "no" -> false
+        "yes" -> true
+        else -> {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation(name), "Expected yes or no")
+            null
+        }
+    }
+
+    private fun positiveDecimal(start: ScoreXmlEvent, feature: String, label: String): Rational? {
+        val value = decimal(start, feature, label) ?: return null
+        if (value <= Rational.ZERO) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "$label must be positive")
+            return null
+        }
+        return value
+    }
+
+    private fun decimal(start: ScoreXmlEvent, feature: String, label: String): Rational? {
+        val text = text(start, feature = feature)
+        if (!context.canContinue) return null
+        return exact(start.location) {
+            parseDecimal(text) ?: run {
+                context.report(DiagnosticCode.INVALID_VALUE, start.location, "$label must be a decimal number")
+                null
+            }
+        }
+    }
+
+    /** Translates exact-arithmetic failures to source-located diagnostics; nothing is rounded. */
+    private fun exact(location: SourceLocation, compute: () -> Rational?): Rational? = try {
+        compute()
+    } catch (exception: RationalException) {
+        val code = if (exception.code == RationalError.OVERFLOW) DiagnosticCode.NUMERIC_OVERFLOW else DiagnosticCode.INVALID_VALUE
+        context.report(code, location.withDeclaredPart(), "Exact value is outside the supported range: ${exception.code}")
+        null
     }
 
     /** Each handler consumes its subtree, leaving the cursor on its end event. */
@@ -292,15 +582,15 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         }
     }
 
-    private fun text(start: ScoreXmlEvent, allowed: Set<String> = emptySet()): String {
-        attributes(start, allowed)
+    private fun text(start: ScoreXmlEvent, allowed: Set<String> = emptySet(), feature: String = "S03"): String {
+        attributes(start, allowed, feature)
         return buildString {
             while (context.canContinue) {
                 val event = reader.next() ?: break
                 when (event.kind) {
                     ScoreXmlEventKind.END_ELEMENT -> break
                     ScoreXmlEventKind.TEXT -> append(event.text)
-                    ScoreXmlEventKind.START_ELEMENT -> unsupportedTree(event)
+                    ScoreXmlEventKind.START_ELEMENT -> unsupportedTree(event, feature)
                 }
             }
         }
@@ -315,8 +605,19 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         }
     }
 
-    private fun unsupportedTree(start: ScoreXmlEvent) {
-        unsupported(start.location, feature(start), "Unmapped subtree: ${start.name}")
+    /** Reports and skips a subtree; foreign names always use the foreign-extension feature. */
+    private fun unsupportedTree(
+        start: ScoreXmlEvent,
+        feature: String = feature(start),
+        message: String = "Unmapped subtree: ${start.name}",
+    ) {
+        val foreign = start.name?.namespaceUri?.isNotEmpty() == true
+        unsupported(start.location, if (foreign) "foreign-extension" else feature, message)
+        skipTree()
+    }
+
+    /** Consumes the remainder of the current element, leaving the cursor on its end event. */
+    private fun skipTree() {
         var depth = 1
         while (depth > 0 && context.canContinue) {
             when (reader.next()?.kind ?: return) {
@@ -373,6 +674,13 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
 
     private fun SourceLocation.withDeclaredPart(): SourceLocation = copy(partId = declaredPartId ?: partId)
 
+    private class TimedNote(val event: Event?, val end: Rational)
+
+    private sealed interface NoteContent {
+        class Pitch(val pitch: NotePitch) : NoteContent
+        class Rest(val wholeMeasure: Boolean) : NoteContent
+    }
+
     private class PartDefinition(val id: String, val index: Int, val location: SourceLocation) {
         var name: String? = null
         var abbreviation: String? = null
@@ -390,3 +698,50 @@ private fun ScoreXmlEvent.attributeLocation(name: String): SourceLocation = attr
 private fun ScoreXmlEvent.attributeLocation(name: XmlName): SourceLocation = location.copy(
     path = location.path + "/@" + if (name.namespaceUri.isEmpty()) name.localName else "{${name.namespaceUri}}${name.localName}",
 )
+
+private const val WHITESPACE = " \t\r\n"
+
+private val NOTE_TYPES: Map<String, NoteValue> = mapOf(
+    "maxima" to NoteValue.MAXIMA, "long" to NoteValue.LONG, "breve" to NoteValue.BREVE,
+    "whole" to NoteValue.WHOLE, "half" to NoteValue.HALF, "quarter" to NoteValue.QUARTER,
+    "eighth" to NoteValue.EIGHTH, "16th" to NoteValue.N16, "32nd" to NoteValue.N32,
+    "64th" to NoteValue.N64, "128th" to NoteValue.N128, "256th" to NoteValue.N256,
+    "512th" to NoteValue.N512, "1024th" to NoteValue.N1024,
+)
+
+private val NOTE_CHILD_FEATURES: Map<String, String> = mapOf(
+    "tie" to "S09", "instrument" to "S16", "footnote" to "S25", "level" to "S25",
+    "time-modification" to "S11", "stem" to "S10", "beam" to "S10",
+    "notehead" to "S17", "notehead-text" to "S17", "notations" to "S12", "lyric" to "S14",
+    "play" to "S26", "listen" to "S26",
+)
+
+private val DECIMAL = Regex("""([+-]?)([0-9]*)(?:\.([0-9]*))?""")
+
+/**
+ * Exact xs:decimal value after whitespace collapse, or null if the lexical form is invalid.
+ * Values whose reduced components exceed [Int] throw [RationalException] rather than rounding.
+ */
+internal fun parseDecimal(text: String): Rational? {
+    val match = DECIMAL.matchEntire(text.trim { it in WHITESPACE }) ?: return null
+    val (sign, whole, fraction) = match.destructured
+    if (whole.isEmpty() && fraction.isEmpty()) return null
+    val wholeDigits = whole.trimStart('0')
+    val fractionDigits = fraction.trimEnd('0')
+    // 10 digits can exceed Int; 9 fraction digits keep 10^n within Int.
+    if (wholeDigits.length > 10 || fractionDigits.length > 9) throw RationalException(RationalError.OVERFLOW)
+    val wholeValue = wholeDigits.ifEmpty { "0" }.toLong()
+    if (wholeValue > Int.MAX_VALUE) throw RationalException(RationalError.OVERFLOW)
+    var value = Rational.of(wholeValue.toInt())
+    if (fractionDigits.isNotEmpty()) {
+        value += Rational.of(fractionDigits.toInt(), POWERS_OF_TEN[fractionDigits.length])
+    }
+    return if (sign == "-") -value else value
+}
+
+private val POWERS_OF_TEN = IntArray(10).also { powers ->
+    powers[0] = 1
+    for (index in 1 until powers.size) powers[index] = powers[index - 1] * 10
+}
+
+private fun positiveInt(text: String): Int? = text.trim { it in WHITESPACE }.toIntOrNull()?.takeIf { it > 0 }

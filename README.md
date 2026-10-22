@@ -6,9 +6,10 @@ Multiplatform and the [Bravura](https://github.com/steinbergmedia/bravura) SMuFL
 ![C major scale rendered by the library](docs/example.png)
 
 **Milestone 1 (current):** a single treble-clef staff with whole, half and quarter notes, stems,
-ledger lines, barlines and a final barline. A separate MusicXML importer now reads partwise headers
-and empty measure structures; musical event import, playback, editing, beaming and system breaking
-remain future work. See the [importer scope](docs/musicxml/partwise-import.md).
+ledger lines, barlines and a final barline. A separate MusicXML importer now reads partwise headers,
+measures and a single voice of notes and rests with exact timing; chords, multiple voices/staves,
+playback, editing, beaming and system breaking remain future work. See the
+[importer scope](docs/musicxml/partwise-import.md) and [note/rest scope](docs/musicxml/note-import.md).
 
 ## Modules
 
@@ -18,7 +19,7 @@ remain future work. See the [importer scope](docs/musicxml/partwise-import.md).
 | `sheetmusic-core` | Score model (`Score`, `Measure`, `Note`, …), SMuFL glyph metrics and the layout engine. Pure Kotlin with no Compose dependency. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser, Node.js), Wasm (browser, Node.js) |
 | `sheetmusic-compose` | The `SheetMusic` composable. It bundles the Bravura font. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser), Wasm (browser) |
 | `sample` | The example score as a desktop app and as a web page (JS and Wasm), with one shared screen | JVM desktop, JS, Wasm |
-| `musicxml-parser` | Public partwise score skeleton importer with metadata, ID/reference diagnostics and provenance; secure XML reader and XML/ZIP probes. See [importer scope](docs/musicxml/partwise-import.md) and [diagnostic contract](docs/musicxml/diagnostics.md). | Android, JVM, iosArm64, iosSimulatorArm64 |
+| `musicxml-parser` | Public partwise score importer with metadata, single-voice notes/rests, ID/reference diagnostics and provenance; secure XML reader and XML/ZIP probes. See [importer scope](docs/musicxml/partwise-import.md) and [diagnostic contract](docs/musicxml/diagnostics.md). | Android, JVM, iosArm64, iosSimulatorArm64 |
 
 ## Using it from another KMP project
 

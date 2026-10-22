@@ -169,7 +169,8 @@ class MusicXmlParserTest {
 
     @Test
     fun testMusicalSubtreesProduceFeatureDiagnostics() {
-        val features = listOf("note" to "S04", "backup" to "S06", "attributes" to "S07", "direction" to "S13",
+        // Interpreted note/attribute content is covered by NoteImportTest; an unmapped attributes child stays S07.
+        val features = listOf("backup" to "S06", "attributes" to "S07", "direction" to "S13",
             "barline" to "S15", "print" to "S17", "harmony" to "S22", "figured-bass" to "S22",
             "grouping" to "S25", "sound" to "S26", "listening" to "S26")
         val xml = document("<measure number='A'/><measure number='A'>" +
@@ -230,7 +231,7 @@ class MusicXmlParserTest {
     fun testFatalTailDiscardsSkeletonAndProvenance() {
         failure(document() + "<tail/>", DiagnosticCode.MALFORMED_XML)
         failure(document().dropLast(4), DiagnosticCode.MALFORMED_XML)
-        val result = failure(document("<measure number='1'><note/></measure>") + "<tail/>",
+        val result = failure(document("<measure number='1'><direction/></measure>") + "<tail/>",
             DiagnosticCode.MALFORMED_XML, ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(listOf(DiagnosticCode.UNSUPPORTED_FEATURE, DiagnosticCode.MALFORMED_XML), result.diagnostics.map { it.code })
     }
@@ -246,7 +247,7 @@ class MusicXmlParserTest {
 
     @Test
     fun testDiagnosticBudgetStopsUnsupportedContent() {
-        val result = failure(document("<measure number='1'><note/><note/><note/></measure>"), DiagnosticCode.DIAGNOSTIC_LIMIT,
+        val result = failure(document("<measure number='1'><direction/><direction/><direction/></measure>"), DiagnosticCode.DIAGNOSTIC_LIMIT,
             ParseOptions(ParsePolicy.TOLERANT, ParseLimits(maxDiagnostics = 2)))
         assertEquals(listOf(DiagnosticCode.UNSUPPORTED_FEATURE, DiagnosticCode.DIAGNOSTIC_LIMIT), result.diagnostics.map { it.code })
     }

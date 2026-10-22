@@ -45,6 +45,12 @@ missing part-list, unsupported content and security/resource finalization. These
 authored common tests, not the independent MX-04 corpus; F02 is intended schema-valid but has not
 been XSD-validated. See [mapping, limits and target evidence](partwise-import.md).
 
+MX-07 adds original F01, F03 basic and F04 XML in `NoteFixtures.kt` and 12 `NoteImportTest`
+assertions for exact onsets/durations, divisions changes and persistence, pitch alter versus printed
+accidental, zero/negative/malformed/overflow durations, missing structure, unsupported note content
+and cursor-move discarding. These are implementation-authored, not the independent MX-04 corpus,
+and have not been XSD-validated. See [note/rest scope](note-import.md).
+
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.
 3. Compare exact musical semantics using reduced rational values; compare presentation fields only where the fixture calls for them.

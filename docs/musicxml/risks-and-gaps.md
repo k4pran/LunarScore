@@ -118,6 +118,27 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-07 note/rest decisions and remaining gaps
+
+The public importer now produces [single-voice notes and rests](note-import.md) with exact onsets.
+This supersedes MX-06's parent-level S04/S07 discard branches; MX-02's `RationalException` translation
+obligation is met for durations and divisions.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Zero, negative or malformed duration/divisions; invalid step/octave/alter/type/voice/staff/yes-no flags | Fatal `INVALID_VALUE` at the element/attribute location under both policies | Full XSD lexical validation remains separate |
+| Duration or divisions outside reduced Int bounds; overflowing quotient or cursor sum | Fatal `NUMERIC_OVERFLOW` at the duration/divisions location; boundary `Int.MAX_VALUE` accepted | Wider numeric support is not promised |
+| Missing divisions before a duration; missing duration/pitch-or-rest/step/octave; duplicates | Fatal `INVALID_STRUCTURE`; no default divisions or duration inferred | MX-08 state resolution across parts/staves |
+| Chord and grace notes | S06/S18 `DISCARDED`; whole note dropped and cursor not advanced | MX-09 chords, MX-15 grace |
+| Unpitched notes; staff other than 1 | S16/S06 `DISCARDED`; note dropped, cursor still advances so later onsets stay exact | MX-16 percussion, MX-09 staves |
+| Backup/forward | S06 `DISCARDED`; later notes/time signatures in that measure are each reported and dropped instead of mistimed; divisions still apply | MX-09 cursor interpretation and `INVALID_CURSOR_MOVE` |
+| Ties, tuplet time-modification, stems/beams, notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
+| Key, clef, staves and other attributes children; complex or annotated time | S07 `DISCARDED`; a simple time keeps its signature even if its attributes are discarded | MX-08 |
+| Voice labels without backup | Labels retained; events stay sequential in one timeline | MX-09 |
+| Measure fullness versus time signature | Not checked; extent is the observed end of timed content | `INCONSISTENT_MEASURE_DURATION` policy remains later work |
+
+F01/F03 basic/F04 are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-06 partwise skeleton decisions and remaining gaps
 
 The public [partwise skeleton importer](partwise-import.md) now parses metadata and ordered
