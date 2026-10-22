@@ -118,6 +118,26 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-12 beam, stem and tuplet decisions and remaining gaps
+
+The importer now keeps [stems, beams, time modifications and tuplet spans](tuplet-import.md) on
+imported notes and rests. This supersedes MX-07's S10/S11 discard of `stem`, `beam` and
+`time-modification`, and MX-11's S11 discard of `notations/tuplet`.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Nested tuplets | Each note keeps its cumulative `time-modification` (F11 9:4); each bracket level is a separate `TUPLET` relationship by number; durations stay exact rationals from `duration` | Per-level ratios are not factored or stored separately |
+| Tuplet numbers 1–16 | Accepted, including 7, 8 and 16 (F11); 0 and 17 fatal `INVALID_VALUE`. No fixed-size number state, so no index failure | None |
+| Unmatched or duplicate tuplet endpoints | `UNMATCHED_SPAN`; relationship kept with a null partner | None |
+| Unknown stem, beam type or normal type; beam number outside 1–8; nonpositive actual/normal counts | Fatal `INVALID_VALUE` | None |
+| Missing tuplet type or actual/normal notes; `normal-dot` without `normal-type`; duplicate stem/time modification/beam level | Fatal `INVALID_STRUCTURE` | None |
+| `tuplet-actual`/`tuplet-normal`; tuplet `bracket`, `show-number`, `show-type`, `line-shape`, `placement`, position | S11 `DISCARDED`; tuplet span kept | Tuplet display model (MX-18) |
+| Beam `fan`, `repeater`, `color`, `id`; stem position and color | S10 `DISCARDED` per attribute; beam or stem kept | Feathered beams and layout (MX-18) |
+| Beam continuity (begin without end), tuplet/duration agreement | Not checked; duration stays authoritative | Optional semantic check |
+| Mixed chord values: chord tones with different type, time modification, stems or beams | Not reachable yet: chord notes are still S06 `DISCARDED` because MX-09 chord import is not on this branch | MX-09 chords, then a mixed-value chord fixture |
+
+F09 and F11 are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-11 tie and slur decisions and remaining gaps
 
 The importer now [resolves ties and slurs](span-import.md) into `Score.relationships`. This
@@ -134,7 +154,7 @@ supersedes MX-07's S09 discard of `tie` and its S12 discard of the whole `notati
 | Missing `type`; unknown `type`; `number` outside 1–16 | Fatal `INVALID_STRUCTURE`; fatal `INVALID_VALUE` | None |
 | `tie time-only`; `tied type="let-ring"`; tie or tied on a rest | S09 `DISCARDED`; mark dropped (a slur on a rest is kept) | Repeat-pass playback (MX-17); let-ring model |
 | Display attributes on `tie`/`tied`/`slur` | S09 `DISCARDED` per attribute; span kept | MX-18 layout |
-| Other `notations` children and `notations` attributes | S12 (S11 `tuplet`, S25 `footnote`/`level`) `DISCARDED` per child | MX-12, MX-13 |
+| Other `notations` children and `notations` attributes | S12 (S25 `footnote`/`level`) `DISCARDED` per child; `tuplet` superseded by MX-12 below | MX-13 |
 
 F10 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
 
@@ -188,7 +208,7 @@ obligation is met for durations and divisions.
 | Chord and grace notes | S06/S18 `DISCARDED`; whole note dropped and cursor not advanced | MX-09 chords, MX-15 grace |
 | Unpitched notes; staff other than 1 | S16/S06 `DISCARDED`; note dropped, cursor still advances so later onsets stay exact | MX-16 percussion, MX-09 staves |
 | Backup/forward | S06 `DISCARDED`; later notes/time signatures in that measure are each reported and dropped instead of mistimed; divisions still apply | MX-09 cursor interpretation and `INVALID_CURSOR_MOVE` |
-| Ties, tuplet time-modification, stems/beams, notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
+| Ties, tuplet time-modification, stems/beams (superseded by MX-11/MX-12 above), notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
 | Key, clef, staves and other attributes children; complex or annotated time | S07 `DISCARDED`; a simple time keeps its signature even if its attributes are discarded | Key/clef/staves/staff details superseded by MX-08 above; complex time remains |
 | Voice labels without backup | Labels retained; events stay sequential in one timeline | MX-09 |
 | Measure fullness versus time signature | Not checked; extent is the observed end of timed content | `INCONSISTENT_MEASURE_DURATION` policy remains later work |
@@ -230,7 +250,7 @@ Proposed record shape: `UnsupportedFeature(featureId, sourceLocation, retention)
 | Timewise root is valid in 4.0 but rejected by both inspected music21 entry points | Normalized since MX-10, with no unsupported warning (`UNSUPPORTED_ROOT` remains only for other roots) | MX-05,MX-10; F12 pair tested. Source guards verified; music21 runtime not executed. |
 | Missing/unknown/duplicate part ID is repaired, skipped or overwritten in reference source | `MissingPartId`, `UnknownPartId`, `DuplicatePartId`; any tolerant repair also records what was changed/lost | MX-06; F02/F22 variants |
 | Backup before measure start is clamped in reference; forward overfill allowed locally | `InvalidCursorMove` / `InconsistentMeasureDuration`, not silent clamp or inferred notation | MX-09; F05/F23; also divisions-boundary moves |
-| Numbered tuplet state uses fixed lists although 4.0 number-level permits 1–16 | Support valid labels through 16; if temporarily limited, `UnsupportedFeature("S11", location, retention)`. Never an indexing exception | MX-12,MX-20; F11 numbers 7,8,16 and invalid 17. Index failure is a source-based inference, not a reproduced crash. |
+| Numbered tuplet state uses fixed lists although 4.0 number-level permits 1–16 | Implemented in MX-12: labels 1–16 pair through the span resolver with no fixed-size state; 17 is fatal `INVALID_VALUE` | MX-12,MX-20; F11 numbers 7,8,16 and inline invalid 17 tested. Index failure is a source-based inference, not a reproduced crash. |
 | Sound tie and notation-only tied mark collapse in the inspected tie helper | Implemented in MX-11: separate `SOUND_TIE`/`NOTATED_TIE`, orphans `UNMATCHED_SPAN` | MX-11; F10 notation-only and orphan XML cases; stop-before-start at resolver level until MX-09 |
 | Harmony/figured bass and tablature/technical variants exceed initial parser scope; figured bass dispatch is explicitly skipped in reference | `UnsupportedFeature("S22" / "S23", location, retention)` for each unsupported subtree/attribute | MX-08,MX-13,MX-20,MX-21; F24,F25 |
 | Beat/measure repeat and slash measure styles are TODOs in reference | `UnsupportedFeature("S24", location, retention)`; retain actual events even when style cannot be represented | MX-17,MX-21; F26 |

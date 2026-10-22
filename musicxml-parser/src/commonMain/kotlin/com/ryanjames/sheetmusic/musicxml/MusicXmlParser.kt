@@ -2,6 +2,8 @@ package com.ryanjames.sheetmusic.musicxml
 
 import com.ryanjames.sheetmusic.score.Accidental
 import com.ryanjames.sheetmusic.score.Attribute
+import com.ryanjames.sheetmusic.score.Beam
+import com.ryanjames.sheetmusic.score.BeamType
 import com.ryanjames.sheetmusic.score.AttributeEvent
 import com.ryanjames.sheetmusic.score.ClefSign
 import com.ryanjames.sheetmusic.score.Event
@@ -22,7 +24,9 @@ import com.ryanjames.sheetmusic.score.RelationshipKind
 import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.Staff
+import com.ryanjames.sheetmusic.score.StemDirection
 import com.ryanjames.sheetmusic.score.Step
+import com.ryanjames.sheetmusic.score.TimeModification
 import com.ryanjames.sheetmusic.score.WrittenPitch
 
 /**
@@ -30,7 +34,8 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * voice of pitched notes and rests on staff 1 with exact onsets and durations from divisions,
  * plus staff-1 key, simple time, clef and staff-line changes at their exact offsets. A timewise
  * score is normalized while streaming to the same projection: a part missing from a timewise
- * measure gets an empty measure there. Sound ties, notated ties and slurs on imported events are
+ * measure gets an empty measure there. Stems, beams and cumulative (nested) time modifications are
+ * kept as note notation. Sound ties, notated ties, slurs and tuplets on imported events are
  * paired within each part across measures and voices; an unmatched endpoint is reported as
  * `UNMATCHED_SPAN` and kept with a null partner. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
@@ -629,6 +634,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var value: NoteValue? = null
         var dots = 0
         var accidental: Accidental? = null
+        var timeModification: TimeModification? = null
+        var stem: StemDirection? = null
+        val beams = mutableListOf<Beam>()
         var discarded = false
         var untimed = false
         val marks = mutableListOf<SpanMark>()
@@ -682,6 +690,12 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     dots++
                 }
                 "accidental" -> if (once(seen, name, event)) accidental = accidental(event)
+                "time-modification" -> if (once(seen, name, event)) timeModification = timeModification(event)
+                "stem" -> if (once(seen, name, event)) stem = stem(event)
+                "beam" -> beam(event)?.let { beam ->
+                    if (beams.any { it.level == beam.level }) invalid(event, "Duplicate beam number ${beam.level}")
+                    else beams += beam
+                }
                 "tie" -> tie(event)?.let { marks += it }
                 "notations" -> notations(event, marks)
                 "staff" -> if (once(seen, name, event)) {
@@ -714,7 +728,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
         if (discarded) return TimedNote(null, end, emptyList())
-        val notation = NotatedValue(value, dots, accidental = accidental)
+        val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList())
         val event = when (val noteContent = content ?: return null) {
             is NoteContent.Rest -> RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
             is NoteContent.Pitch -> NoteEvent(id, onset, quarters, noteContent.pitch, voice = voice, notation = notation, role = role)
@@ -725,7 +739,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /**
      * Passes an event's span marks to the part's resolver: stops (and the stop half of a tied
      * `continue`) first, then slur continue points, then starts, so a span can end and another
-     * begin on one note. Ties pair by written pitch; a tie on a rest is discarded.
+     * begin on one note. Ties pair by written pitch; a tie on a rest is discarded. Slurs and
+     * tuplets pair by number and may start or stop on a rest.
      */
     private fun registerSpans(event: Event, marks: List<SpanMark>, measure: Int) {
         if (marks.isEmpty()) return
@@ -736,7 +751,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         val endpoints = marks.mapNotNull { mark ->
             val key = when {
-                mark.kind == RelationshipKind.SLUR -> mark.number
+                mark.kind == RelationshipKind.SLUR || mark.kind == RelationshipKind.TUPLET -> mark.number
                 pitch == null -> {
                     unsupported(mark.location, "S09", "A tie on a rest is not interpreted; the tie is discarded")
                     return@mapNotNull null
@@ -767,8 +782,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Interprets `tied` and `slur` notations; other notations are discarded under their feature
-     * group. Display attributes of the interpreted marks are reported as discarded.
+     * Interprets `tied`, `slur` and `tuplet` notations; other notations are discarded under their
+     * feature group. Display attributes of the interpreted marks are reported as discarded.
      */
     private fun notations(start: ScoreXmlEvent, marks: MutableList<SpanMark>) {
         attributes(start, feature = "S12")
@@ -787,11 +802,99 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                         marks += SpanMark(kind, type, number, event.location)
                     }
                 }
-                "tuplet" -> unsupportedTree(event, "S11")
+                "tuplet" -> tuplet(event)?.let { marks += it }
                 "footnote", "level" -> unsupportedTree(event, "S25")
                 else -> unsupportedTree(event, "S12")
             }
         }
+    }
+
+    /**
+     * A tuplet bracket endpoint, paired by `number` like a slur. The note's `time-modification`
+     * carries its timing; the `tuplet-actual`/`tuplet-normal` display ratio and presentation
+     * attributes are reported as discarded.
+     */
+    private fun tuplet(start: ScoreXmlEvent): SpanMark? {
+        attributes(start, setOf("type", "number"), "S11")
+        val type = spanType(start, "Tuplet", TIE_TYPES)
+        val number = numberLevel(start, "Tuplet")
+        children { event -> unsupportedTree(event, "S11", "Tuplet display content is not interpreted: ${event.name}") }
+        return if (type != null && number != null) SpanMark(RelationshipKind.TUPLET, type, number, start.location) else null
+    }
+
+    /**
+     * Reads the actual/normal note counts and optional normal type and dots. The counts are the
+     * note's cumulative ratio, so a nested tuplet's counts already include its enclosing tuplets.
+     */
+    private fun timeModification(start: ScoreXmlEvent): TimeModification? {
+        attributes(start, feature = "S11")
+        val seen = mutableSetOf<String>()
+        var actual: Int? = null
+        var normal: Int? = null
+        var normalValue: NoteValue? = null
+        var normalDots = 0
+        children { event ->
+            when (val name = event.localName()) {
+                "actual-notes", "normal-notes" -> if (once(seen, name, event)) {
+                    val count = positiveInt(text(event, feature = "S11"))
+                    if (count == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "$name must be a positive Int")
+                    if (name == "actual-notes") actual = count else normal = count
+                }
+                "normal-type" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S11").trim { it in WHITESPACE }
+                    normalValue = NOTE_TYPES[text]
+                    if (normalValue == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown normal type: $text")
+                }
+                "normal-dot" -> {
+                    attributes(event, feature = "S11")
+                    skipTree()
+                    normalDots++
+                }
+                else -> unsupportedTree(event, "S11")
+            }
+        }
+        if (!context.canContinue) return null
+        val actualNotes = actual
+        val normalNotes = normal
+        if (actualNotes == null || normalNotes == null) {
+            // A present but invalid count has already been reported.
+            if ("actual-notes" !in seen || "normal-notes" !in seen) {
+                invalid(start, "A time modification requires actual-notes and normal-notes")
+            }
+            return null
+        }
+        if (normalDots > 0 && "normal-type" !in seen) {
+            invalid(start, "A normal-dot requires a normal-type")
+            return null
+        }
+        return TimeModification(actualNotes, normalNotes, normalValue, normalDots)
+    }
+
+    /** A printed stem direction; position and color attributes are reported as discarded. */
+    private fun stem(start: ScoreXmlEvent): StemDirection? {
+        val text = text(start, feature = "S10").trim { it in WHITESPACE }
+        if (!context.canContinue) return null
+        return STEM_DIRECTIONS[text] ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "Unknown stem direction: $text")
+            null
+        }
+    }
+
+    /** One beam level (`number` 1 to 8, default 1) and its type; fan and display attributes are discarded. */
+    private fun beam(start: ScoreXmlEvent): Beam? {
+        val numberText = start.attribute("number")
+        val text = text(start, setOf("number"), "S10").trim { it in WHITESPACE }
+        if (!context.canContinue) return null
+        val level = if (numberText == null) 1 else positiveInt(numberText)?.takeIf { it <= 8 }
+        if (level == null) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "Beam number must be 1 to 8")
+            return null
+        }
+        val type = BEAM_TYPES[text] ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "Unknown beam type: $text")
+            return null
+        }
+        return Beam(level, type)
     }
 
     /** Reads a required span `type`; a missing type is invalid structure and an unknown one an invalid value. */
@@ -1057,9 +1160,17 @@ private val NOTE_TYPES: Map<String, NoteValue> = mapOf(
 
 private val NOTE_CHILD_FEATURES: Map<String, String> = mapOf(
     "instrument" to "S16", "footnote" to "S25", "level" to "S25",
-    "time-modification" to "S11", "stem" to "S10", "beam" to "S10",
     "notehead" to "S17", "notehead-text" to "S17", "lyric" to "S14",
     "play" to "S26", "listen" to "S26",
+)
+
+private val STEM_DIRECTIONS: Map<String, StemDirection> = mapOf(
+    "up" to StemDirection.UP, "down" to StemDirection.DOWN, "double" to StemDirection.DOUBLE, "none" to StemDirection.NONE,
+)
+
+private val BEAM_TYPES: Map<String, BeamType> = mapOf(
+    "begin" to BeamType.BEGIN, "continue" to BeamType.CONTINUE, "end" to BeamType.END,
+    "forward hook" to BeamType.FORWARD_HOOK, "backward hook" to BeamType.BACKWARD_HOOK,
 )
 
 private val ATTRIBUTES_CHILD_FEATURES: Map<String, String> = mapOf(

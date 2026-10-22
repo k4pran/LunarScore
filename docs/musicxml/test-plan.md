@@ -77,9 +77,9 @@ Each `F` fixture is a small hand-verifiable file unless noted. Create F01–F08 
 | F06 | Two notes in a chord at the same onset plus a cross-staff note; chord children retain individual durations. Include a shorter child and equal child, assert following onset uses the reference note; a longer child must receive a semantic diagnostic. |
 | F07 | Mid-measure clef/key/time change; each event sees state active at its offset. |
 | F08 | Two parts with different measure content and a two-staff piano part; IDs and offsets stay separate. |
-| F09 | Eighth notes with beams and triplet; exact 1/3 or 2/3 rational duration as specified by fixture. |
+| F09 | Eighth notes with beams and triplet; exact 1/3 or 2/3 rational duration as specified by fixture. Implemented in `TupletFixtures.kt` (MX-12). |
 | F10 | Tie and slur crossing a measure; endpoints resolve by ID and notation/playback types stay distinct. Add notation-only tied, orphan endpoints and a slur stop preceding its musical start in document order. Executable XML in `SpanFixtures.kt` (MX-11); stop-before-start is a resolver test until backup/forward is interpreted. |
-| F11 | Nested tuplet/time-modification, dotted note and pickup measure; no floating-point drift. Include valid tuplet numbers 7,8,16 and invalid 17 independently of nesting depth. |
+| F11 | Nested tuplet/time-modification, dotted note and pickup measure; no floating-point drift. Include valid tuplet numbers 7,8,16 and invalid 17 independently of nesting depth. Implemented in `TupletFixtures.kt`; 17 is an inline variant (MX-12). |
 | F12 | Partwise/timewise equivalent pair; canonical semantic projections are equal. The schema-validated [MX-00 example](reference-analysis.md#concrete-specification--importer-disagreement) is a seed; the executable pair is `TimewiseFixtures.kt` (MX-10), which also has a measure missing one part. |
 | F13 | Staccato, trill and dynamic on a note; annotations retained and scoped correctly. |
 | F14 | Tempo/metronome, text direction, wedge and offset; event order and span retained. |

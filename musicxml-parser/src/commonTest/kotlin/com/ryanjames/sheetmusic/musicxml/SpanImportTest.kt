@@ -85,12 +85,12 @@ class SpanImportTest {
     @Test
     fun testUnsupportedSpanContentIsDiscardedWithFeatureIds() {
         val xml = document(
-            note("C", "<tie type='start' time-only='1'/>", notations = "<tied type='let-ring'/><fermata/><tuplet type='start'/>") +
+            note("C", "<tie type='start' time-only='1'/>", notations = "<tied type='let-ring'/><fermata/><footnote>a</footnote>") +
                 note("D", notations = "<slur type='start' placement='above'/>") +
                 "<note><rest/><duration>1</duration><tie type='start'/><notations><slur type='stop'/></notations></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S09", "S09", "S12", "S11", "S09", "S09"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S09", "S09", "S12", "S25", "S09", "S09"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.unsupported?.retention == ContentRetention.DISCARDED })
         // The slur keeps its endpoints, including a rest; ties on rests and restricted ties are dropped.
         assertEquals(listOf(Relationship("P1:slur-1", RelationshipKind.SLUR, event(2), event(3))), result.value.relationships)
