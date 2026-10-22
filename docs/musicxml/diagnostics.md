@@ -27,7 +27,7 @@ truncated score. Failure codes and their meaning are stable; message prose is no
 |---|---|---|---|
 | `MALFORMED_XML`, `UNSAFE_XML`, `UNSUPPORTED_ENCODING`, `UNSUPPORTED_XML_VERSION`, `UNSUPPORTED_ROOT`, `UNSUPPORTED_NAMESPACE` | Error/failure, stop | Error/failure, stop | Supply available coordinates; do not invent line/column before reader creation |
 | `INVALID_STRUCTURE`, `INVALID_VALUE`, `NUMERIC_OVERFLOW` | Error/failure, stop | Error/failure, stop | Missing required structure/references or uninterpretable required values cannot yield an accepted score |
-| `UNMATCHED_SPAN`, `INVALID_CURSOR_MOVE`, `INCONSISTENT_MEASURE_DURATION` | Error/failure | Warning/accepted candidate | Preserve unresolved facts where representable; describe any repair/discard explicitly; do not silently clamp a cursor |
+| `UNMATCHED_SPAN`, `INVALID_CURSOR_MOVE`, `INCONSISTENT_MEASURE_DURATION`, `INCONSISTENT_CHORD_DURATION` | Error/failure | Warning/accepted candidate | Preserve unresolved facts where representable; describe any repair/discard explicitly; do not silently clamp a cursor. MX-09 adds the chord code for a tone longer than its reference note |
 | `UNSUPPORTED_FEATURE` | Error/failure | Warning/accepted candidate | Include coverage feature ID, location and explicit retention outcome for each meaningful unmapped subtree/attribute |
 | `RECOVERED_VALUE` | Error/failure | Warning/accepted candidate | Message describes the actual repair; use unsupported-content records as well when meaningful source material is lost |
 | `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `PATH_LIMIT`, `ATTRIBUTE_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |

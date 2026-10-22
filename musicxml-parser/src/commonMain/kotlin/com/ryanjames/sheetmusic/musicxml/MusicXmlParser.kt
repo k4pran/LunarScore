@@ -25,11 +25,13 @@ import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.WrittenPitch
 
 /**
- * Imports a UTF-8 partwise score with ordered metadata, parts and measures, plus one sequential
- * voice of pitched notes and rests on staff 1 with exact onsets and durations from divisions,
- * plus staff-1 key, simple time, clef and staff-line changes at their exact offsets. Other musical content is not implemented yet: meaningful unmapped
- * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
- * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
+ * Imports a UTF-8 partwise score with ordered metadata, parts and measures, plus pitched notes,
+ * rests and chords in any voice and staff with exact onsets and durations from divisions, placed by
+ * a measure-local cursor that backup/forward move. Key, simple time, clef and staff-line changes
+ * become staff-scoped events at their exact offsets. Other musical content is not implemented yet:
+ * meaningful unmapped content rejects strict parsing, or is discarded with warnings under tolerant
+ * policy. A part defines staves 1 to its largest `staves` declaration (staff 1 when it only has
+ * events); measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
  * limits and cooperative [isCancelled] checks are shared with the ordered XML reader.
  */
@@ -49,8 +51,9 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     private val bodies = mutableMapOf<String, List<Measure>>()
     private var declaredPartId: String? = null
     private var currentPartId: String? = null
-    private val partsDeclaringStaves = mutableSetOf<String>()
+    private val declaredStaves = mutableMapOf<String, Int>()
     private var divisions: Rational? = null
+    private var staffCount = 1
 
     fun parse(): Score {
         val root = checkNotNull(reader.current)
@@ -113,11 +116,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 val measures = bodies[definition.id].orEmpty().toList()
                 Part(
                     id = definition.id,
-                    staves = if (definition.id in partsDeclaringStaves || measures.any { it.events.isNotEmpty() }) {
-                        listOf(Staff(1))
-                    } else {
-                        emptyList()
-                    },
+                    staves = (1..(declaredStaves[definition.id] ?: if (measures.any { it.events.isNotEmpty() }) 1 else 0))
+                        .map { Staff(it) },
                     measures = measures,
                     name = definition.name,
                     abbreviation = definition.abbreviation,
@@ -280,6 +280,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         bodies[id] = measures
         currentPartId = id
         divisions = null
+        staffCount = 1
         provenance(path, start)
         children { event ->
             if (event.localName() == "measure") {
@@ -307,36 +308,83 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Interprets one voice of sequential notes/rests at a measure-local quarter-note cursor.
-     * Divisions persist across the measures of the current part. After an uninterpreted
-     * backup/forward, later timed content in the measure is discarded rather than mistimed.
+     * Interprets notes, chords and backup/forward at a measure-local quarter-note cursor. A chord
+     * tone starts with its reference note (the preceding non-chord note) and never moves the cursor;
+     * a cursor move ends the chord. Divisions and the staff count persist across measures of a part.
      */
     private fun measure(partId: String, path: String, number: Int, displayNumber: String, implicit: Boolean): Measure {
         val events = mutableListOf<Event>()
         var cursor = Rational.ZERO
         var extent = Rational.ZERO
-        var cursorLost = false
+        var reference: ChordReference? = null
+        var chordCount = 0
         fun eventId() = "$partId:measure-$number:event-${events.size + 1}"
         fun add(event: Event, source: ScoreXmlEvent) {
             provenance("$path.events[${events.size}]", source)
             events += event
         }
+        // A chord ID is allocated when the first chord tone arrives, then given to the reference note too.
+        fun chordId(chord: ChordReference): String = chord.id ?: "$partId:measure-$number:chord-${++chordCount}".also { id ->
+            chord.id = id
+            val index = chord.eventIndex ?: return@also
+            (events[index] as? NoteEvent)?.let { events[index] = it.copy(chordId = id) }
+        }
         children { event ->
             when (event.localName()) {
-                "note" -> if (cursorLost) {
-                    unsupportedTree(event, "S06", "Note after an uninterpreted cursor move is discarded")
-                } else {
-                    val note = note(event, cursor, eventId()) ?: return@children
-                    note.event?.let { add(it, event) }
-                    cursor = note.end
+                "note" -> {
+                    val note = note(event) ?: return@children
+                    val chord = if (note.chord) {
+                        reference ?: run {
+                            invalid(event, "A chord note requires a preceding non-chord note in the measure without an intervening cursor move")
+                            return@children
+                        }
+                    } else {
+                        null
+                    }
+                    val onset = chord?.onset ?: cursor
+                    val end = exact(note.durationLocation) { onset + note.duration } ?: return@children
+                    if (end > extent) extent = end
+                    var chordId: String? = null
+                    if (chord == null) {
+                        reference = ChordReference(onset, note.duration, events.size.takeIf { note.content != null })
+                        cursor = end
+                    } else {
+                        if (note.duration > chord.duration) {
+                            context.report(
+                                DiagnosticCode.INCONSISTENT_CHORD_DURATION, note.durationLocation.withDeclaredPart(),
+                                "Chord tone lasts ${note.duration} quarters, longer than its reference note (${chord.duration}); " +
+                                    "its duration is kept and the cursor follows the reference note",
+                            )
+                        }
+                        if (note.content is NoteContent.Rest || chord.eventIndex?.let { events[it] } is RestEvent) {
+                            unsupported(event.location, "S06", "Chord grouping with a rest is not represented; members keep their shared onset")
+                        }
+                        if (note.content is NoteContent.Pitch) chordId = chordId(chord)
+                    }
+                    note.content?.let { add(note.toEvent(eventId(), onset, chordId), event) }
+                }
+                "attributes" -> attributesElement(event) { attribute, staff, source ->
+                    add(AttributeEvent(eventId(), cursor, attribute, staff), source)
+                }
+                "backup" -> {
+                    val move = cursorMove(event, forward = false) ?: return@children
+                    reference = null
+                    val target = exact(event.location) { cursor - move } ?: return@children
+                    cursor = if (target < Rational.ZERO) {
+                        context.report(
+                            DiagnosticCode.INVALID_CURSOR_MOVE, event.location.withDeclaredPart(),
+                            "Backup of $move quarters from offset $cursor moves before the measure start; the cursor is clamped to 0",
+                        )
+                        Rational.ZERO
+                    } else {
+                        target
+                    }
+                }
+                "forward" -> {
+                    val move = cursorMove(event, forward = true) ?: return@children
+                    reference = null
+                    cursor = exact(event.location) { cursor + move } ?: return@children
                     if (cursor > extent) extent = cursor
-                }
-                "attributes" -> attributesElement(event, cursorLost) { attribute, source ->
-                    add(AttributeEvent(eventId(), cursor, attribute), source)
-                }
-                "backup", "forward" -> {
-                    unsupportedTree(event, "S06", "Cursor move is not interpreted; later timed content in this measure is discarded")
-                    cursorLost = true
                 }
                 else -> unsupportedTree(event)
             }
@@ -345,63 +393,91 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Interprets divisions and staff-1 key, time, clef and staff-line state. Each state change
-     * becomes an [AttributeEvent] at the current cursor offset, in source order, so intra-measure
-     * changes apply exactly where they occur.
+     * Interprets a backup or forward duration in quarter notes using the current divisions. A forward
+     * gap is the absence of events, so its optional voice and staff are validated but not stored.
      */
-    private fun attributesElement(start: ScoreXmlEvent, cursorLost: Boolean, add: (Attribute, ScoreXmlEvent) -> Unit) {
+    private fun cursorMove(start: ScoreXmlEvent, forward: Boolean): Rational? {
+        attributes(start, feature = "S06")
+        val seen = mutableSetOf<String>()
+        var durationEvent: ScoreXmlEvent? = null
+        var duration: Rational? = null
+        children { event ->
+            when (val name = event.localName()) {
+                "duration" -> if (once(seen, name, event)) {
+                    durationEvent = event
+                    duration = positiveDecimal(event, "S06", "Duration")
+                }
+                "voice" -> if (!forward) unsupportedTree(event, "S06") else if (once(seen, name, event)) voiceLabel(event)
+                "staff" -> if (!forward) unsupportedTree(event, "S06") else if (once(seen, name, event)) staffNumber(event)
+                "footnote", "level" -> unsupportedTree(event, "S25")
+                else -> unsupportedTree(event, "S06")
+            }
+        }
+        if (!context.canContinue) return null
+        val durationSource = durationEvent ?: run {
+            invalid(start, "A ${start.localName()} requires a duration")
+            return null
+        }
+        val currentDivisions = divisions ?: run {
+            invalid(durationSource, "A duration requires preceding divisions")
+            return null
+        }
+        val sourceDuration = duration ?: return null
+        return exact(durationSource.location) { sourceDuration / currentDivisions }
+    }
+
+    /**
+     * Interprets divisions, staves and key, time, clef and staff-line state. Each state change
+     * becomes an [AttributeEvent] at the current cursor offset, in source order, so intra-measure
+     * changes apply exactly where they occur. A change without a `number` applies to every staff
+     * (one event per staff, once this element's `staves` is known), except a clef, which defaults
+     * to staff 1. A `number` beyond the declared staves is `INVALID_VALUE`.
+     */
+    private fun attributesElement(start: ScoreXmlEvent, add: (Attribute, Int, ScoreXmlEvent) -> Unit) {
         attributes(start, feature = "S07")
-        fun emit(attribute: Attribute?, source: ScoreXmlEvent) {
-            if (attribute == null) return
-            if (cursorLost) unsupported(source.location, "S06", "Attribute change after an uninterpreted cursor move is discarded")
-            else add(attribute, source)
+        val changes = mutableListOf<StaffChange>()
+        fun scoped(event: ScoreXmlEvent, label: String, allStaves: Boolean, parse: (ScoreXmlEvent) -> Attribute?) {
+            val number = event.attribute("number")
+            val staff = if (number == null) {
+                if (allStaves) null else 1
+            } else {
+                positiveInt(number) ?: run {
+                    context.report(DiagnosticCode.INVALID_VALUE, event.attributeLocation("number"), "$label number must be a positive Int")
+                    return
+                }
+            }
+            parse(event)?.let { changes += StaffChange(it, staff, event, label) }
         }
         children { event ->
             when (val name = event.localName()) {
                 "divisions" -> positiveDecimal(event, "S05", "Divisions")?.let { divisions = it }
-                "key" -> emit(key(event), event)
-                "time" -> emit(time(event), event)
-                "clef" -> emit(clef(event), event)
+                "key" -> scoped(event, "Key signature", allStaves = true, ::key)
+                "time" -> scoped(event, "Time signature", allStaves = true, ::time)
+                "clef" -> scoped(event, "Clef", allStaves = false, ::clef)
                 "staves" -> staves(event)
-                "staff-details" -> emit(staffDetails(event), event)
+                "staff-details" -> scoped(event, "Staff details", allStaves = true, ::staffDetails)
                 else -> unsupportedTree(event, ATTRIBUTES_CHILD_FEATURES[name] ?: "S07")
             }
         }
-    }
-
-    /**
-     * Returns whether an attributes child scoped by its optional `number` attribute applies to staff 1.
-     * Another staff is reported as discarded; a non-positive number is `INVALID_VALUE`. Callers skip
-     * the content of an element that does not apply without validating it.
-     */
-    private fun appliesToStaffOne(start: ScoreXmlEvent, label: String): Boolean {
-        val number = start.attribute("number") ?: return true
-        return when (val staff = positiveInt(number)) {
-            null -> {
-                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "$label number must be a positive Int")
-                false
+        for (change in changes) {
+            if (!context.canContinue) return
+            val staff = change.staff
+            if (staff != null && staff > staffCount) {
+                context.report(
+                    DiagnosticCode.INVALID_VALUE, change.source.attributeLocation("number").withDeclaredPart(),
+                    "${change.label} number $staff exceeds the $staffCount declared staves",
+                )
+                return
             }
-            1 -> true
-            else -> {
-                unsupported(start.location, "S08", "$label for staff $staff is not interpreted and is discarded")
-                false
-            }
+            (staff?.let { listOf(it) } ?: (1..staffCount)).forEach { add(change.attribute, it, change.source) }
         }
     }
 
-    /** Consumes a discarded element without interpreting its children, so they cannot fail the parse. */
-    private fun skipDiscarded(): Nothing? {
-        skipTree()
-        return null
-    }
-
     /**
-     * Interprets one simple beats/beat-type pair for staff 1; other time forms, and meters scoped
-     * by `number` to another staff, are reported as discarded.
+     * Interprets one simple beats/beat-type pair; other time forms are reported as discarded.
      */
     private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
         attributes(start, setOf("number"), "S07")
-        if (!appliesToStaffOne(start, "Time signature")) return skipDiscarded()
         val beats = mutableListOf<String>()
         val beatTypes = mutableListOf<String>()
         var simple = true
@@ -433,7 +509,6 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
      */
     private fun key(start: ScoreXmlEvent): Attribute.KeySignature? {
         attributes(start, setOf("number"), "S07")
-        if (!appliesToStaffOne(start, "Key signature")) return skipDiscarded()
         val seen = mutableSetOf<String>()
         var fifths: Int? = null
         var mode: KeyMode? = null
@@ -472,7 +547,6 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     /** Interprets a clef sign, line and octave change; a missing G/F/C line uses its standard line. */
     private fun clef(start: ScoreXmlEvent): Attribute.Clef? {
         attributes(start, setOf("number"), "S07")
-        if (!appliesToStaffOne(start, "Clef")) return skipDiscarded()
         val seen = mutableSetOf<String>()
         var sign: ClefSign? = null
         var line: Int? = null
@@ -500,8 +574,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Only one staff is interpreted; a larger staff count is reported as discarded. Any valid count
-     * declares staff 1 for the current part, even when the part has no events.
+     * Sets the staff count for later content of the current part. The part declares staves up to
+     * its largest count, even when it has no events.
      */
     private fun staves(start: ScoreXmlEvent) {
         val text = text(start, feature = "S08")
@@ -509,8 +583,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         when (val count = positiveInt(text)) {
             null -> context.report(DiagnosticCode.INVALID_VALUE, start.location, "Staves must be a positive Int")
             else -> {
-                currentPartId?.let { partsDeclaringStaves += it }
-                if (count > 1) unsupported(start.location, "S08", "$count staves are not interpreted; only staff 1 is imported")
+                staffCount = count
+                currentPartId?.let { declaredStaves[it] = maxOf(declaredStaves[it] ?: 0, count) }
             }
         }
     }
@@ -518,7 +592,6 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     /** Interprets the staff-line count; other staff details are reported as discarded. */
     private fun staffDetails(start: ScoreXmlEvent): Attribute.StaffLines? {
         attributes(start, setOf("number"), "S17")
-        if (!appliesToStaffOne(start, "Staff details")) return skipDiscarded()
         val seen = mutableSetOf<String>()
         var lines: Int? = null
         children { event ->
@@ -544,11 +617,11 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Parses a note in the current voice. A null result means it cannot be timed (an error, or an
-     * untimed chord/grace note that was reported as discarded). A timed but discarded note keeps
-     * its end cursor without an event, so later onsets stay exact.
+     * Parses a note's content, timing, voice and staff; the caller places it. A null result means it
+     * cannot be timed (an error, or an untimed grace note that was reported as discarded). A timed
+     * but discarded note has null content and keeps its duration, so later onsets stay exact.
      */
-    private fun note(start: ScoreXmlEvent, onset: Rational, id: String): TimedNote? {
+    private fun note(start: ScoreXmlEvent): ParsedNote? {
         attributes(start, feature = "S04")
         val seen = mutableSetOf<String>()
         var content: NoteContent? = null
@@ -556,6 +629,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         var durationEvent: ScoreXmlEvent? = null
         var role = NoteRole.NORMAL
         var voice = "1"
+        var staff = 1
+        var chord = false
         var value: NoteValue? = null
         var dots = 0
         var accidental: Accidental? = null
@@ -568,10 +643,14 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 return@children
             }
             when (val name = event.localName()) {
-                "chord", "grace" -> {
-                    val feature = if (name == "chord") "S06" else "S18"
-                    unsupportedTree(event, feature, "A $name note is not interpreted; the note is discarded")
+                "grace" -> {
+                    unsupportedTree(event, "S18", "A grace note is not interpreted; the note is discarded")
                     untimed = true
+                }
+                "chord" -> if (once(seen, name, event)) {
+                    attributes(event, feature = "S06")
+                    skipTree()
+                    chord = true
                 }
                 "cue" -> if (once(seen, name, event)) {
                     attributes(event, feature = "S18")
@@ -595,11 +674,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                     durationEvent = event
                     duration = positiveDecimal(event, "S05", "Duration")
                 }
-                "voice" -> if (once(seen, name, event)) {
-                    val text = text(event, feature = "S06").trim { it in WHITESPACE }
-                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Voice must be nonblank")
-                    else voice = text
-                }
+                "voice" -> if (once(seen, name, event)) voiceLabel(event)?.let { voice = it }
                 "type" -> if (once(seen, name, event)) {
                     val text = text(event, feature = "S05").trim { it in WHITESPACE }
                     value = NOTE_TYPES[text]
@@ -611,16 +686,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                     dots++
                 }
                 "accidental" -> if (once(seen, name, event)) accidental = accidental(event)
-                "staff" -> if (once(seen, name, event)) {
-                    when (val staff = positiveInt(text(event, feature = "S06"))) {
-                        null -> context.report(DiagnosticCode.INVALID_VALUE, event.location, "Staff must be a positive Int")
-                        1 -> Unit
-                        else -> {
-                            unsupported(event.location, "S06", "Staff $staff is not interpreted; the note is discarded")
-                            discarded = true
-                        }
-                    }
-                }
+                "staff" -> if (once(seen, name, event)) staffNumber(event)?.let { staff = it }
                 else -> unsupportedTree(event, NOTE_CHILD_FEATURES[name] ?: "S04")
             }
         }
@@ -639,14 +705,30 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         }
         val sourceDuration = duration ?: return null
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
-        val end = exact(durationSource.location) { onset + quarters } ?: return null
-        if (discarded) return TimedNote(null, end)
         val notation = NotatedValue(value, dots, accidental = accidental)
-        val event = when (val noteContent = content ?: return null) {
-            is NoteContent.Rest -> RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
-            is NoteContent.Pitch -> NoteEvent(id, onset, quarters, noteContent.pitch, voice = voice, notation = notation, role = role)
+        val noteContent = if (discarded) null else content ?: return null
+        return ParsedNote(noteContent, quarters, durationSource.location, chord, voice, staff, role, notation)
+    }
+
+    private fun voiceLabel(start: ScoreXmlEvent): String? {
+        val text = text(start, feature = "S06").trim { it in WHITESPACE }
+        if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, start.location, "Voice must be nonblank")
+        return text.ifEmpty { null }
+    }
+
+    /** A staff number within the staves currently declared for the part (one when undeclared). */
+    private fun staffNumber(start: ScoreXmlEvent): Int? {
+        val text = text(start, feature = "S06")
+        if (!context.canContinue) return null
+        val staff = positiveInt(text) ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "Staff must be a positive Int")
+            return null
         }
-        return TimedNote(event, end)
+        if (staff > staffCount) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "Staff $staff exceeds the $staffCount declared staves")
+            return null
+        }
+        return staff
     }
 
     private fun pitch(start: ScoreXmlEvent): NoteContent? {
@@ -842,7 +924,30 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
 
     private fun SourceLocation.withDeclaredPart(): SourceLocation = copy(partId = declaredPartId ?: partId)
 
-    private class TimedNote(val event: Event?, val end: Rational)
+    private class ParsedNote(
+        val content: NoteContent?,
+        val duration: Rational,
+        val durationLocation: SourceLocation,
+        val chord: Boolean,
+        val voice: String,
+        val staff: Int,
+        val role: NoteRole,
+        val notation: NotatedValue,
+    ) {
+        fun toEvent(id: String, onset: Rational, chordId: String?): Event = when (content) {
+            is NoteContent.Rest -> RestEvent(id, onset, duration, staff, voice, notation, content.wholeMeasure)
+            is NoteContent.Pitch -> NoteEvent(id, onset, duration, content.pitch, staff, voice, notation, role, chordId)
+            null -> error("A discarded note has no event")
+        }
+    }
+
+    /** The onset and duration of the non-chord note that chord tones share; [id] is allocated lazily. */
+    private class ChordReference(val onset: Rational, val duration: Rational, val eventIndex: Int?) {
+        var id: String? = null
+    }
+
+    /** A parsed staff-scoped attribute; a null [staff] applies to every staff. */
+    private class StaffChange(val attribute: Attribute, val staff: Int?, val source: ScoreXmlEvent, val label: String)
 
     private sealed interface NoteContent {
         class Pitch(val pitch: NotePitch) : NoteContent

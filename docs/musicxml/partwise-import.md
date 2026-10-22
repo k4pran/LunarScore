@@ -44,7 +44,7 @@ implies full MusicXML coverage, XSD validation or a renderable/playable score.
 - Empty measures and zero-measure part bodies are accepted by this skeleton API. An absent or
   empty part-list is rejected. Zero-measure bodies are an intentional neutral-model convenience,
   not a claim of schema conformance. Events/staff definitions remain empty and extent is zero;
-  MX-07/MX-08/MX-09 will supply musical interpretation and alignment.
+  MX-07/MX-08/MX-09 supply musical interpretation and alignment.
 
 Recognized top-level header elements must appear in specification order, with singleton fields
 checked for duplicates. Selected nested singleton fields are also checked. Unexpected structural

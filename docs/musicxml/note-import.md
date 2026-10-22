@@ -34,9 +34,9 @@ val events = score.parts.single().measures.single().events // AttributeEvent, No
 | `type` | `NotatedValue.value` (maxima … 1024th); absent type stays null, never inferred from duration |
 | `dot` | `NotatedValue.dots` count |
 | `accidental` with `cautionary`/`editorial` | `NotatedValue.accidental`, independent of `alter` (F03) |
-| `voice` | Event voice label, default `"1"`; voices are not separated in time (no backup/forward) |
+| `voice` | Event voice label, default `"1"`; voices are placed in time by backup/forward ([MX-09](polyphony.md)) |
 | `cue` | `NoteRole.CUE`; cue notes advance time like normal notes |
-| `staff` = 1 | Staff 1; parts containing events declare `Staff(1)` |
+| `staff` | Event staff, default 1; must not exceed the declared staves ([MX-09](polyphony.md)) |
 | `time` with one positive integer `beats`/`beat-type` pair | `AttributeEvent(TimeSignature)` at the cursor offset |
 
 Event IDs are generated as `<partId>:measure-<n>:event-<k>`, score-global and independent of
@@ -48,19 +48,17 @@ All of these are `UNSUPPORTED_FEATURE` with `DISCARDED` retention: strict reject
 
 | Content | Feature | Effect on timing |
 |---|---|---|
-| `chord` notes | S06 | Whole note discarded; cursor not advanced (chord tones share the previous onset) |
 | `grace` notes | S18 | Whole note discarded; no duration |
-| `unpitched` notes; `staff` other than 1 | S16; S06 | Note discarded; cursor still advances by its duration so later onsets stay exact |
-| `backup`/`forward` | S06 | Later notes and time signatures in that measure are each reported and discarded rather than placed at a wrong onset; divisions changes still apply |
+| `unpitched` notes | S16 | Note discarded; cursor still advances by its duration so later onsets stay exact |
 | `tie`, `time-modification`, `stem`/`beam`, `notations`, `lyric` | S09, S11, S10, S12, S14 | Child discarded; note and exact duration kept |
 | `instrument`; `footnote`/`level`; `play`/`listen` | S16; S25; S26 | Child discarded |
 | `notehead`, rest display-step/octave, dot attributes | S17 | Child/attribute discarded |
 | Note attributes (`default-x`, `dynamics`, `print-object`, …), unknown note children | S04 | Discarded |
-| `time` with `number` other than 1 | S08 (S07 before MX-08) | Whole time signature discarded so a meter scoped to another staff is never applied to staff 1; a non-positive `number` is `INVALID_VALUE` |
 | Time attributes (`symbol`, …); additive, multiple, interchangeable or `senza-misura` time | S07 | Discarded (a simple time with an unmapped attribute still yields its signature). Key, clef, staves and staff details are interpreted by [MX-08](attribute-state.md) |
 
 Measure fullness against the time signature is not checked. Key, clef and staff-detail state is
-[MX-08](attribute-state.md); multi-voice/cursor interpretation remains MX-09.
+[MX-08](attribute-state.md). [MX-09](polyphony.md) supersedes MX-07's discarding of chords, staves
+other than 1, backup/forward and staff-scoped time signatures.
 
 ## Fixtures and verification
 
