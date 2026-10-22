@@ -428,7 +428,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     val direction = direction(event, cursor, eventId()) ?: return@children
                     direction.event?.let {
                         add(it, event)
-                        registerWedges(it, direction.wedges, number)
+                        registerWedges(it, direction.wedges, SpanPosition(number, direction.wedgeOnset))
                     }
                 }
                 "backup", "forward" -> {
@@ -999,7 +999,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             }
             exact(source.location) { value / divisions } ?: return null
         } ?: Rational.ZERO
-        if (discarded || (marks.isEmpty() && sound == null)) return TimedDirection(null, emptyList())
+        if (discarded || (marks.isEmpty() && sound == null)) return TimedDirection(null, emptyList(), onset)
+        val wedgeOnset = if (wedges.isEmpty()) onset else exact(start.location) { onset + quarters } ?: return null
         val event = DirectionEvent(
             id,
             onset,
@@ -1008,7 +1009,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             sound = sound?.copy(offset = if (offsetAffectsSound) quarters else Rational.ZERO),
             display = DirectionDisplay(placement, directive, quarters),
         )
-        return TimedDirection(event, wedges.toList())
+        return TimedDirection(event, wedges.toList(), wedgeOnset)
     }
 
     /**
@@ -1119,10 +1120,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return DirectionSound(tempo, dynamics)
     }
 
-    /** Passes a direction's wedge marks to the part's resolver: stops, then continue points, then starts. */
-    private fun registerWedges(event: DirectionEvent, marks: List<SpanMark>, measure: Int) {
+    /** Passes a direction's wedge marks at [position] to the part's resolver: stops, then continue points, then starts. */
+    private fun registerWedges(event: DirectionEvent, marks: List<SpanMark>, position: SpanPosition) {
         val endpoints = marks.map { mark ->
-            mark to SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), SpanPosition(measure, event.onset), mark.location)
+            mark to SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), position, mark.location)
         }
         val resolver = body.spans
         endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.STOP) resolver.stop(endpoint) }
@@ -1444,8 +1445,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     private class TimedNote(val event: Event?, val end: Rational, val marks: List<SpanMark>)
 
-    /** A read direction; a null [event] means it was discarded with a diagnostic. */
-    private class TimedDirection(val event: DirectionEvent?, val wedges: List<SpanMark>)
+    /**
+     * A read direction; a null [event] means it was discarded with a diagnostic. [wedgeOnset] is
+     * the measure-local position, including the display offset, that orders its wedge endpoints.
+     */
+    private class TimedDirection(val event: DirectionEvent?, val wedges: List<SpanMark>, val wedgeOnset: Rational)
 
     /** A span endpoint read from a note, before the note's event identity is known. */
     private class SpanMark(val kind: RelationshipKind, val type: SpanType, val number: String, val location: SourceLocation)

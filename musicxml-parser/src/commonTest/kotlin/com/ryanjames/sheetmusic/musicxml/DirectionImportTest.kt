@@ -161,6 +161,20 @@ class DirectionImportTest {
     }
 
     @Test
+    fun testWedgeEndpointsAreOrderedByDisplayOffset() {
+        val xml = document(
+            direction("<wedge type='stop'/>", "<offset>2</offset>") + note("C") +
+                direction("<wedge type='crescendo'/>") + note("D") + note("E"),
+        )
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(
+            listOf(Relationship("P1:wedge-1", RelationshipKind.WEDGE, event(1, 3), event(1, 1))),
+            result.value.relationships,
+        )
+    }
+
+    @Test
     fun testUnsupportedVariantsAreDiscardedWithFeatureIds() {
         val xml = document(
             direction("<rehearsal>A</rehearsal><words font-weight='bold'>cresc.</words>") +
