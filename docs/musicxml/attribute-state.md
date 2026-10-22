@@ -20,12 +20,13 @@ val clefAtNote = states[noteEvent.id]?.clef   // null means no clef has been see
 | `key` with `fifths` and optional `mode` | `Attribute.KeySignature(fifths, KeyMode?)`; absent mode stays null |
 | `time` with one positive `beats`/`beat-type` pair | `Attribute.TimeSignature` (MX-07) |
 | `clef` `sign`/`line`/`clef-octave-change` | `Attribute.Clef`; signs G, F, C, percussion, TAB, jianpu, none. A missing line uses the MusicXML standard line for G (2), F (4) and C (3); otherwise it stays null |
-| `staves` = 1 | No event; staff 1 is already declared |
+| `staves` | No event; sets the part's staff count ([MX-09](polyphony.md)) |
 | `staff-details` `staff-lines` | `Attribute.StaffLines(count)`, zero allowed |
 
 Each change is emitted in source order at the cursor offset, so one `attributes` element can yield
 several events at the same onset. A `number` attribute on `key`, `time`, `clef` or `staff-details`
-scopes the change to that staff; only staff 1 is interpreted.
+scopes the change to that staff. Since [MX-09](polyphony.md), every staff is interpreted. Without
+`number`, key, time and staff details apply to every staff and a clef applies to staff 1.
 
 ## Effective state
 
@@ -47,9 +48,9 @@ Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from
 
 | Content | Outcome |
 |---|---|
-| Non-integer `fifths`, `line`, `clef-octave-change`; unknown clef sign; non-positive `staves` or attribute `number`; negative `staff-lines` | Fatal `INVALID_VALUE` |
+| Non-integer `fifths`, `line`, `clef-octave-change`; unknown clef sign; non-positive `staves` or attribute `number`; `number` beyond the declared staves (MX-09); negative `staff-lines` | Fatal `INVALID_VALUE` |
 | Key without `fifths` (traditional form), clef without `sign`, duplicate `fifths`/`mode`/`sign`/`line`/`staff-lines` | Fatal `INVALID_STRUCTURE` |
-| `key`/`time`/`clef`/`staff-details` for staff ≠ 1; `staves` > 1; `part-symbol` | S08 `DISCARDED` |
+| `part-symbol` | S08 `DISCARDED` (staff-scoped content and `staves` > 1 are interpreted since MX-09) |
 | Non-traditional keys (`key-step`/`key-alter`/`key-accidental`) | S07 `DISCARDED`, whole key dropped |
 | Key `cancel`, `key-octave`, an unknown `mode` value; key/clef display attributes (`print-object`, `after-barline`, `size`, …) | S07 `DISCARDED`; the key or clef itself is kept (unknown mode becomes null) |
 | `staff-tuning`, `capo` | S23 `DISCARDED` |
@@ -57,7 +58,6 @@ Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from
 | `transpose`, `instruments`, `for-part` | S16 `DISCARDED` |
 | `measure-style` | S24 `DISCARDED` |
 | `directive` and other unknown children | S07 `DISCARDED` |
-| Any state change after an uninterpreted `backup`/`forward` | S06 `DISCARDED`, rather than placed at a wrong offset |
 
 ## Fixtures and verification
 

@@ -169,8 +169,9 @@ class MusicXmlParserTest {
 
     @Test
     fun testMusicalSubtreesProduceFeatureDiagnostics() {
-        // Interpreted note/attribute content is covered by NoteImportTest; an unmapped attributes child stays S07.
-        val features = listOf("backup" to "S06", "attributes" to "S07", "direction" to "S13",
+        // Interpreted note/attribute/cursor content is covered by NoteImportTest and PolyphonyImportTest;
+        // an unmapped attributes child stays S07.
+        val features = listOf("attributes" to "S07", "direction" to "S13",
             "barline" to "S15", "print" to "S17", "harmony" to "S22", "figured-bass" to "S22",
             "grouping" to "S25", "sound" to "S26", "listening" to "S26")
         val xml = document("<measure number='A'/><measure number='A'>" +

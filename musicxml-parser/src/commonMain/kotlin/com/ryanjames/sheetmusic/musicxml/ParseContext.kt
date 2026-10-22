@@ -77,7 +77,8 @@ internal class ParseContext(private val options: ParseOptions = ParseOptions()) 
         }
         val recoverable = when (code) {
             DiagnosticCode.UNMATCHED_SPAN, DiagnosticCode.INVALID_CURSOR_MOVE,
-            DiagnosticCode.INCONSISTENT_MEASURE_DURATION, DiagnosticCode.UNSUPPORTED_FEATURE,
+            DiagnosticCode.INCONSISTENT_MEASURE_DURATION, DiagnosticCode.INCONSISTENT_CHORD_DURATION,
+            DiagnosticCode.UNSUPPORTED_FEATURE,
             DiagnosticCode.RECOVERED_VALUE -> true
             else -> false
         }
