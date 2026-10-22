@@ -78,7 +78,7 @@ Windows verification on 2026-10-22:
 
 | Check | Result |
 |---|---|
-| Parser JVM / Android host tests | 82 passed per target (12 note, 18 skeleton, 24 reader, 15 contract, 13 probes) |
+| Parser JVM / Android host tests | 91 passed per target (12 note, 18 skeleton, 33 reader, 15 contract, 13 probes) |
 | Parser build, Android AAR, JVM jar | Passed |
 | Parser iosArm64 / iosSimulatorArm64 test klibs | Cross-compiled |
 | Neutral model / core regression tests | Passed |
