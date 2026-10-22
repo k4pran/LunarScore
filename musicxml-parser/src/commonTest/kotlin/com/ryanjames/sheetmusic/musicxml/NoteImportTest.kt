@@ -200,6 +200,19 @@ class NoteImportTest {
     }
 
     @Test
+    fun testForeignTimeChildKeepsSimpleMeter() {
+        val xml = document(
+            "<attributes><time xmlns:e='urn:extension'><beats>3</beats><e:hint>x</e:hint><beat-type>4</beat-type></time>" +
+                "</attributes><note><rest/><duration>1</duration></note>",
+        )
+        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf("foreign-extension"), result.diagnostics.map { it.unsupported?.featureId })
+        val events = events(result)
+        assertEquals(Attribute.TimeSignature(3, 4), assertIs<AttributeEvent>(events[0]).attribute)
+        assertIs<RestEvent>(events[1])
+    }
+
+    @Test
     fun testTimeNumberScopesMeterToStaff() {
         val xml = document(
             "<attributes><time number='2'><beats>3</beats><beat-type>4</beat-type></time>" +
