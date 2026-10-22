@@ -11,6 +11,7 @@ import com.ryanjames.sheetmusic.score.NoteEvent
 import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.Score
+import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.WrittenPitch
 import com.ryanjames.sheetmusic.score.effectiveStates
@@ -128,6 +129,15 @@ class AttributeImportTest {
         failure(document("<attributes><staves>0</staves></attributes>"), DiagnosticCode.INVALID_VALUE)
         failure(document("<attributes><staff-details><staff-lines>-1</staff-lines></staff-details></attributes>"),
             DiagnosticCode.INVALID_VALUE)
+    }
+
+    @Test
+    fun testStavesDeclarationRetainsStaffOneWithoutEvents() {
+        val declared = success(document("<attributes><staves>1</staves></attributes>")).value.parts.single()
+        assertTrue(declared.measures.single().events.isEmpty())
+        assertEquals(listOf(Staff(1)), declared.staves)
+        val undeclared = success(document("")).value.parts.single()
+        assertTrue(undeclared.staves.isEmpty())
     }
 
     @Test
