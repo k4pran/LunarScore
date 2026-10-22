@@ -42,7 +42,7 @@ public fun Score.validate(): List<ModelDiagnostic> {
                 val instrument = when (event) {
                     is NoteEvent -> event.instrumentId
                     is AttributeEvent -> (event.attribute as? Attribute.InstrumentChange)?.instrumentId
-                    is RestEvent -> null
+                    is RestEvent, is DirectionEvent -> null
                 }
                 if (instrument != null && instrument !in instrumentIds) {
                     diagnostics += ModelDiagnostic(ModelDiagnosticCode.UNKNOWN_INSTRUMENT, path, instrument)

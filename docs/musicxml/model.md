@@ -36,7 +36,8 @@ does not depend on that module.
   and time modification. MX-12 adds the printed `StemDirection` and per-level `Beam`s to
   `NotatedValue`; a time modification is the cumulative ratio for nested tuplets, while each tuplet
   bracket is a `TUPLET` relationship. Explicit performance attack/release offsets are in quarter notes.
-  Grace duration is null and does not advance the main timeline. Cue duration is positive.
+  MX-13 adds `NotatedValue.expressions` (articulations, ornaments and `Dynamics`, each type kept
+  apart from its `Placement`). Grace duration is null and does not advance the main timeline. Cue duration is positive.
   A chord is independently timed noteheads sharing a chord ID; staff and duration may differ.
 - Attribute events retain exact offsets for simple time signatures, traditional key signatures
   (fifths and optional `KeyMode`), clefs (line null when unspecified for signs without a standard
@@ -44,6 +45,10 @@ does not depend on that module.
   source attributes must be expanded explicitly. MX-08 adds `Part.effectiveStates()`, which resolves
   the `AttributeState` in effect for every event per staff, in onset order and across measures;
   missing state stays null. See [attribute state](attribute-state.md).
+- MX-13 adds `DirectionEvent`: printed `DirectionMark`s (words, dynamics, metronome, wedge) in
+  source order, optional `DirectionSound` playback tempo/dynamics/offset and `DirectionDisplay`
+  placement/directive/offset, kept separately. Wedge endpoints are linked by `WEDGE` relationships.
+  See [directions and note expressions](direction-import.md).
 - Relationships have their own IDs and typed endpoint event IDs. Sound ties, printed ties and slurs
   remain independent; multiple/nested spans may share endpoints. Missing endpoints remain null.
   IDs must be assigned independently of source XML IDs so anonymous elements remain addressable.
@@ -71,7 +76,7 @@ repair or omit records. Source positions, strict/tolerant import policy and unsu
 retention belong to MX-03, outside the neutral model. Chord-reference duration rules, meter fullness,
 pitch agreement for ties and other musical consistency checks remain feature tasks.
 
-Additive meters, non-traditional keys, directions, layout hints, lyrics, rich annotations and opaque source content
+Additive meters, non-traditional keys, unsupported direction types, layout hints, lyrics, rich annotations and opaque source content
 are not accepted as import input by this change; no parser API exists here. Their future adapters
 must implement them or emit the S01–S27 unsupported diagnostics in the coverage/risk ledger.
 

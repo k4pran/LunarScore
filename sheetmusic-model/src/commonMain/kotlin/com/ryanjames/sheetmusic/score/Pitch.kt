@@ -65,6 +65,7 @@ public data class Beam(val level: Int, val type: BeamType) {
  * Notation without inferred playback; absent [value] means unspecified, rather than quarter.
  * [timeModification] is the note's cumulative ratio, including every enclosing nested tuplet.
  * [beams] are listed in source order with distinct levels; an empty list means no printed beam.
+ * [expressions] are articulations, ornaments and dynamics attached to the note, in source order.
  */
 public data class NotatedValue(
     val value: NoteValue? = null,
@@ -73,6 +74,7 @@ public data class NotatedValue(
     val accidental: Accidental? = null,
     val stem: StemDirection? = null,
     val beams: List<Beam> = emptyList(),
+    val expressions: List<NoteExpression> = emptyList(),
 ) {
     init {
         require(dots >= 0)

@@ -44,7 +44,7 @@ partwise and timewise input. Each kind is paired on its own:
 | Unknown `type` (including `continue` on `tie` and `let-ring` on `slur`); `number` outside 1–16 | Fatal `INVALID_VALUE` |
 | `tie` with `time-only`; `tied type="let-ring"`; a `tie` or `tied` on a rest | S09 `DISCARDED`; that mark is dropped. A slur on a rest is kept |
 | Display attributes on `tie`/`tied`/`slur` (`placement`, `orientation`, `line-type`, bezier, color, `id`, …) | S09 `DISCARDED` per attribute; the span is kept |
-| Other `notations` children: `footnote`/`level`; articulations, ornaments, fermata, dynamics, technical and the rest | S25; S12 `DISCARDED`. `notations` attributes are S12. `tuplet` is resolved as a `TUPLET` span by [MX-12](tuplet-import.md) |
+| Other `notations` children: `footnote`/`level`; fermata, technical and the rest | S25; S12 `DISCARDED`. `notations` attributes are S12. `tuplet` is resolved as a `TUPLET` span by [MX-12](tuplet-import.md); articulations, ornaments and dynamics are note expressions from [MX-13](direction-import.md) |
 
 Ties are not checked against durations or onsets: a stop pairs even when it does not start where
 the tied note ends. Enharmonic ties (for example C#4 to Db4) are not paired.

@@ -118,6 +118,29 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-13 direction and note expression decisions and remaining gaps
+
+The importer now keeps [directions and note expressions](direction-import.md). This supersedes the
+MX-06 S13 discard of a measure's `direction` element, MX-11's S12 discard of `articulations`,
+`ornaments` and `dynamics` notations, and the S26 discard of a direction's `sound` tempo/dynamics.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Semantic versus visual components | Mark type (`ArticulationType`, `OrnamentType`, dynamics markings, words, metronome, wedge type) kept apart from `placement`, `directive` and display `offset`; `sound` tempo/dynamics in `DirectionSound`, never derived from printed marks (F13/F14) | Renderer does not consume expressions or directions yet |
+| Direction after backup/forward | S06 `DISCARDED`; no event, so it is never mistimed; a wedge partner becomes `UNMATCHED_SPAN` (inline test) | MX-09 cursor interpretation, then an exact-offset-after-backup fixture |
+| Direction on staff ≠ 1 | S06 `DISCARDED`, like notes | MX-09 multiple staves |
+| `offset` | Exact rational quarter notes, negative allowed; display only unless `sound="yes"`, which also sets `DirectionSound.offset`; offset before divisions fatal `INVALID_STRUCTURE` | None |
+| Other direction types: `rehearsal`, `segno`, `coda`, `pedal`, `octave-shift`, `dashes`, `bracket`, `damp`, `eyeglasses`, `image`, `principal-voice`, `percussion`, `accordion-registration`, `harp-pedals`, `scordatura`, `string-mute`, `staff-divide`, `symbol`, `other-direction` | S13 `DISCARDED` per element; the rest of the direction is kept, and a direction with nothing interpretable has no event | Model and import each type; `PEDAL` relationship is reserved |
+| Metric modulation, `beat-unit-tied`, `metronome-note` metronome forms | S13 `DISCARDED`; metronome dropped | Complex metronome model |
+| Display attributes (fonts, enclosure, position, color, `parentheses`, wedge `spread`/`niente`/line style, `strong-accent type`, trill-sound and mordent attributes) | S13 or S12 `DISCARDED` per attribute; mark kept | Layout hints (MX-18); ornament realization |
+| Other notations: `fermata`, `technical`, `arpeggiate`, `glissando`, `slide`, `accidental-mark`, `non-arpeggiate`, `other-notation`; other articulations/ornaments (`breath-mark`, `caesura`, `scoop`, `plop`, `doit`, `falloff`, `wavy-line`, `tremolo`, `other-ornament`, …) | S12 `DISCARDED` per element | Fermata, tremolo and wavy-line models |
+| Other `sound` attributes and children; `listening` in a direction | S26 `DISCARDED`; tempo/dynamics kept | MX-16 instrument change, MX-20/21 listening and playback |
+| Unmatched wedge endpoints or `continue` without an open wedge | `UNMATCHED_SPAN`; relationship kept with a null partner | None |
+| Unknown placement, wedge type or beat unit; wedge number outside 1–16; malformed offset or sound values; blank per-minute | Fatal `INVALID_VALUE` | None |
+| Direction without `direction-type`; wedge without type; metronome without beat-unit/per-minute; duplicate offset/voice/staff/sound | Fatal `INVALID_STRUCTURE` | None |
+
+F13 and F14 are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-12 beam, stem and tuplet decisions and remaining gaps
 
 The importer now keeps [stems, beams, time modifications and tuplet spans](tuplet-import.md) on
@@ -154,7 +177,7 @@ supersedes MX-07's S09 discard of `tie` and its S12 discard of the whole `notati
 | Missing `type`; unknown `type`; `number` outside 1–16 | Fatal `INVALID_STRUCTURE`; fatal `INVALID_VALUE` | None |
 | `tie time-only`; `tied type="let-ring"`; tie or tied on a rest | S09 `DISCARDED`; mark dropped (a slur on a rest is kept) | Repeat-pass playback (MX-17); let-ring model |
 | Display attributes on `tie`/`tied`/`slur` | S09 `DISCARDED` per attribute; span kept | MX-18 layout |
-| Other `notations` children and `notations` attributes | S12 (S25 `footnote`/`level`) `DISCARDED` per child; `tuplet` superseded by MX-12 below | MX-13 |
+| Other `notations` children and `notations` attributes | S12 (S25 `footnote`/`level`) `DISCARDED` per child; `tuplet` superseded by MX-12 and articulations, ornaments and dynamics by MX-13 above | Remaining notations (fermata, technical, …) |
 
 F10 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
 

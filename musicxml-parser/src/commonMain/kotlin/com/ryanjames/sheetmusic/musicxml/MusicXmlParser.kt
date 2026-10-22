@@ -5,18 +5,27 @@ import com.ryanjames.sheetmusic.score.Attribute
 import com.ryanjames.sheetmusic.score.Beam
 import com.ryanjames.sheetmusic.score.BeamType
 import com.ryanjames.sheetmusic.score.AttributeEvent
+import com.ryanjames.sheetmusic.score.ArticulationType
 import com.ryanjames.sheetmusic.score.ClefSign
+import com.ryanjames.sheetmusic.score.DirectionDisplay
+import com.ryanjames.sheetmusic.score.DirectionEvent
+import com.ryanjames.sheetmusic.score.DirectionMark
+import com.ryanjames.sheetmusic.score.DirectionSound
+import com.ryanjames.sheetmusic.score.Dynamics
 import com.ryanjames.sheetmusic.score.Event
 import com.ryanjames.sheetmusic.score.KeyMode
 import com.ryanjames.sheetmusic.score.Measure
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
 import com.ryanjames.sheetmusic.score.NotatedValue
+import com.ryanjames.sheetmusic.score.NoteExpression
 import com.ryanjames.sheetmusic.score.NoteEvent
 import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.NoteRole
 import com.ryanjames.sheetmusic.score.NoteValue
+import com.ryanjames.sheetmusic.score.OrnamentType
 import com.ryanjames.sheetmusic.score.Part
+import com.ryanjames.sheetmusic.score.Placement
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.RationalError
 import com.ryanjames.sheetmusic.score.RationalException
@@ -27,6 +36,7 @@ import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.StemDirection
 import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.TimeModification
+import com.ryanjames.sheetmusic.score.WedgeType
 import com.ryanjames.sheetmusic.score.WrittenPitch
 
 /**
@@ -37,7 +47,10 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * measure gets an empty measure there. Stems, beams and cumulative (nested) time modifications are
  * kept as note notation. Sound ties, notated ties, slurs and tuplets on imported events are
  * paired within each part across measures and voices; an unmatched endpoint is reported as
- * `UNMATCHED_SPAN` and kept with a null partner. Other musical content is not implemented yet: meaningful unmapped
+ * `UNMATCHED_SPAN` and kept with a null partner. Articulations, ornaments and note dynamics are
+ * kept as note expressions; staff-1 directions (words, dynamics, metronome marks and wedges, with
+ * separate sound tempo/dynamics and display placement/offset) become events at the cursor, and
+ * wedges are paired like slurs. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -409,6 +422,15 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 "attributes" -> attributesElement(event, cursorLost) { attribute, source ->
                     add(AttributeEvent(eventId(), cursor, attribute), source)
                 }
+                "direction" -> if (cursorLost) {
+                    unsupportedTree(event, "S06", "Direction after an uninterpreted cursor move is discarded")
+                } else {
+                    val direction = direction(event, cursor, eventId()) ?: return@children
+                    direction.event?.let {
+                        add(it, event)
+                        registerWedges(it, direction.wedges, number)
+                    }
+                }
                 "backup", "forward" -> {
                     unsupportedTree(event, "S06", "Cursor move is not interpreted; later timed content in this measure is discarded")
                     cursorLost = true
@@ -640,6 +662,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var discarded = false
         var untimed = false
         val marks = mutableListOf<SpanMark>()
+        val expressions = mutableListOf<NoteExpression>()
         children { event ->
             // An untimed note's diagnostic covers its remaining children.
             if (untimed) {
@@ -697,7 +720,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     else beams += beam
                 }
                 "tie" -> tie(event)?.let { marks += it }
-                "notations" -> notations(event, marks)
+                "notations" -> notations(event, marks, expressions)
                 "staff" -> if (once(seen, name, event)) {
                     when (val staff = positiveInt(text(event, feature = "S06"))) {
                         null -> context.report(DiagnosticCode.INVALID_VALUE, event.location, "Staff must be a positive Int")
@@ -728,7 +751,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
         if (discarded) return TimedNote(null, end, emptyList())
-        val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList())
+        val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList())
         val event = when (val noteContent = content ?: return null) {
             is NoteContent.Rest -> RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
             is NoteContent.Pitch -> NoteEvent(id, onset, quarters, noteContent.pitch, voice = voice, notation = notation, role = role)
@@ -748,7 +771,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val (voice, pitch) = when (event) {
             is NoteEvent -> event.voice to (event.pitch as? NotePitch.Pitched)?.written
             is RestEvent -> event.voice to null
-            is AttributeEvent -> return
+            is AttributeEvent, is DirectionEvent -> return
         }
         val endpoints = marks.mapNotNull { mark ->
             val key = when {
@@ -808,10 +831,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Interprets `tied`, `slur` and `tuplet` notations; other notations are discarded under their
-     * feature group. Display attributes of the interpreted marks are reported as discarded.
+     * Interprets `tied`, `slur` and `tuplet` notations as span marks, and articulations, ornaments
+     * and dynamics as [expressions]; other notations are discarded under their feature group.
+     * Display attributes of the interpreted marks are reported as discarded.
      */
-    private fun notations(start: ScoreXmlEvent, marks: MutableList<SpanMark>) {
+    private fun notations(start: ScoreXmlEvent, marks: MutableList<SpanMark>, expressions: MutableList<NoteExpression>) {
         attributes(start, feature = "S12")
         children { event ->
             when (val name = event.localName()) {
@@ -829,6 +853,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     }
                 }
                 "tuplet" -> tuplet(event)?.let { marks += it }
+                "articulations" -> expressionGroup(event, "Articulation", ARTICULATIONS) { type, placement ->
+                    NoteExpression.Articulation(type, placement)
+                }.let { expressions += it }
+                "ornaments" -> expressionGroup(event, "Ornament", ORNAMENTS) { type, placement ->
+                    NoteExpression.Ornament(type, placement)
+                }.let { expressions += it }
+                "dynamics" -> dynamics(event, "S12")?.let { expressions += it }
                 "footnote", "level" -> unsupportedTree(event, "S25")
                 else -> unsupportedTree(event, "S12")
             }
@@ -846,6 +877,272 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val number = numberLevel(start, "Tuplet")
         children { event -> unsupportedTree(event, "S11", "Tuplet display content is not interpreted: ${event.name}") }
         return if (type != null && number != null) SpanMark(RelationshipKind.TUPLET, type, number, start.location) else null
+    }
+
+    /**
+     * Reads `articulations` or `ornaments`: each child named in [types] becomes one expression with
+     * its placement; other children (for example `breath-mark` or `wavy-line`) and display or
+     * playback attributes are reported as S12 discarded.
+     */
+    private fun <T> expressionGroup(
+        start: ScoreXmlEvent,
+        label: String,
+        types: Map<String, T>,
+        create: (T, Placement?) -> NoteExpression,
+    ): List<NoteExpression> {
+        attributes(start, feature = "S12")
+        val expressions = mutableListOf<NoteExpression>()
+        children { event ->
+            val type = event.localName()?.let { types[it] } ?: run {
+                unsupportedTree(event, "S12", "$label is not interpreted: ${event.name}")
+                return@children
+            }
+            attributes(event, setOf("placement"), "S12")
+            val placement = placement(event)
+            children { child -> unsupportedTree(child, "S12") }
+            expressions += create(type, placement)
+        }
+        return expressions
+    }
+
+    /**
+     * Reads a `dynamics` element in notations or a direction. Each standard marking keeps its
+     * element name and `other-dynamics` its text, in source order. Without a marking it is discarded.
+     */
+    private fun dynamics(start: ScoreXmlEvent, feature: String): Dynamics? {
+        attributes(start, setOf("placement"), feature)
+        val placement = placement(start)
+        val markings = mutableListOf<String>()
+        children { event ->
+            val name = event.localName()
+            when {
+                name == "other-dynamics" -> markings += text(event, feature = feature)
+                name != null && name in DYNAMIC_MARKINGS -> {
+                    attributes(event, feature = feature)
+                    skipTree()
+                    markings += name
+                }
+                else -> unsupportedTree(event, feature)
+            }
+        }
+        if (!context.canContinue) return null
+        if (markings.isEmpty()) {
+            unsupported(start.location, feature, "Dynamics without a marking are discarded")
+            return null
+        }
+        return Dynamics(markings.toList(), placement)
+    }
+
+    /**
+     * Reads a direction at [onset]. Printed direction types become [DirectionMark]s in source
+     * order, the `sound` child becomes separate [DirectionSound] playback data, and placement,
+     * directive and `offset` become [DirectionDisplay]. An offset with `sound="yes"` also shifts the
+     * sound. A direction for another staff, or with nothing interpretable, has a null event. A null
+     * result means a fatal diagnostic was reported.
+     */
+    private fun direction(start: ScoreXmlEvent, onset: Rational, id: String): TimedDirection? {
+        attributes(start, setOf("placement", "directive"), "S13")
+        val placement = placement(start)
+        val directive = yesNo(start, "directive") ?: return null
+        val seen = mutableSetOf<String>()
+        val marks = mutableListOf<DirectionMark>()
+        val wedges = mutableListOf<SpanMark>()
+        var voice: String? = null
+        var offset: Rational? = null
+        var offsetSource: ScoreXmlEvent? = null
+        var offsetAffectsSound = false
+        var sound: DirectionSound? = null
+        var discarded = false
+        children { event ->
+            when (val name = event.localName()) {
+                "direction-type" -> {
+                    seen += name
+                    directionType(event, marks, wedges)
+                }
+                "offset" -> if (once(seen, name, event)) {
+                    offsetAffectsSound = yesNo(event, "sound") ?: return@children
+                    offsetSource = event
+                    offset = decimal(event, "S13", "Offset", setOf("sound"))
+                }
+                "voice" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S13").trim { it in WHITESPACE }
+                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Voice must be nonblank")
+                    else voice = text
+                }
+                "staff" -> if (once(seen, name, event)) {
+                    when (val staff = positiveInt(text(event, feature = "S13"))) {
+                        null -> context.report(DiagnosticCode.INVALID_VALUE, event.location, "Staff must be a positive Int")
+                        1 -> Unit
+                        else -> {
+                            unsupported(event.location, "S06", "Staff $staff is not interpreted; the direction is discarded")
+                            discarded = true
+                        }
+                    }
+                }
+                "sound" -> if (once(seen, name, event)) sound = sound(event)
+                "footnote", "level" -> unsupportedTree(event, "S25")
+                "listening" -> unsupportedTree(event, "S26")
+                else -> unsupportedTree(event, "S13")
+            }
+        }
+        if (!context.canContinue) return null
+        if ("direction-type" !in seen) {
+            invalid(start, "A direction requires a direction-type")
+            return null
+        }
+        val quarters = offsetSource?.let { source ->
+            val value = offset ?: return null
+            val divisions = body.divisions ?: run {
+                invalid(source, "An offset requires preceding divisions")
+                return null
+            }
+            exact(source.location) { value / divisions } ?: return null
+        } ?: Rational.ZERO
+        if (discarded || (marks.isEmpty() && sound == null)) return TimedDirection(null, emptyList())
+        val event = DirectionEvent(
+            id,
+            onset,
+            marks.toList(),
+            voice = voice,
+            sound = sound?.copy(offset = if (offsetAffectsSound) quarters else Rational.ZERO),
+            display = DirectionDisplay(placement, directive, quarters),
+        )
+        return TimedDirection(event, wedges.toList())
+    }
+
+    /** Reads words, dynamics, simple metronome marks and wedges; other direction types are S13 discarded. */
+    private fun directionType(start: ScoreXmlEvent, marks: MutableList<DirectionMark>, wedges: MutableList<SpanMark>) {
+        attributes(start, feature = "S13")
+        children { event ->
+            when (event.localName()) {
+                "words" -> marks += DirectionMark.Words(text(event, feature = "S13"))
+                "dynamics" -> dynamics(event, "S13")?.let { marks += it }
+                "metronome" -> metronome(event)?.let { marks += it }
+                "wedge" -> wedge(event)?.let { (mark, span) ->
+                    marks += mark
+                    wedges += span
+                }
+                else -> unsupportedTree(event, "S13", "Direction type is not interpreted: ${event.name}")
+            }
+        }
+    }
+
+    /**
+     * Reads a `beat-unit = per-minute` metronome mark. Metric modulations, tied beat units and
+     * `metronome-note` forms are reported as discarded, as are `parentheses` and display attributes.
+     */
+    private fun metronome(start: ScoreXmlEvent): DirectionMark.Metronome? {
+        attributes(start, feature = "S13")
+        var beatUnits = 0
+        var beatUnit: NoteValue? = null
+        var dots = 0
+        var perMinute: String? = null
+        var simple = true
+        val seen = mutableSetOf<String>()
+        children { event ->
+            when (val name = event.localName()) {
+                "beat-unit" -> {
+                    beatUnits++
+                    val text = text(event, feature = "S13").trim { it in WHITESPACE }
+                    val value = NOTE_TYPES[text]
+                    if (value == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown beat unit: $text")
+                    if (beatUnits == 1) beatUnit = value
+                }
+                "beat-unit-dot" -> {
+                    attributes(event, feature = "S13")
+                    skipTree()
+                    if (beatUnits == 1) dots++
+                }
+                "per-minute" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S13").trim { it in WHITESPACE }
+                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Per-minute must be nonblank")
+                    perMinute = text
+                }
+                null -> unsupportedTree(event)
+                else -> {
+                    simple = false
+                    skipTree()
+                }
+            }
+        }
+        if (!context.canContinue) return null
+        if (!simple || beatUnits > 1) {
+            unsupported(start.location, "S13", "Only a beat-unit = per-minute metronome mark is interpreted; metronome discarded")
+            return null
+        }
+        val unit = beatUnit
+        val rate = perMinute
+        if (unit == null || rate == null) {
+            invalid(start, "A metronome mark requires a beat-unit and per-minute")
+            return null
+        }
+        return DirectionMark.Metronome(unit, rate, dots)
+    }
+
+    /** A hairpin endpoint paired by `number` (1 to 16) like a slur; display attributes are S13 discarded. */
+    private fun wedge(start: ScoreXmlEvent): Pair<DirectionMark.Wedge, SpanMark>? {
+        attributes(start, setOf("type", "number"), "S13")
+        val text = start.attribute("type") ?: run {
+            invalid(start, "A wedge requires a type")
+            return null
+        }
+        val type = WEDGE_TYPES[text]
+        if (type == null) context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("type"), "Unknown wedge type: $text")
+        val number = numberLevel(start, "Wedge")
+        children { event -> unsupportedTree(event, "S13") }
+        if (type == null || number == null || !context.canContinue) return null
+        val spanType = when (type) {
+            WedgeType.CRESCENDO, WedgeType.DIMINUENDO -> SpanType.START
+            WedgeType.CONTINUE -> SpanType.CONTINUE
+            WedgeType.STOP -> SpanType.STOP
+        }
+        return DirectionMark.Wedge(type) to SpanMark(RelationshipKind.WEDGE, spanType, number, start.location)
+    }
+
+    /**
+     * Reads the `tempo` and `dynamics` playback attributes of a direction's `sound`. Other sound
+     * attributes and children are reported as S26 discarded; a sound with neither attribute is null.
+     */
+    private fun sound(start: ScoreXmlEvent): DirectionSound? {
+        attributes(start, setOf("tempo", "dynamics"), "S26")
+        val tempo = nonNegativeDecimalAttribute(start, "tempo", "Sound tempo")
+        val dynamics = nonNegativeDecimalAttribute(start, "dynamics", "Sound dynamics")
+        children { event -> unsupportedTree(event, "S26") }
+        if (!context.canContinue || (tempo == null && dynamics == null)) return null
+        return DirectionSound(tempo, dynamics)
+    }
+
+    /** Passes a direction's wedge marks to the part's resolver: stops, then continue points, then starts. */
+    private fun registerWedges(event: DirectionEvent, marks: List<SpanMark>, measure: Int) {
+        val endpoints = marks.map { mark ->
+            mark to SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), SpanPosition(measure, event.onset), mark.location)
+        }
+        val resolver = body.spans
+        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.STOP) resolver.stop(endpoint) }
+        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.CONTINUE) resolver.continuePoint(endpoint) }
+        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.START) resolver.start(endpoint) }
+    }
+
+    private fun placement(start: ScoreXmlEvent): Placement? = when (val text = start.attribute("placement")) {
+        null -> null
+        "above" -> Placement.ABOVE
+        "below" -> Placement.BELOW
+        else -> {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("placement"), "Unknown placement: $text")
+            null
+        }
+    }
+
+    /** An optional non-negative decimal attribute; null when absent or after an `INVALID_VALUE`. */
+    private fun nonNegativeDecimalAttribute(start: ScoreXmlEvent, name: String, label: String): Rational? {
+        val text = start.attribute(name) ?: return null
+        val location = start.attributeLocation(name)
+        val value = exact(location) { parseDecimal(text) }
+        if (value == null || value < Rational.ZERO) {
+            if (context.canContinue) context.report(DiagnosticCode.INVALID_VALUE, location, "$label must be a non-negative decimal")
+            return null
+        }
+        return value
     }
 
     /**
@@ -1012,8 +1309,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return value
     }
 
-    private fun decimal(start: ScoreXmlEvent, feature: String, label: String): Rational? {
-        val text = text(start, feature = feature)
+    private fun decimal(start: ScoreXmlEvent, feature: String, label: String, allowed: Set<String> = emptySet()): Rational? {
+        val text = text(start, allowed, feature)
         if (!context.canContinue) return null
         return exact(start.location) {
             parseDecimal(text) ?: run {
@@ -1140,6 +1437,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     private class TimedNote(val event: Event?, val end: Rational, val marks: List<SpanMark>)
 
+    /** A read direction; a null [event] means it was discarded with a diagnostic. */
+    private class TimedDirection(val event: DirectionEvent?, val wedges: List<SpanMark>)
+
     /** A span endpoint read from a note, before the note's event identity is known. */
     private class SpanMark(val kind: RelationshipKind, val type: SpanType, val number: String, val location: SourceLocation)
 
@@ -1197,6 +1497,33 @@ private val STEM_DIRECTIONS: Map<String, StemDirection> = mapOf(
 private val BEAM_TYPES: Map<String, BeamType> = mapOf(
     "begin" to BeamType.BEGIN, "continue" to BeamType.CONTINUE, "end" to BeamType.END,
     "forward hook" to BeamType.FORWARD_HOOK, "backward hook" to BeamType.BACKWARD_HOOK,
+)
+
+private val ARTICULATIONS: Map<String, ArticulationType> = mapOf(
+    "accent" to ArticulationType.ACCENT, "strong-accent" to ArticulationType.STRONG_ACCENT,
+    "staccato" to ArticulationType.STACCATO, "tenuto" to ArticulationType.TENUTO,
+    "detached-legato" to ArticulationType.DETACHED_LEGATO, "staccatissimo" to ArticulationType.STACCATISSIMO,
+    "spiccato" to ArticulationType.SPICCATO, "stress" to ArticulationType.STRESS,
+    "unstress" to ArticulationType.UNSTRESS, "soft-accent" to ArticulationType.SOFT_ACCENT,
+)
+
+private val ORNAMENTS: Map<String, OrnamentType> = mapOf(
+    "trill-mark" to OrnamentType.TRILL_MARK, "turn" to OrnamentType.TURN, "delayed-turn" to OrnamentType.DELAYED_TURN,
+    "inverted-turn" to OrnamentType.INVERTED_TURN, "delayed-inverted-turn" to OrnamentType.DELAYED_INVERTED_TURN,
+    "vertical-turn" to OrnamentType.VERTICAL_TURN, "inverted-vertical-turn" to OrnamentType.INVERTED_VERTICAL_TURN,
+    "shake" to OrnamentType.SHAKE, "mordent" to OrnamentType.MORDENT, "inverted-mordent" to OrnamentType.INVERTED_MORDENT,
+    "haydn" to OrnamentType.HAYDN, "schleifer" to OrnamentType.SCHLEIFER,
+)
+
+/** The empty dynamics elements of MusicXML 4.0; `other-dynamics` carries its own text. */
+private val DYNAMIC_MARKINGS: Set<String> = setOf(
+    "p", "pp", "ppp", "pppp", "ppppp", "pppppp", "f", "ff", "fff", "ffff", "fffff", "ffffff",
+    "mp", "mf", "sf", "sfp", "sfpp", "fp", "rf", "rfz", "sfz", "sffz", "fz", "n", "pf", "sfzp",
+)
+
+private val WEDGE_TYPES: Map<String, WedgeType> = mapOf(
+    "crescendo" to WedgeType.CRESCENDO, "diminuendo" to WedgeType.DIMINUENDO,
+    "continue" to WedgeType.CONTINUE, "stop" to WedgeType.STOP,
 )
 
 private val ATTRIBUTES_CHILD_FEATURES: Map<String, String> = mapOf(
