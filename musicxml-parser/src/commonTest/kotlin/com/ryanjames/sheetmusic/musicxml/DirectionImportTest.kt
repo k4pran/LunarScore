@@ -214,6 +214,8 @@ class DirectionImportTest {
             ).forEach { failure(document(it), DiagnosticCode.INVALID_VALUE, options) }
             listOf(
                 "<direction><sound tempo='60'/></direction>",
+                "<direction><direction-type/><sound tempo='60'/></direction>",
+                "<direction><direction-type/></direction>",
                 direction("<wedge/>"),
                 direction("<metronome><beat-unit>quarter</beat-unit></metronome>"),
                 direction("<words>x</words>", "<offset>1</offset><offset>2</offset>"),
@@ -224,6 +226,16 @@ class DirectionImportTest {
                 options,
             )
         }
+    }
+
+    @Test
+    fun testDirectionDynamicsIgnoreTheirOwnPlacement() {
+        val xml = document(direction("<dynamics placement='below'><p/></dynamics>", attributes = " placement='above'"))
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val direction = assertIs<DirectionEvent>(result.value.parts.single().measures.single().events.single())
+        assertEquals(listOf(Dynamics(listOf("p"))), direction.marks)
+        assertEquals(Placement.ABOVE, direction.display.placement)
     }
 
     @Test
