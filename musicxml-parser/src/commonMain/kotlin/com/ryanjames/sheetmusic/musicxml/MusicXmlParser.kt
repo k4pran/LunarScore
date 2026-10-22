@@ -908,10 +908,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /**
      * Reads a `dynamics` element in notations or a direction. Each standard marking keeps its
      * element name and `other-dynamics` its text, in source order. Without a marking it is discarded.
+     * In a direction its own placement is ignored, as MusicXML specifies; the direction's governs.
      */
-    private fun dynamics(start: ScoreXmlEvent, feature: String): Dynamics? {
+    private fun dynamics(start: ScoreXmlEvent, feature: String, inDirection: Boolean = false): Dynamics? {
         attributes(start, setOf("placement"), feature)
-        val placement = placement(start)
+        val placement = if (inDirection) null else placement(start)
         val markings = mutableListOf<String>()
         children { event ->
             val name = event.localName()
@@ -1010,13 +1011,18 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return TimedDirection(event, wedges.toList())
     }
 
-    /** Reads words, dynamics, simple metronome marks and wedges; other direction types are S13 discarded. */
+    /**
+     * Reads words, dynamics, simple metronome marks and wedges; other direction types are S13
+     * discarded. An empty direction-type is invalid.
+     */
     private fun directionType(start: ScoreXmlEvent, marks: MutableList<DirectionMark>, wedges: MutableList<SpanMark>) {
         attributes(start, feature = "S13")
+        var empty = true
         children { event ->
+            empty = false
             when (event.localName()) {
                 "words" -> marks += DirectionMark.Words(text(event, feature = "S13"))
-                "dynamics" -> dynamics(event, "S13")?.let { marks += it }
+                "dynamics" -> dynamics(event, "S13", inDirection = true)?.let { marks += it }
                 "metronome" -> metronome(event)?.let { marks += it }
                 "wedge" -> wedge(event)?.let { (mark, span) ->
                     marks += mark
@@ -1025,6 +1031,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 else -> unsupportedTree(event, "S13", "Direction type is not interpreted: ${event.name}")
             }
         }
+        if (empty && context.canContinue) invalid(start, "A direction-type requires content")
     }
 
     /**
