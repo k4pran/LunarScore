@@ -58,7 +58,7 @@ Model-only F01/F05/F10/F17 projections now exist; no XML importer or source diag
 |---|---|---|
 | Exact rational exceeds reduced Int component bounds | `RationalException(OVERFLOW)`; reduction/boundary tests, no wrap or rounding | MX-03/MX-07 must translate numeric failures to source-located diagnostics; wider numeric support is not promised |
 | Invalid fraction or division by zero | `ZERO_DENOMINATOR` / `DIVISION_BY_ZERO`; independent codes tested | Parser must distinguish malformed input from a resource/numeric limit |
-| Orphan or forward relationship endpoints | Retained IDs/nulls; `MISSING_ENDPOINT` / `UNKNOWN_EVENT` model diagnostics; F10 projection | MX-11 source resolution, tie pitch checks, locations and strict/tolerant policy |
+| Orphan or forward relationship endpoints | Retained IDs/nulls; `MISSING_ENDPOINT` / `UNKNOWN_EVENT` model diagnostics; F10 projection | Source resolution, pitch pairing, locations and strict/tolerant policy done in MX-11 (see below) |
 | Duplicate IDs, unknown staff/instrument | `DUPLICATE_ID`, `UNKNOWN_STAFF`, `UNKNOWN_INSTRUMENT` with neutral paths; graph tests | MX-03 source locations; MX-06/MX-09 importer policies |
 | Simple meter/state vocabulary only | No source import or implicit loss; additive meters/keys/other domains remain unimplemented | Their feature adapters must retain data or emit structured unsupported diagnostics before claiming support |
 | Rich model cannot yet be rendered | Existing renderer-to-neutral adapter preserves its complete current subset; legacy tests retained | Later neutral-to-layout adapter must report each unsupported case; no reverse adapter is exposed now |
@@ -117,6 +117,26 @@ MX-01's provisional reader-policy entries above; the original probes remain unch
 JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md](xml-reader.md).
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
+
+## MX-11 tie and slur decisions and remaining gaps
+
+The importer now [resolves ties and slurs](span-import.md) into `Score.relationships`. This
+supersedes MX-07's S09 discard of `tie` and its S12 discard of the whole `notations` element.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Start without stop, stop without start, slur `continue` without an open slur | `UNMATCHED_SPAN` at the endpoint element; strict rejects, tolerant warns and keeps the relationship with a null partner (model `MISSING_ENDPOINT`) | None |
+| Duplicate start (same kind, key and voice while open) | Earlier start reported as `UNMATCHED_SPAN` immediately and kept with a null end | None |
+| Stop before its start in document order | Paired when the start is musically earlier (measure, onset); resolver unit test | XML evidence needs MX-09 backup/forward |
+| Ties across voices; concurrent same-pitch ties | Pair by written pitch, preferring the same voice | Chord-tone ties need MX-09 chords |
+| Endpoint on a discarded chord/grace/unpitched/other-staff note | Not registered; the partner becomes `UNMATCHED_SPAN` | MX-09, MX-15, MX-16 |
+| Enharmonic ties; tie stop not at the tied note's end | Not paired / not checked | Optional semantic check |
+| Missing `type`; unknown `type`; `number` outside 1–16 | Fatal `INVALID_STRUCTURE`; fatal `INVALID_VALUE` | None |
+| `tie time-only`; `tied type="let-ring"`; tie or tied on a rest | S09 `DISCARDED`; mark dropped (a slur on a rest is kept) | Repeat-pass playback (MX-17); let-ring model |
+| Display attributes on `tie`/`tied`/`slur` | S09 `DISCARDED` per attribute; span kept | MX-18 layout |
+| Other `notations` children and `notations` attributes | S12 (S11 `tuplet`, S25 `footnote`/`level`) `DISCARDED` per child | MX-12, MX-13 |
+
+F10 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
 
 ## MX-10 timewise normalization decisions and remaining gaps
 
@@ -211,7 +231,7 @@ Proposed record shape: `UnsupportedFeature(featureId, sourceLocation, retention)
 | Missing/unknown/duplicate part ID is repaired, skipped or overwritten in reference source | `MissingPartId`, `UnknownPartId`, `DuplicatePartId`; any tolerant repair also records what was changed/lost | MX-06; F02/F22 variants |
 | Backup before measure start is clamped in reference; forward overfill allowed locally | `InvalidCursorMove` / `InconsistentMeasureDuration`, not silent clamp or inferred notation | MX-09; F05/F23; also divisions-boundary moves |
 | Numbered tuplet state uses fixed lists although 4.0 number-level permits 1–16 | Support valid labels through 16; if temporarily limited, `UnsupportedFeature("S11", location, retention)`. Never an indexing exception | MX-12,MX-20; F11 numbers 7,8,16 and invalid 17. Index failure is a source-based inference, not a reproduced crash. |
-| Sound tie and notation-only tied mark collapse in the inspected tie helper | Preserve both; until notation-only support, `UnsupportedFeature("S09", location, retention)`; orphan relationships use `UnmatchedSpan` | MX-11; F10 notation-only, stop-before-start and orphan cases |
+| Sound tie and notation-only tied mark collapse in the inspected tie helper | Implemented in MX-11: separate `SOUND_TIE`/`NOTATED_TIE`, orphans `UNMATCHED_SPAN` | MX-11; F10 notation-only and orphan XML cases; stop-before-start at resolver level until MX-09 |
 | Harmony/figured bass and tablature/technical variants exceed initial parser scope; figured bass dispatch is explicitly skipped in reference | `UnsupportedFeature("S22" / "S23", location, retention)` for each unsupported subtree/attribute | MX-08,MX-13,MX-20,MX-21; F24,F25 |
 | Beat/measure repeat and slash measure styles are TODOs in reference | `UnsupportedFeature("S24", location, retention)`; retain actual events even when style cannot be represented | MX-17,MX-21; F26 |
 | Link/bookmark/grouping dispatch is skipped; editorial preservation needs explicit scope | `UnsupportedFeature("S25", location, retention)` for unmapped content; no network dereference | MX-03,MX-06,MX-18,MX-21; F27 |
