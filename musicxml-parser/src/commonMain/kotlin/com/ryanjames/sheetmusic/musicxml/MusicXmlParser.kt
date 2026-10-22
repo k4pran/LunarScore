@@ -29,7 +29,7 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * voice of pitched notes and rests on staff 1 with exact onsets and durations from divisions,
  * plus staff-1 key, simple time, clef and staff-line changes at their exact offsets. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
- * events define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
+ * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
  * limits and cooperative [isCancelled] checks are shared with the ordered XML reader.
  */
@@ -48,6 +48,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     private val definitions = linkedMapOf<String, PartDefinition>()
     private val bodies = mutableMapOf<String, List<Measure>>()
     private var declaredPartId: String? = null
+    private var currentPartId: String? = null
+    private val partsDeclaringStaves = mutableSetOf<String>()
     private var divisions: Rational? = null
 
     fun parse(): Score {
@@ -111,7 +113,11 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 val measures = bodies[definition.id].orEmpty().toList()
                 Part(
                     id = definition.id,
-                    staves = if (measures.any { it.events.isNotEmpty() }) listOf(Staff(1)) else emptyList(),
+                    staves = if (definition.id in partsDeclaringStaves || measures.any { it.events.isNotEmpty() }) {
+                        listOf(Staff(1))
+                    } else {
+                        emptyList()
+                    },
                     measures = measures,
                     name = definition.name,
                     abbreviation = definition.abbreviation,
@@ -272,6 +278,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         val path = "parts[${definition.index}]"
         val measures = mutableListOf<Measure>()
         bodies[id] = measures
+        currentPartId = id
         divisions = null
         provenance(path, start)
         children { event ->
@@ -492,14 +499,19 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         return Attribute.Clef(clefSign, line ?: STANDARD_CLEF_LINES[clefSign], octaveChange)
     }
 
-    /** Only one staff is interpreted; a larger staff count is reported as discarded. */
+    /**
+     * Only one staff is interpreted; a larger staff count is reported as discarded. Any valid count
+     * declares staff 1 for the current part, even when the part has no events.
+     */
     private fun staves(start: ScoreXmlEvent) {
         val text = text(start, feature = "S08")
         if (!context.canContinue) return
         when (val count = positiveInt(text)) {
             null -> context.report(DiagnosticCode.INVALID_VALUE, start.location, "Staves must be a positive Int")
-            1 -> Unit
-            else -> unsupported(start.location, "S08", "$count staves are not interpreted; only staff 1 is imported")
+            else -> {
+                currentPartId?.let { partsDeclaringStaves += it }
+                if (count > 1) unsupported(start.location, "S08", "$count staves are not interpreted; only staff 1 is imported")
+            }
         }
     }
 
