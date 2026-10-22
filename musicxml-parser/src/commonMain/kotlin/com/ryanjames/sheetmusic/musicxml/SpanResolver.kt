@@ -30,44 +30,58 @@ internal class ResolvedSpan(val relationship: Relationship, val startLocation: S
  * since voices can put a stop before its start in document order. A second start with the same
  * kind, key and voice as an open start leaves the earlier one unmatched. Every unmatched endpoint is
  * reported through [unmatched] and kept as a relationship with a null partner.
+ *
+ * Endpoints must arrive in measure order. Pending endpoints are indexed by kind, key and voice so
+ * each endpoint resolves in constant or logarithmic time, keeping resolution of untrusted input
+ * near-linear.
  */
 internal class SpanResolver(
     private val partId: String,
     private val unmatched: (SourceLocation, String) -> Unit,
 ) {
     private val spans = mutableListOf<PendingSpan>()
-    private val openStarts = mutableListOf<PendingSpan>()
-    private val waitingStops = mutableListOf<PendingSpan>()
+    private val openStarts = mutableMapOf<SpanKey, LinkedHashSet<PendingSpan>>()
+    private val openStartsByVoice = mutableMapOf<VoiceKey, PendingSpan>()
+    private val waitingStops = mutableMapOf<SpanKey, WaitingQueue>()
+    private val waitingStopsByVoice = mutableMapOf<VoiceKey, WaitingQueue>()
+    private var waitingMeasure = 0
     private val counters = mutableMapOf<RelationshipKind, Int>()
 
     fun start(endpoint: SpanEndpoint) {
-        val stop = waitingStops.preferVoice(endpoint) { it.end!!.position > endpoint.position }
+        dropStaleStops(endpoint)
+        val stop = waitingStopsByVoice[endpoint.voiceKey()]?.firstAfter(endpoint.position)
+            ?: waitingStops[endpoint.spanKey()]?.firstAfter(endpoint.position)
         if (stop != null) {
-            waitingStops -= stop
+            removeWaitingStop(stop)
             stop.start = endpoint
             return
         }
-        openStarts.firstOrNull { it.start!!.matches(endpoint) && it.start!!.voice == endpoint.voice }?.let { duplicate ->
-            openStarts -= duplicate
+        openStartsByVoice[endpoint.voiceKey()]?.let { duplicate ->
+            removeOpenStart(duplicate)
             duplicate.reported = true
             unmatched(duplicate.start!!.location, "${label(endpoint)} start has no stop before the next start of the same span")
         }
-        openStarts += PendingSpan(endpoint.kind, start = endpoint).also { spans += it }
+        val span = PendingSpan(endpoint.kind, start = endpoint).also { spans += it }
+        openStarts.getOrPut(endpoint.spanKey()) { LinkedHashSet() } += span
+        openStartsByVoice[endpoint.voiceKey()] = span
     }
 
     fun stop(endpoint: SpanEndpoint) {
-        val start = openStarts.preferVoice(endpoint) { true }
+        dropStaleStops(endpoint)
+        val start = openStartsByVoice[endpoint.voiceKey()] ?: openStarts[endpoint.spanKey()]?.firstOrNull()
         if (start != null) {
-            openStarts -= start
+            removeOpenStart(start)
             start.end = endpoint
         } else {
-            waitingStops += PendingSpan(endpoint.kind, end = endpoint).also { spans += it }
+            val span = PendingSpan(endpoint.kind, end = endpoint).also { spans += it }
+            span.waitingIndex = waitingStops.getOrPut(endpoint.spanKey()) { WaitingQueue() }.add(span)
+            span.waitingVoiceIndex = waitingStopsByVoice.getOrPut(endpoint.voiceKey()) { WaitingQueue() }.add(span)
         }
     }
 
     /** Checks a mid-span point such as a slur `continue`; it is not an endpoint. */
     fun continuePoint(endpoint: SpanEndpoint) {
-        if (openStarts.none { it.start!!.matches(endpoint) }) {
+        if (openStarts[endpoint.spanKey()].isNullOrEmpty()) {
             unmatched(endpoint.location, "${label(endpoint)} continue has no open start")
         }
     }
@@ -91,17 +105,95 @@ internal class SpanResolver(
         }
     }
 
-    private fun MutableList<PendingSpan>.preferVoice(endpoint: SpanEndpoint, accept: (PendingSpan) -> Boolean): PendingSpan? {
-        val candidates = filter { (it.start ?: it.end)!!.matches(endpoint) && accept(it) }
-        return candidates.firstOrNull { (it.start ?: it.end)!!.voice == endpoint.voice } ?: candidates.firstOrNull()
+    /** No start in a later measure can precede an earlier measure's stop, so those stops stop waiting. */
+    private fun dropStaleStops(endpoint: SpanEndpoint) {
+        if (endpoint.position.measure > waitingMeasure) {
+            waitingMeasure = endpoint.position.measure
+            waitingStops.clear()
+            waitingStopsByVoice.clear()
+        }
     }
 
-    private fun SpanEndpoint.matches(other: SpanEndpoint) = kind == other.kind && key == other.key
+    private fun removeOpenStart(span: PendingSpan) {
+        val start = span.start!!
+        val group = openStarts.getValue(start.spanKey())
+        group -= span
+        if (group.isEmpty()) openStarts -= start.spanKey()
+        if (openStartsByVoice[start.voiceKey()] === span) openStartsByVoice -= start.voiceKey()
+    }
+
+    private fun removeWaitingStop(span: PendingSpan) {
+        val end = span.end!!
+        waitingStops.getValue(end.spanKey()).remove(span.waitingIndex)
+        waitingStopsByVoice.getValue(end.voiceKey()).remove(span.waitingVoiceIndex)
+    }
+
+    private fun SpanEndpoint.spanKey() = SpanKey(kind, key)
+
+    private fun SpanEndpoint.voiceKey() = VoiceKey(kind, key, voice)
 
     private fun label(endpoint: SpanEndpoint) = "${LABELS.getValue(endpoint.kind)} ${endpoint.key}"
 
+    private data class SpanKey(val kind: RelationshipKind, val key: String)
+
+    private data class VoiceKey(val kind: RelationshipKind, val key: String, val voice: String)
+
     private class PendingSpan(val kind: RelationshipKind, var start: SpanEndpoint? = null, var end: SpanEndpoint? = null) {
         var reported = false
+        var waitingIndex = -1
+        var waitingVoiceIndex = -1
+    }
+
+    /**
+     * Waiting stops in arrival order, finding the earliest-arrived stop after a position in
+     * logarithmic time through a segment tree of the latest stop position over arrival indices.
+     * A removed stop leaves an empty leaf.
+     */
+    private class WaitingQueue {
+        private val stops = mutableListOf<PendingSpan?>()
+        private var capacity = 1
+        private var latest = arrayOfNulls<SpanPosition>(2)
+
+        /** Appends [span] and returns its arrival index. */
+        fun add(span: PendingSpan): Int {
+            val index = stops.size
+            stops += span
+            if (index < capacity) {
+                set(index, span.end!!.position)
+            } else {
+                capacity *= 2
+                latest = arrayOfNulls(2 * capacity)
+                stops.forEachIndexed { i, stop -> latest[capacity + i] = stop?.end?.position }
+                for (node in capacity - 1 downTo 1) latest[node] = later(latest[2 * node], latest[2 * node + 1])
+            }
+            return index
+        }
+
+        fun remove(index: Int) {
+            stops[index] = null
+            set(index, null)
+        }
+
+        fun firstAfter(position: SpanPosition): PendingSpan? {
+            if (!isAfter(1, position)) return null
+            var node = 1
+            while (node < capacity) node = if (isAfter(2 * node, position)) 2 * node else 2 * node + 1
+            return stops[node - capacity]
+        }
+
+        private fun isAfter(node: Int, position: SpanPosition) = latest[node]?.let { it > position } == true
+
+        private fun set(index: Int, position: SpanPosition?) {
+            var node = capacity + index
+            latest[node] = position
+            while (node > 1) {
+                node /= 2
+                latest[node] = later(latest[2 * node], latest[2 * node + 1])
+            }
+        }
+
+        private fun later(first: SpanPosition?, second: SpanPosition?) =
+            if (first == null || (second != null && second > first)) second else first
     }
 
     private companion object {

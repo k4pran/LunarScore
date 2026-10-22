@@ -166,6 +166,37 @@ class SpanImportTest {
         assertNull(spans[2].endLocation)
     }
 
+    @Test
+    fun testResolverPairsWaitingStopsByArrivalAndVoice() {
+        val resolver = SpanResolver("P1") { _, _ -> }
+        fun slur(id: String, voice: String, measure: Int, onset: Int) =
+            SpanEndpoint(RelationshipKind.SLUR, "1", id, voice, SpanPosition(measure, Rational.of(onset)), SourceLocation(path = "/$id"))
+        listOf(5, 1, 4, 2, 3).forEach { resolver.stop(slur("stop-$it", "1", 1, it)) }
+        resolver.stop(slur("other-voice-stop", "2", 1, 6))
+        resolver.start(slur("start-a", "1", 1, 3))
+        resolver.start(slur("start-b", "2", 1, 3))
+        resolver.start(slur("start-c", "2", 1, 0))
+        resolver.start(slur("start-d", "1", 2, 0))
+        resolver.stop(slur("stop-d", "1", 2, 1))
+        val pairs = resolver.finish().map { it.relationship }.filter { it.startEventId != null && it.endEventId != null }
+            .associate { it.startEventId!! to it.endEventId!! }
+        assertEquals(mapOf("start-a" to "stop-5", "start-b" to "other-voice-stop", "start-c" to "stop-1", "start-d" to "stop-d"), pairs)
+    }
+
+    @Test
+    fun testResolverHandlesManyPendingEndpointsInLinearTime() {
+        val resolver = SpanResolver("P1") { _, _ -> }
+        val count = 50_000
+        fun tie(id: String, voice: String, onset: Int) =
+            SpanEndpoint(RelationshipKind.SOUND_TIE, "C4", id, voice, SpanPosition(1, Rational.of(onset)), SourceLocation(path = "/$id"))
+        repeat(count) { resolver.stop(tie("stop-$it", "$it", it)) }
+        repeat(count) { resolver.start(tie("start-$it", "start-$it", count)) }
+        repeat(count) { resolver.stop(tie("late-stop-$it", "late-$it", count + 1)) }
+        val spans = resolver.finish()
+        assertEquals(2 * count, spans.size)
+        assertEquals("late-stop-0", spans.first { it.relationship.startEventId == "start-0" }.relationship.endEventId)
+    }
+
     private fun event(index: Int) = "P1:measure-1:event-$index"
 
     private fun note(step: String, ties: String = "", notations: String = "", voice: String = "1", alter: String? = null): String =
