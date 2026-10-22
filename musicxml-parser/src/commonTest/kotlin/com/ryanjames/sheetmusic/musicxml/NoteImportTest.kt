@@ -200,6 +200,22 @@ class NoteImportTest {
     }
 
     @Test
+    fun testTimeNumberScopesMeterToStaff() {
+        val xml = document(
+            "<attributes><time number='2'><beats>3</beats><beat-type>4</beat-type></time>" +
+                "<time number='1'><beats>2</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>1</duration></note>",
+        )
+        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf("S07"), result.diagnostics.map { it.unsupported?.featureId })
+        val events = events(result)
+        assertEquals(2, events.size)
+        assertEquals(Attribute.TimeSignature(2, 4), assertIs<AttributeEvent>(events[0]).attribute)
+        assertIs<RestEvent>(events[1])
+        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
+        failure(xml.replace("number='2'", "number='0'"), DiagnosticCode.INVALID_VALUE, ParseOptions(ParsePolicy.TOLERANT))
+    }
+
+    @Test
     fun testParseDecimalIsExact() {
         assertEquals(Rational.of(5, 2), parseDecimal(" 2.50 "))
         assertEquals(Rational.of(1, 2), parseDecimal(".5"))
