@@ -726,24 +726,48 @@ internal fun parseDecimal(text: String): Rational? {
     val match = DECIMAL.matchEntire(text.trim { it in WHITESPACE }) ?: return null
     val (sign, whole, fraction) = match.destructured
     if (whole.isEmpty() && fraction.isEmpty()) return null
-    val wholeDigits = whole.trimStart('0')
     val fractionDigits = fraction.trimEnd('0')
-    // 10 digits can exceed Int; 9 fraction digits keep 10^n within Int.
-    if (wholeDigits.length > 10 || fractionDigits.length > 9) throw RationalException(RationalError.OVERFLOW)
-    // Apply the sign before the range check so Int.MIN_VALUE stays representable.
-    val signum = if (sign == "-") -1L else 1L
-    val wholeValue = signum * wholeDigits.ifEmpty { "0" }.toLong()
-    if (wholeValue !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) throw RationalException(RationalError.OVERFLOW)
-    var value = Rational.of(wholeValue.toInt())
-    if (fractionDigits.isNotEmpty()) {
-        value += Rational.of((signum * fractionDigits.toInt()).toInt(), POWERS_OF_TEN[fractionDigits.length])
+    // The last fraction digit is non-zero, so the scaled numerator lacks a factor of 2 or 5 and the
+    // reduced denominator keeps 2^n or 5^n; beyond 2^30 neither fits in Int.
+    if (whole.trimStart('0').length > 10 || fractionDigits.length > 30) throw RationalException(RationalError.OVERFLOW)
+    // Reduce value * 10^n by the shared factors of 2 and 5 as digits so wide numerators are not rejected early.
+    var numeratorDigits = (whole + fractionDigits).trimStart('0').ifEmpty { "0" }
+    var twos = fractionDigits.length
+    var fives = fractionDigits.length
+    while (twos > 0 && numeratorDigits.last().digitToInt() % 2 == 0) {
+        numeratorDigits = divideDigits(numeratorDigits, 2)
+        twos--
     }
-    return value
+    while (fives > 0 && numeratorDigits.last().digitToInt() % 5 == 0) {
+        numeratorDigits = divideDigits(numeratorDigits, 5)
+        fives--
+    }
+    if (numeratorDigits.length > 10 || twos > 30 || fives > 13) throw RationalException(RationalError.OVERFLOW)
+    // Apply the sign before the range check so Int.MIN_VALUE stays representable.
+    val numerator = (if (sign == "-") -1L else 1L) * numeratorDigits.toLong()
+    val denominator = (1L shl twos) * POWERS_OF_FIVE[fives]
+    if (numerator !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() || denominator > Int.MAX_VALUE) {
+        throw RationalException(RationalError.OVERFLOW)
+    }
+    return Rational.of(numerator.toInt(), denominator.toInt())
 }
 
-private val POWERS_OF_TEN = IntArray(10).also { powers ->
+/** Exact quotient of a non-negative decimal digit string by a divisor that divides it. */
+private fun divideDigits(digits: String, divisor: Int): String {
+    var remainder = 0
+    val quotient = buildString {
+        for (digit in digits) {
+            val current = remainder * 10 + digit.digitToInt()
+            append('0' + current / divisor)
+            remainder = current % divisor
+        }
+    }
+    return quotient.trimStart('0').ifEmpty { "0" }
+}
+
+private val POWERS_OF_FIVE = LongArray(14).also { powers ->
     powers[0] = 1
-    for (index in 1 until powers.size) powers[index] = powers[index - 1] * 10
+    for (index in 1 until powers.size) powers[index] = powers[index - 1] * 5
 }
 
 private fun positiveInt(text: String): Int? = text.trim { it in WHITESPACE }.toIntOrNull()?.takeIf { it > 0 }
