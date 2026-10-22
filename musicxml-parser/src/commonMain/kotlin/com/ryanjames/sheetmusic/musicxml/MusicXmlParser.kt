@@ -374,6 +374,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
             when (event.localName()) {
                 "beats" -> beats += text(event, feature = "S07")
                 "beat-type" -> beatTypes += text(event, feature = "S07")
+                // Foreign extensions are reported on their own and keep the understood meter.
+                null -> unsupportedTree(event)
                 else -> {
                     simple = false
                     skipTree()
