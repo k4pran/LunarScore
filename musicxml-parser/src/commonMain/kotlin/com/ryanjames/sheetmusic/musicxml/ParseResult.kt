@@ -22,12 +22,15 @@ public data class ParseLimits(
     val maxAttributesPerElement: Int = 256,
     /** Attributes across the whole input, including namespace and XML declaration attributes. */
     val maxTotalAttributes: Int = 100_000,
+    /** Declared staves summed across parts; checked before a staff count is applied or expanded. */
+    val maxStaves: Int = 1_024,
 ) {
     init {
         require(maxInputBytes > 0 && maxDepth > 0 && maxElements > 0 && maxDiagnostics > 0)
         require(maxRetainedSourceBytes >= 0 && maxProvenanceEntries >= 0)
         require(maxSourcePathCharacters > 0)
         require(maxAttributesPerElement > 0 && maxTotalAttributes > 0)
+        require(maxStaves > 0)
     }
 }
 

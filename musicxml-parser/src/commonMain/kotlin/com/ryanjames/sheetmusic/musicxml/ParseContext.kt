@@ -1,7 +1,7 @@
 package com.ryanjames.sheetmusic.musicxml
 
 /** Shared policy/limit enforcement for future reader and semantic adapters. One context per parse. */
-internal class ParseContext(private val options: ParseOptions = ParseOptions()) {
+internal class ParseContext(val options: ParseOptions = ParseOptions()) {
     private val diagnostics = mutableListOf<ParseDiagnostic>()
     private val provenance = mutableListOf<SourceProvenance>()
     private var retainedBytes = 0

@@ -575,7 +575,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
 
     /**
      * Sets the staff count for later content of the current part. The part declares staves up to
-     * its largest count, even when it has no events.
+     * its largest count, even when it has no events. Declared staves across all parts are bounded
+     * before any count is applied, since staves and unnumbered attributes expand per staff.
      */
     private fun staves(start: ScoreXmlEvent) {
         val text = text(start, feature = "S08")
@@ -583,6 +584,11 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         when (val count = positiveInt(text)) {
             null -> context.report(DiagnosticCode.INVALID_VALUE, start.location, "Staves must be a positive Int")
             else -> {
+                val otherStaves = declaredStaves.entries.sumOf { (id, staves) -> if (id == currentPartId) 0L else staves.toLong() }
+                if (otherStaves + count > context.options.limits.maxStaves) {
+                    context.report(DiagnosticCode.STAFF_LIMIT, start.location, "Declared staff limit exceeded")
+                    return
+                }
                 staffCount = count
                 currentPartId?.let { declaredStaves[it] = maxOf(declaredStaves[it] ?: 0, count) }
             }

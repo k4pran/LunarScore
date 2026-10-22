@@ -54,6 +54,9 @@ definition, a `<chord/>` note is an extra tone of the preceding non-chord note (
   `AttributeEvent` per staff, using the staff count at the end of their `attributes` element, since
   `staves` follows `key`/`time` in schema order. A `clef` without `number` applies to staff 1.
 - A `number` beyond the declared staves is `INVALID_VALUE` at the attribute.
+- Declared staves summed across parts are bounded by `ParseLimits.maxStaves` (default 1,024)
+  before a count is applied, because staves and unnumbered attributes expand per staff. Excess is a
+  fatal `STAFF_LIMIT` under both policies.
 - Parts are independent. Divisions and staff count reset at each part body, and event IDs include
   the part ID (`P2:measure-1:event-7`). `Part.effectiveStates()` resolves state per staff, so each
   staff sees only its own clef.
@@ -77,10 +80,10 @@ They are intended to be schema-valid but have not been XSD-validated.
   at the reference end. A longer-tone variant is also tested.
 - F08 has a flute and a two-staff piano, with unnumbered key/time applied to both staves.
 
-`PolyphonyImportTest` adds 10 common tests: F05/F06/F08 semantics and provenance, the longer chord
+`PolyphonyImportTest` adds 11 common tests: F05/F06/F08 semantics and provenance, the longer chord
 tone under both policies, backup before zero (strict failure, tolerant clamp, exact-zero success),
 invalid move content, move extras (S06/S25), chords without a reference, rest and unpitched chord
-members, and staff numbers beyond the declared staves. Tests that asserted MX-07/MX-08 discard
+members, staff numbers beyond the declared staves and the declared staff limit. Tests that asserted MX-07/MX-08 discard
 behaviour now assert the interpreted result.
 
 Windows verification on 2026-10-22:

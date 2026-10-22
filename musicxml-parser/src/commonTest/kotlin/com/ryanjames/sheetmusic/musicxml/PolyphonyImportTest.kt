@@ -226,6 +226,23 @@ class PolyphonyImportTest {
             DiagnosticCode.INVALID_VALUE)
     }
 
+    @Test
+    fun testDeclaredStavesAreBoundedAcrossParts() {
+        for (policy in ParsePolicy.entries) {
+            failure(document("<attributes><staves>2147483647</staves><key><fifths>0</fifths></key></attributes>"),
+                DiagnosticCode.STAFF_LIMIT, ParseOptions(policy))
+        }
+        val limits = ParseLimits(maxStaves = 3)
+        val exact = success(document("<attributes><staves>3</staves></attributes><attributes><staves>2</staves></attributes>"),
+            ParseOptions(limits = limits))
+        assertEquals(listOf(Staff(1), Staff(2), Staff(3)), exact.value.parts.single().staves)
+        val twoParts = "<score-partwise version='4.0'><part-list>" +
+            "<score-part id='P1'><part-name>A</part-name></score-part><score-part id='P2'><part-name>B</part-name></score-part></part-list>" +
+            "<part id='P1'><measure number='1'><attributes><staves>2</staves></attributes></measure></part>" +
+            "<part id='P2'><measure number='1'><attributes><staves>2</staves></attributes></measure></part></score-partwise>"
+        failure(twoParts, DiagnosticCode.STAFF_LIMIT, ParseOptions(limits = limits))
+    }
+
     private val half = NotatedValue(NoteValue.HALF)
     private val quarter = NotatedValue(NoteValue.QUARTER)
 
