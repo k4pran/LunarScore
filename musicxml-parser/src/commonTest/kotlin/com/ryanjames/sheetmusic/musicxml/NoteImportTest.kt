@@ -54,6 +54,8 @@ class NoteImportTest {
         assertEquals(NotatedValue(NoteValue.QUARTER, accidental = Accidental("natural", cautionary = true)), note.notation)
         val microtone = success(document("<note><pitch><step>B</step><alter>-0.5</alter><octave>3</octave></pitch><duration>1</duration></note>"))
         assertEquals(pitched(Step.B, 3, Rational.of(-1, 2)), assertIs<NoteEvent>(events(microtone).single()).pitch)
+        val minimum = success(document("<note><pitch><step>C</step><alter>-2147483648</alter><octave>4</octave></pitch><duration>1</duration></note>"))
+        assertEquals(pitched(Step.C, 4, Rational.of(Int.MIN_VALUE)), assertIs<NoteEvent>(events(minimum).single()).pitch)
     }
 
     @Test
@@ -205,8 +207,10 @@ class NoteImportTest {
         assertEquals(Rational.of(-1, 4), parseDecimal("-0.25"))
         assertEquals(Rational.of(1, 1_000_000_000), parseDecimal("0.000000001"))
         assertEquals(Rational.of(Int.MAX_VALUE), parseDecimal("0002147483647.000"))
+        assertEquals(Rational.of(Int.MIN_VALUE), parseDecimal("-2147483648"))
+        assertEquals(Rational.of(Int.MIN_VALUE), parseDecimal("-0002147483648.000"))
         listOf("", ".", "-", "1e3", "1,5", "0x10", "1 2").forEach { assertNull(parseDecimal(it), it) }
-        listOf("2147483648", "0.0000000001", "12345678901").forEach {
+        listOf("2147483648", "-2147483649", "-2147483648.5", "0.0000000001", "12345678901").forEach {
             assertEquals(RationalError.OVERFLOW, assertFailsWith<RationalException> { parseDecimal(it) }.code)
         }
     }
