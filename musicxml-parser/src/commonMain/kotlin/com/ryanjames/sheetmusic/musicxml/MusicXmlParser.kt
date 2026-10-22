@@ -730,13 +730,15 @@ internal fun parseDecimal(text: String): Rational? {
     val fractionDigits = fraction.trimEnd('0')
     // 10 digits can exceed Int; 9 fraction digits keep 10^n within Int.
     if (wholeDigits.length > 10 || fractionDigits.length > 9) throw RationalException(RationalError.OVERFLOW)
-    val wholeValue = wholeDigits.ifEmpty { "0" }.toLong()
-    if (wholeValue > Int.MAX_VALUE) throw RationalException(RationalError.OVERFLOW)
+    // Apply the sign before the range check so Int.MIN_VALUE stays representable.
+    val signum = if (sign == "-") -1L else 1L
+    val wholeValue = signum * wholeDigits.ifEmpty { "0" }.toLong()
+    if (wholeValue !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) throw RationalException(RationalError.OVERFLOW)
     var value = Rational.of(wholeValue.toInt())
     if (fractionDigits.isNotEmpty()) {
-        value += Rational.of(fractionDigits.toInt(), POWERS_OF_TEN[fractionDigits.length])
+        value += Rational.of((signum * fractionDigits.toInt()).toInt(), POWERS_OF_TEN[fractionDigits.length])
     }
-    return if (sign == "-") -value else value
+    return value
 }
 
 private val POWERS_OF_TEN = IntArray(10).also { powers ->
