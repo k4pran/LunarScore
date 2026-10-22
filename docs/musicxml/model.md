@@ -33,7 +33,9 @@ does not depend on that module.
   staff-scoped attribute event; the model does not derive or respell pitches. Unpitched percussion
   keeps display step/octave and instrument identity separately; MIDI percussion keys are 0–127.
 - Note duration is performed musical duration, distinct from printed base value, dots, accidental
-  and time modification. Explicit performance attack/release offsets are in quarter notes.
+  and time modification. MX-12 adds the printed `StemDirection` and per-level `Beam`s to
+  `NotatedValue`; a time modification is the cumulative ratio for nested tuplets, while each tuplet
+  bracket is a `TUPLET` relationship. Explicit performance attack/release offsets are in quarter notes.
   Grace duration is null and does not advance the main timeline. Cue duration is positive.
   A chord is independently timed noteheads sharing a chord ID; staff and duration may differ.
 - Attribute events retain exact offsets for simple time signatures, traditional key signatures

@@ -48,14 +48,34 @@ public data class TimeModification(
 /** Printed accidental name and cautionary/editorial flags, independent of [WrittenPitch.alter]. */
 public data class Accidental(val name: String, val cautionary: Boolean = false, val editorial: Boolean = false)
 
-/** Notation without inferred playback; absent [value] means unspecified, rather than quarter. */
+/** Printed stem direction; [NONE] is an explicitly stemless note, unlike an unspecified (null) stem. */
+public enum class StemDirection { UP, DOWN, DOUBLE, NONE }
+
+/** The role of one beam level on a note: a segment endpoint, a middle point or a partial hook. */
+public enum class BeamType { BEGIN, CONTINUE, END, FORWARD_HOOK, BACKWARD_HOOK }
+
+/** One printed beam on a note; [level] 1 is the eighth-note beam, up to 8 for 1024th notes. */
+public data class Beam(val level: Int, val type: BeamType) {
+    init {
+        require(level in 1..8)
+    }
+}
+
+/**
+ * Notation without inferred playback; absent [value] means unspecified, rather than quarter.
+ * [timeModification] is the note's cumulative ratio, including every enclosing nested tuplet.
+ * [beams] are listed in source order with distinct levels; an empty list means no printed beam.
+ */
 public data class NotatedValue(
     val value: NoteValue? = null,
     val dots: Int = 0,
     val timeModification: TimeModification? = null,
     val accidental: Accidental? = null,
+    val stem: StemDirection? = null,
+    val beams: List<Beam> = emptyList(),
 ) {
     init {
         require(dots >= 0)
+        require(beams.distinctBy { it.level }.size == beams.size)
     }
 }

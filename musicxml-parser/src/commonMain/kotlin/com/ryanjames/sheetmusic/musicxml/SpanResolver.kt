@@ -10,7 +10,7 @@ internal data class SpanPosition(val measure: Int, val onset: Rational) : Compar
         compareValuesBy(this, other, { it.measure }, { it.onset })
 }
 
-/** One source endpoint on an imported event. [key] pairs endpoints: pitch for ties, number for slurs. */
+/** One source endpoint on an imported event. [key] pairs endpoints: pitch for ties, number for slurs and tuplets. */
 internal data class SpanEndpoint(
     val kind: RelationshipKind,
     val key: String,
@@ -24,7 +24,7 @@ internal data class SpanEndpoint(
 internal class ResolvedSpan(val relationship: Relationship, val startLocation: SourceLocation?, val endLocation: SourceLocation?)
 
 /**
- * Pairs start/stop endpoints of one part's sound ties, notated ties and slurs, each kind
+ * Pairs start/stop endpoints of one part's sound ties, notated ties, slurs and tuplets, each kind
  * independently. A stop takes the earliest open start with its kind and key, preferring the same
  * voice. A stop with no open start waits for a later start whose position is musically earlier,
  * since voices can put a stop before its start in document order. A second start with the same
@@ -201,11 +201,13 @@ internal class SpanResolver(
             RelationshipKind.SOUND_TIE to "sound-tie",
             RelationshipKind.NOTATED_TIE to "notated-tie",
             RelationshipKind.SLUR to "slur",
+            RelationshipKind.TUPLET to "tuplet",
         )
         val LABELS = mapOf(
             RelationshipKind.SOUND_TIE to "Sound tie on",
             RelationshipKind.NOTATED_TIE to "Notated tie on",
             RelationshipKind.SLUR to "Slur",
+            RelationshipKind.TUPLET to "Tuplet",
         )
     }
 }

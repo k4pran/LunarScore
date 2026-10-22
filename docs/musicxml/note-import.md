@@ -52,7 +52,7 @@ All of these are `UNSUPPORTED_FEATURE` with `DISCARDED` retention: strict reject
 | `grace` notes | S18 | Whole note discarded; no duration |
 | `unpitched` notes; `staff` other than 1 | S16; S06 | Note discarded; cursor still advances by its duration so later onsets stay exact |
 | `backup`/`forward` | S06 | Later notes and time signatures in that measure are each reported and discarded rather than placed at a wrong onset; divisions changes still apply |
-| `time-modification`, `stem`/`beam`, `lyric` | S11, S10, S14 | Child discarded; note and exact duration kept. `tie` and `notations` are interpreted by [MX-11](span-import.md) |
+| `lyric` | S14 | Child discarded; note and exact duration kept. `tie` and `notations` are interpreted by [MX-11](span-import.md); `time-modification`, `stem`, `beam` and `tuplet` by [MX-12](tuplet-import.md) |
 | `instrument`; `footnote`/`level`; `play`/`listen` | S16; S25; S26 | Child discarded |
 | `notehead`, rest display-step/octave, dot attributes | S17 | Child/attribute discarded |
 | Note attributes (`default-x`, `dynamics`, `print-object`, …), unknown note children | S04 | Discarded |

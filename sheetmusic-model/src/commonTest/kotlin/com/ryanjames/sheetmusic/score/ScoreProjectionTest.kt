@@ -149,6 +149,11 @@ class ScoreProjectionTest {
         assertFailsWith<IllegalArgumentException> { RestEvent("r", Rational.ZERO, Rational.of(-1)) }
         assertFailsWith<IllegalArgumentException> { TimeModification(0, 2) }
         assertFailsWith<IllegalArgumentException> { NotatedValue(dots = -1) }
+        assertFailsWith<IllegalArgumentException> { Beam(0, BeamType.BEGIN) }
+        assertFailsWith<IllegalArgumentException> { Beam(9, BeamType.END) }
+        assertFailsWith<IllegalArgumentException> {
+            NotatedValue(beams = listOf(Beam(1, BeamType.BEGIN), Beam(1, BeamType.END)))
+        }
     }
 
     private fun score(vararg measures: Measure): Score = Score(listOf(Part("P1", listOf(Staff(1)), measures.toList())))
