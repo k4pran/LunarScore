@@ -3,7 +3,9 @@ package com.ryanjames.sheetmusic.musicxml
 import com.ryanjames.sheetmusic.score.Accidental
 import com.ryanjames.sheetmusic.score.Attribute
 import com.ryanjames.sheetmusic.score.AttributeEvent
+import com.ryanjames.sheetmusic.score.ClefSign
 import com.ryanjames.sheetmusic.score.Event
+import com.ryanjames.sheetmusic.score.KeyMode
 import com.ryanjames.sheetmusic.score.Measure
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
@@ -25,7 +27,7 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
 /**
  * Imports a UTF-8 partwise score with ordered metadata, parts and measures, plus one sequential
  * voice of pitched notes and rests on staff 1 with exact onsets and durations from divisions,
- * and simple time signatures. Other musical content is not implemented yet: meaningful unmapped
+ * plus staff-1 key, simple time, clef and staff-line changes at their exact offsets. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -335,16 +337,46 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         return Measure("measure-$number", displayNumber, extent, events.toList(), implicit)
     }
 
+    /**
+     * Interprets divisions and staff-1 key, time, clef and staff-line state. Each state change
+     * becomes an [AttributeEvent] at the current cursor offset, in source order, so intra-measure
+     * changes apply exactly where they occur.
+     */
     private fun attributesElement(start: ScoreXmlEvent, cursorLost: Boolean, add: (Attribute, ScoreXmlEvent) -> Unit) {
         attributes(start, feature = "S07")
+        fun emit(attribute: Attribute?, source: ScoreXmlEvent) {
+            if (attribute == null) return
+            if (cursorLost) unsupported(source.location, "S06", "Attribute change after an uninterpreted cursor move is discarded")
+            else add(attribute, source)
+        }
         children { event ->
-            when (event.localName()) {
+            when (val name = event.localName()) {
                 "divisions" -> positiveDecimal(event, "S05", "Divisions")?.let { divisions = it }
-                "time" -> time(event)?.let {
-                    if (cursorLost) unsupported(event.location, "S06", "Time signature after an uninterpreted cursor move is discarded")
-                    else add(it, event)
-                }
-                else -> unsupportedTree(event, "S07")
+                "key" -> emit(key(event), event)
+                "time" -> emit(time(event), event)
+                "clef" -> emit(clef(event), event)
+                "staves" -> staves(event)
+                "staff-details" -> emit(staffDetails(event), event)
+                else -> unsupportedTree(event, ATTRIBUTES_CHILD_FEATURES[name] ?: "S07")
+            }
+        }
+    }
+
+    /**
+     * Returns whether an attributes child scoped by its optional `number` attribute applies to staff 1.
+     * Another staff is reported as discarded; a non-positive number is `INVALID_VALUE`.
+     */
+    private fun appliesToStaffOne(start: ScoreXmlEvent, label: String): Boolean {
+        val number = start.attribute("number") ?: return true
+        return when (val staff = positiveInt(number)) {
+            null -> {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "$label number must be a positive Int")
+                false
+            }
+            1 -> true
+            else -> {
+                unsupported(start.location, "S08", "$label for staff $staff is not interpreted and is discarded")
+                false
             }
         }
     }
@@ -355,18 +387,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
      */
     private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
         attributes(start, setOf("number"), "S07")
-        var otherStaff = false
-        start.attribute("number")?.let { number ->
-            when (val staff = positiveInt(number)) {
-                null -> context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"),
-                    "Time number must be a positive Int")
-                1 -> Unit
-                else -> {
-                    unsupported(start.location, "S07", "Time signature for staff $staff is not interpreted; time discarded")
-                    otherStaff = true
-                }
-            }
-        }
+        val staffOne = appliesToStaffOne(start, "Time signature")
         val beats = mutableListOf<String>()
         val beatTypes = mutableListOf<String>()
         var simple = true
@@ -382,7 +403,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 }
             }
         }
-        if (!context.canContinue || otherStaff) return null
+        if (!context.canContinue || !staffOne) return null
         val beatCount = beats.singleOrNull()?.let(::positiveInt)
         val beatUnit = beatTypes.singleOrNull()?.let(::positiveInt)
         if (!simple || beatCount == null || beatUnit == null) {
@@ -390,6 +411,117 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
             return null
         }
         return Attribute.TimeSignature(beatCount, beatUnit)
+    }
+
+    /**
+     * Interprets a traditional key (fifths and optional mode). Non-traditional keys are discarded;
+     * cancellation and accidental octave display are reported while the key itself is kept.
+     */
+    private fun key(start: ScoreXmlEvent): Attribute.KeySignature? {
+        attributes(start, setOf("number"), "S07")
+        val staffOne = appliesToStaffOne(start, "Key signature")
+        val seen = mutableSetOf<String>()
+        var fifths: Int? = null
+        var mode: KeyMode? = null
+        var traditional = true
+        children { event ->
+            when (val name = event.localName()) {
+                "fifths" -> if (once(seen, name, event)) {
+                    fifths = integer(event, "Fifths")
+                }
+                "mode" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S07").trim { it in WHITESPACE }
+                    mode = KeyMode.entries.firstOrNull { it.name.lowercase() == text }
+                    if (mode == null) unsupported(event.location, "S07", "Key mode $text is not interpreted; mode discarded")
+                }
+                "key-step", "key-alter", "key-accidental" -> {
+                    traditional = false
+                    skipTree()
+                }
+                "cancel" -> unsupportedTree(event, "S07", "Key cancellation display is not interpreted")
+                "key-octave" -> unsupportedTree(event, "S07", "Key accidental octave display is not interpreted")
+                else -> unsupportedTree(event, "S07")
+            }
+        }
+        if (!context.canContinue || !staffOne) return null
+        if (!traditional) {
+            unsupported(start.location, "S07", "Non-traditional keys are not interpreted; key discarded")
+            return null
+        }
+        val keyFifths = fifths ?: run {
+            invalid(start, "A traditional key requires fifths")
+            return null
+        }
+        return Attribute.KeySignature(keyFifths, mode)
+    }
+
+    /** Interprets a clef sign, line and octave change; a missing G/F/C line uses its standard line. */
+    private fun clef(start: ScoreXmlEvent): Attribute.Clef? {
+        attributes(start, setOf("number"), "S07")
+        val staffOne = appliesToStaffOne(start, "Clef")
+        val seen = mutableSetOf<String>()
+        var sign: ClefSign? = null
+        var line: Int? = null
+        var octaveChange = 0
+        children { event ->
+            when (val name = event.localName()) {
+                "sign" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S07").trim { it in WHITESPACE }
+                    sign = CLEF_SIGNS[text]
+                    if (sign == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown clef sign: $text")
+                }
+                "line" -> if (once(seen, name, event)) line = integer(event, "Clef line")
+                "clef-octave-change" -> if (once(seen, name, event)) {
+                    integer(event, "Clef octave change")?.let { octaveChange = it }
+                }
+                else -> unsupportedTree(event, "S07")
+            }
+        }
+        if (!context.canContinue || !staffOne) return null
+        val clefSign = sign ?: run {
+            invalid(start, "A clef requires a sign")
+            return null
+        }
+        return Attribute.Clef(clefSign, line ?: STANDARD_CLEF_LINES[clefSign], octaveChange)
+    }
+
+    /** Only one staff is interpreted; a larger staff count is reported as discarded. */
+    private fun staves(start: ScoreXmlEvent) {
+        val text = text(start, feature = "S08")
+        if (!context.canContinue) return
+        when (val count = positiveInt(text)) {
+            null -> context.report(DiagnosticCode.INVALID_VALUE, start.location, "Staves must be a positive Int")
+            1 -> Unit
+            else -> unsupported(start.location, "S08", "$count staves are not interpreted; only staff 1 is imported")
+        }
+    }
+
+    /** Interprets the staff-line count; other staff details are reported as discarded. */
+    private fun staffDetails(start: ScoreXmlEvent): Attribute.StaffLines? {
+        attributes(start, setOf("number"), "S17")
+        val staffOne = appliesToStaffOne(start, "Staff details")
+        val seen = mutableSetOf<String>()
+        var lines: Int? = null
+        children { event ->
+            when (val name = event.localName()) {
+                "staff-lines" -> if (once(seen, name, event)) {
+                    lines = text(event, feature = "S17").trim { it in WHITESPACE }.toIntOrNull()?.takeIf { it >= 0 }
+                    if (lines == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Staff lines must be a non-negative Int")
+                }
+                "staff-tuning", "capo" -> unsupportedTree(event, "S23")
+                else -> unsupportedTree(event, "S17")
+            }
+        }
+        if (!context.canContinue || !staffOne) return null
+        return lines?.let { Attribute.StaffLines(it) }
+    }
+
+    private fun integer(start: ScoreXmlEvent, label: String): Int? {
+        val text = text(start, feature = "S07")
+        if (!context.canContinue) return null
+        val value = text.trim { it in WHITESPACE }.toIntOrNull()
+        if (value == null) context.report(DiagnosticCode.INVALID_VALUE, start.location, "$label must be an Int")
+        return value
     }
 
     /**
@@ -732,6 +864,19 @@ private val NOTE_CHILD_FEATURES: Map<String, String> = mapOf(
     "notehead" to "S17", "notehead-text" to "S17", "notations" to "S12", "lyric" to "S14",
     "play" to "S26", "listen" to "S26",
 )
+
+private val ATTRIBUTES_CHILD_FEATURES: Map<String, String> = mapOf(
+    "part-symbol" to "S08", "instruments" to "S16", "transpose" to "S16", "for-part" to "S16",
+    "measure-style" to "S24",
+)
+
+private val CLEF_SIGNS: Map<String, ClefSign> = mapOf(
+    "G" to ClefSign.G, "F" to ClefSign.F, "C" to ClefSign.C, "percussion" to ClefSign.PERCUSSION,
+    "TAB" to ClefSign.TAB, "jianpu" to ClefSign.JIANPU, "none" to ClefSign.NONE,
+)
+
+/** Standard lines MusicXML assigns when a clef omits its line. */
+private val STANDARD_CLEF_LINES: Map<ClefSign, Int> = mapOf(ClefSign.G to 2, ClefSign.F to 4, ClefSign.C to 3)
 
 private val DECIMAL = Regex("""([+-]?)([0-9]*)(?:\.([0-9]*))?""")
 

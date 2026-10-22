@@ -118,6 +118,27 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-08 attribute state decisions and remaining gaps
+
+The importer now emits [key, clef and staff-line state](attribute-state.md) alongside MX-07's
+divisions and simple time, and the model resolves effective state per event. This supersedes
+MX-07's S07 discard of key, clef, staves and staff details.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Notes before any key/clef/time | Effective state field is null; no treble, C major or 4/4 default; missing divisions stays fatal | Renderer adapter must choose any display fallback explicitly |
+| Mid-measure and end-of-measure changes | Events at exact cursor offsets; resolver applies changes in onset order, same-onset in list order, persisting across measures (F07) | Same-onset ordering across voices is revisited with MX-09 cursor interpretation |
+| Key change versus written pitch | `alter` and printed accidental are never inferred from or rewritten by the key (F07) | Accidental display inference is not planned in the importer |
+| Clef without line | Standard line for G/F/C per MusicXML; null for percussion/TAB/jianpu/none | None |
+| Invalid fifths/line/octave change/sign/staves/staff-lines/attribute `number` | Fatal `INVALID_VALUE`; missing fifths or sign `INVALID_STRUCTURE` | Full XSD lexical validation remains separate |
+| `staves` > 1, `part-symbol`, key/time/clef/staff details scoped to staff ≠ 1 | S08 `DISCARDED` (time scope moved from S07 to S08) | MX-09 multi-staff |
+| Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | S07 `DISCARDED`; non-traditional key dropped, otherwise key/clef kept (unknown mode null) | Non-traditional key model |
+| `staff-tuning`/`capo`; other staff details | S23 / S17 `DISCARDED`; staff-line count kept | MX-13/MX-18/MX-21 |
+| `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` | MX-16, MX-17, MX-13 |
+| State change after uninterpreted backup/forward | S06 `DISCARDED` for each key/time/clef/staff-lines change | MX-09 |
+
+F07 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-07 note/rest decisions and remaining gaps
 
 The public importer now produces [single-voice notes and rests](note-import.md) with exact onsets.
@@ -133,7 +154,7 @@ obligation is met for durations and divisions.
 | Unpitched notes; staff other than 1 | S16/S06 `DISCARDED`; note dropped, cursor still advances so later onsets stay exact | MX-16 percussion, MX-09 staves |
 | Backup/forward | S06 `DISCARDED`; later notes/time signatures in that measure are each reported and dropped instead of mistimed; divisions still apply | MX-09 cursor interpretation and `INVALID_CURSOR_MOVE` |
 | Ties, tuplet time-modification, stems/beams, notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
-| Key, clef, staves and other attributes children; complex or annotated time | S07 `DISCARDED`; a simple time keeps its signature even if its attributes are discarded | MX-08 |
+| Key, clef, staves and other attributes children; complex or annotated time | S07 `DISCARDED`; a simple time keeps its signature even if its attributes are discarded | Key/clef/staves/staff details superseded by MX-08 above; complex time remains |
 | Voice labels without backup | Labels retained; events stay sequential in one timeline | MX-09 |
 | Measure fullness versus time signature | Not checked; extent is the observed end of timed content | `INCONSISTENT_MEASURE_DURATION` policy remains later work |
 

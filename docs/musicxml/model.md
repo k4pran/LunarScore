@@ -36,9 +36,12 @@ does not depend on that module.
   and time modification. Explicit performance attack/release offsets are in quarter notes.
   Grace duration is null and does not advance the main timeline. Cue duration is positive.
   A chord is independently timed noteheads sharing a chord ID; staff and duration may differ.
-- Attribute events retain exact offsets for simple time signatures, clefs, transposition and
-  instrument changes. They are staff-scoped; part-wide source attributes must be expanded explicitly.
-  These are data records, not a state resolver.
+- Attribute events retain exact offsets for simple time signatures, traditional key signatures
+  (fifths and optional `KeyMode`), clefs (line null when unspecified for signs without a standard
+  line), staff-line counts, transposition and instrument changes. They are staff-scoped; part-wide
+  source attributes must be expanded explicitly. MX-08 adds `Part.effectiveStates()`, which resolves
+  the `AttributeState` in effect for every event per staff, in onset order and across measures;
+  missing state stays null. See [attribute state](attribute-state.md).
 - Relationships have their own IDs and typed endpoint event IDs. Sound ties, printed ties and slurs
   remain independent; multiple/nested spans may share endpoints. Missing endpoints remain null.
   IDs must be assigned independently of source XML IDs so anonymous elements remain addressable.
@@ -66,7 +69,7 @@ repair or omit records. Source positions, strict/tolerant import policy and unsu
 retention belong to MX-03, outside the neutral model. Chord-reference duration rules, meter fullness,
 pitch agreement for ties and other musical consistency checks remain feature tasks.
 
-Additive meters, keys, directions, layout hints, lyrics, rich annotations and opaque source content
+Additive meters, non-traditional keys, directions, layout hints, lyrics, rich annotations and opaque source content
 are not accepted as import input by this change; no parser API exists here. Their future adapters
 must implement them or emit the S01–S27 unsupported diagnostics in the coverage/risk ledger.
 
