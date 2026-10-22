@@ -18,6 +18,7 @@ import com.ryanjames.sheetmusic.score.Part
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.RationalError
 import com.ryanjames.sheetmusic.score.RationalException
+import com.ryanjames.sheetmusic.score.RelationshipKind
 import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.Staff
@@ -29,7 +30,9 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * voice of pitched notes and rests on staff 1 with exact onsets and durations from divisions,
  * plus staff-1 key, simple time, clef and staff-line changes at their exact offsets. A timewise
  * score is normalized while streaming to the same projection: a part missing from a timewise
- * measure gets an empty measure there. Other musical content is not implemented yet: meaningful unmapped
+ * measure gets an empty measure there. Sound ties, notated ties and slurs on imported events are
+ * paired within each part across measures and voices; an unmatched endpoint is reported as
+ * `UNMATCHED_SPAN` and kept with a null partner. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -108,6 +111,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             }
         }
         if (timewise) bodies.values.forEach { padMissingMeasures(it, timewiseMeasures.size) }
+        val spans = if (context.canContinue) definitions.values.flatMap { bodies[it.id]?.spans?.finish().orEmpty() } else emptyList()
+        spans.forEachIndexed { index, span ->
+            span.startLocation?.let { context.addProvenance(SourceProvenance("relationships[$index].startEventId", it)) }
+            span.endLocation?.let { context.addProvenance(SourceProvenance("relationships[$index].endEventId", it)) }
+        }
         val title = metadata.filterIsInstance<MetadataEntry.Text>().let { entries ->
             entries.firstOrNull { it.kind == MetadataKind.MOVEMENT_TITLE && it.text.isNotBlank() }?.text
                 ?: entries.firstOrNull { it.kind == MetadataKind.WORK_TITLE && it.text.isNotBlank() }?.text
@@ -128,6 +136,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     metadata = definition.metadata.toList(),
                 )
             },
+            relationships = spans.map { it.relationship },
             title = title,
             metadata = metadata.toList(),
         )
@@ -279,7 +288,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             return
         }
         attributes(start, setOf("id"), "S01")
-        body = PartBody(id).also { bodies[id] = it }
+        body = partBody(id).also { bodies[id] = it }
         val measures = body.measures
         provenance("parts[${definition.index}]", start)
         children { event ->
@@ -322,7 +331,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             attributes(event, setOf("id"), "S01")
             body = bodies.getOrPut(id) {
                 provenance("parts[${definition.index}]", event)
-                PartBody(id)
+                partBody(id)
             }
             padMissingMeasures(body, index)
             val measurePath = "parts[${definition.index}].measures[$index]"
@@ -330,6 +339,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             body.measures += measure(id, measurePath, index + 1, header.number, header.implicit)
         }
     }
+
+    private fun partBody(id: String) = PartBody(id, SpanResolver(id) { location, message ->
+        context.report(DiagnosticCode.UNMATCHED_SPAN, location, message)
+    })
 
     /** Appends empty measures for the timewise measures before [count] that lacked this part. */
     private fun padMissingMeasures(part: PartBody, count: Int) {
@@ -381,7 +394,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     unsupportedTree(event, "S06", "Note after an uninterpreted cursor move is discarded")
                 } else {
                     val note = note(event, cursor, eventId()) ?: return@children
-                    note.event?.let { add(it, event) }
+                    note.event?.let {
+                        add(it, event)
+                        registerSpans(it, note.marks, number)
+                    }
                     cursor = note.end
                     if (cursor > extent) extent = cursor
                 }
@@ -615,6 +631,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var accidental: Accidental? = null
         var discarded = false
         var untimed = false
+        val marks = mutableListOf<SpanMark>()
         children { event ->
             // An untimed note's diagnostic covers its remaining children.
             if (untimed) {
@@ -665,6 +682,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     dots++
                 }
                 "accidental" -> if (once(seen, name, event)) accidental = accidental(event)
+                "tie" -> tie(event)?.let { marks += it }
+                "notations" -> notations(event, marks)
                 "staff" -> if (once(seen, name, event)) {
                     when (val staff = positiveInt(text(event, feature = "S06"))) {
                         null -> context.report(DiagnosticCode.INVALID_VALUE, event.location, "Staff must be a positive Int")
@@ -694,13 +713,107 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val sourceDuration = duration ?: return null
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
-        if (discarded) return TimedNote(null, end)
+        if (discarded) return TimedNote(null, end, emptyList())
         val notation = NotatedValue(value, dots, accidental = accidental)
         val event = when (val noteContent = content ?: return null) {
             is NoteContent.Rest -> RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
             is NoteContent.Pitch -> NoteEvent(id, onset, quarters, noteContent.pitch, voice = voice, notation = notation, role = role)
         }
-        return TimedNote(event, end)
+        return TimedNote(event, end, marks.toList())
+    }
+
+    /**
+     * Passes an event's span marks to the part's resolver: stops (and the stop half of a tied
+     * `continue`) first, then slur continue points, then starts, so a span can end and another
+     * begin on one note. Ties pair by written pitch; a tie on a rest is discarded.
+     */
+    private fun registerSpans(event: Event, marks: List<SpanMark>, measure: Int) {
+        if (marks.isEmpty()) return
+        val (voice, pitch) = when (event) {
+            is NoteEvent -> event.voice to (event.pitch as? NotePitch.Pitched)?.written
+            is RestEvent -> event.voice to null
+            is AttributeEvent -> return
+        }
+        val endpoints = marks.mapNotNull { mark ->
+            val key = when {
+                mark.kind == RelationshipKind.SLUR -> mark.number
+                pitch == null -> {
+                    unsupported(mark.location, "S09", "A tie on a rest is not interpreted; the tie is discarded")
+                    return@mapNotNull null
+                }
+                else -> pitchKey(pitch) + if (mark.number == "1") "" else " (number ${mark.number})"
+            }
+            mark to SpanEndpoint(mark.kind, key, event.id, voice, SpanPosition(measure, event.onset), mark.location)
+        }
+        val resolver = body.spans
+        fun splitsContinue(mark: SpanMark) = mark.type == SpanType.CONTINUE && mark.kind != RelationshipKind.SLUR
+        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.STOP || splitsContinue(mark)) resolver.stop(endpoint) }
+        endpoints.forEach { (mark, endpoint) ->
+            if (mark.type == SpanType.CONTINUE && mark.kind == RelationshipKind.SLUR) resolver.continuePoint(endpoint)
+        }
+        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.START || splitsContinue(mark)) resolver.start(endpoint) }
+    }
+
+    /** A sound `tie`; one restricted by `time-only` to some repeat passes is discarded. */
+    private fun tie(start: ScoreXmlEvent): SpanMark? {
+        if (start.attribute("time-only") != null) {
+            unsupportedTree(start, "S09", "A tie restricted by time-only is not interpreted; the tie is discarded")
+            return null
+        }
+        attributes(start, setOf("type"), "S09")
+        val type = spanType(start, "Tie", TIE_TYPES)
+        children { event -> unsupportedTree(event, "S09") }
+        return type?.let { SpanMark(RelationshipKind.SOUND_TIE, it, "1", start.location) }
+    }
+
+    /**
+     * Interprets `tied` and `slur` notations; other notations are discarded under their feature
+     * group. Display attributes of the interpreted marks are reported as discarded.
+     */
+    private fun notations(start: ScoreXmlEvent, marks: MutableList<SpanMark>) {
+        attributes(start, feature = "S12")
+        children { event ->
+            when (val name = event.localName()) {
+                "tied", "slur" -> {
+                    attributes(event, setOf("type", "number"), "S09")
+                    val label = if (name == "tied") "Tied" else "Slur"
+                    val type = spanType(event, label, if (name == "tied") TIED_TYPES else SLUR_TYPES)
+                    val number = numberLevel(event, label)
+                    children { child -> unsupportedTree(child, "S09") }
+                    if (type == SpanType.LET_RING) {
+                        unsupported(event.location, "S09", "A let-ring tied mark is not interpreted; it is discarded")
+                    } else if (type != null && number != null) {
+                        val kind = if (name == "tied") RelationshipKind.NOTATED_TIE else RelationshipKind.SLUR
+                        marks += SpanMark(kind, type, number, event.location)
+                    }
+                }
+                "tuplet" -> unsupportedTree(event, "S11")
+                "footnote", "level" -> unsupportedTree(event, "S25")
+                else -> unsupportedTree(event, "S12")
+            }
+        }
+    }
+
+    /** Reads a required span `type`; a missing type is invalid structure and an unknown one an invalid value. */
+    private fun spanType(start: ScoreXmlEvent, label: String, allowed: Map<String, SpanType>): SpanType? {
+        val text = start.attribute("type") ?: run {
+            invalid(start, "A ${label.lowercase()} requires a type")
+            return null
+        }
+        return allowed[text] ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("type"), "Unknown ${label.lowercase()} type: $text")
+            null
+        }
+    }
+
+    /** A MusicXML number-level, 1 to 16; absent means 1. */
+    private fun numberLevel(start: ScoreXmlEvent, label: String): String? {
+        val text = start.attribute("number") ?: return "1"
+        val number = positiveInt(text)?.takeIf { it <= 16 } ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "$label number must be 1 to 16")
+            return null
+        }
+        return number.toString()
     }
 
     private fun pitch(start: ScoreXmlEvent): NoteContent? {
@@ -896,15 +1009,18 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     private fun SourceLocation.withDeclaredPart(): SourceLocation = copy(partId = declaredPartId ?: partId)
 
-    private class TimedNote(val event: Event?, val end: Rational)
+    private class TimedNote(val event: Event?, val end: Rational, val marks: List<SpanMark>)
+
+    /** A span endpoint read from a note, before the note's event identity is known. */
+    private class SpanMark(val kind: RelationshipKind, val type: SpanType, val number: String, val location: SourceLocation)
 
     private sealed interface NoteContent {
         class Pitch(val pitch: NotePitch) : NoteContent
         class Rest(val wholeMeasure: Boolean) : NoteContent
     }
 
-    /** A part's measures plus the divisions that persist across its measures. */
-    private class PartBody(val id: String) {
+    /** A part's measures plus the divisions and open spans that persist across its measures. */
+    private class PartBody(val id: String, val spans: SpanResolver) {
         val measures = mutableListOf<Measure>()
         var divisions: Rational? = null
     }
@@ -940,9 +1056,9 @@ private val NOTE_TYPES: Map<String, NoteValue> = mapOf(
 )
 
 private val NOTE_CHILD_FEATURES: Map<String, String> = mapOf(
-    "tie" to "S09", "instrument" to "S16", "footnote" to "S25", "level" to "S25",
+    "instrument" to "S16", "footnote" to "S25", "level" to "S25",
     "time-modification" to "S11", "stem" to "S10", "beam" to "S10",
-    "notehead" to "S17", "notehead-text" to "S17", "notations" to "S12", "lyric" to "S14",
+    "notehead" to "S17", "notehead-text" to "S17", "lyric" to "S14",
     "play" to "S26", "listen" to "S26",
 )
 
@@ -950,6 +1066,25 @@ private val ATTRIBUTES_CHILD_FEATURES: Map<String, String> = mapOf(
     "part-symbol" to "S08", "instruments" to "S16", "transpose" to "S16", "for-part" to "S16",
     "measure-style" to "S24",
 )
+
+private enum class SpanType { START, STOP, CONTINUE, LET_RING }
+
+private val TIE_TYPES: Map<String, SpanType> = mapOf("start" to SpanType.START, "stop" to SpanType.STOP)
+
+private val TIED_TYPES: Map<String, SpanType> = TIE_TYPES + mapOf("continue" to SpanType.CONTINUE, "let-ring" to SpanType.LET_RING)
+
+private val SLUR_TYPES: Map<String, SpanType> = TIE_TYPES + ("continue" to SpanType.CONTINUE)
+
+/** Written pitch label used to pair ties, for example `C#4`, or `B(-1/2)3` for a microtone. */
+private fun pitchKey(pitch: WrittenPitch): String {
+    val alter = when (pitch.alter) {
+        Rational.ZERO -> ""
+        Rational.ONE -> "#"
+        Rational.of(-1) -> "b"
+        else -> "(${pitch.alter})"
+    }
+    return "${pitch.step}$alter${pitch.octave}"
+}
 
 private val CLEF_SIGNS: Map<String, ClefSign> = mapOf(
     "G" to ClefSign.G, "F" to ClefSign.F, "C" to ClefSign.C, "percussion" to ClefSign.PERCUSSION,
