@@ -364,7 +364,8 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
 
     /**
      * Returns whether an attributes child scoped by its optional `number` attribute applies to staff 1.
-     * Another staff is reported as discarded; a non-positive number is `INVALID_VALUE`.
+     * Another staff is reported as discarded; a non-positive number is `INVALID_VALUE`. Callers skip
+     * the content of an element that does not apply without validating it.
      */
     private fun appliesToStaffOne(start: ScoreXmlEvent, label: String): Boolean {
         val number = start.attribute("number") ?: return true
@@ -381,13 +382,19 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         }
     }
 
+    /** Consumes a discarded element without interpreting its children, so they cannot fail the parse. */
+    private fun skipDiscarded(): Nothing? {
+        skipTree()
+        return null
+    }
+
     /**
      * Interprets one simple beats/beat-type pair for staff 1; other time forms, and meters scoped
      * by `number` to another staff, are reported as discarded.
      */
     private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
         attributes(start, setOf("number"), "S07")
-        val staffOne = appliesToStaffOne(start, "Time signature")
+        if (!appliesToStaffOne(start, "Time signature")) return skipDiscarded()
         val beats = mutableListOf<String>()
         val beatTypes = mutableListOf<String>()
         var simple = true
@@ -403,7 +410,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 }
             }
         }
-        if (!context.canContinue || !staffOne) return null
+        if (!context.canContinue) return null
         val beatCount = beats.singleOrNull()?.let(::positiveInt)
         val beatUnit = beatTypes.singleOrNull()?.let(::positiveInt)
         if (!simple || beatCount == null || beatUnit == null) {
@@ -419,7 +426,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
      */
     private fun key(start: ScoreXmlEvent): Attribute.KeySignature? {
         attributes(start, setOf("number"), "S07")
-        val staffOne = appliesToStaffOne(start, "Key signature")
+        if (!appliesToStaffOne(start, "Key signature")) return skipDiscarded()
         val seen = mutableSetOf<String>()
         var fifths: Int? = null
         var mode: KeyMode? = null
@@ -443,7 +450,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 else -> unsupportedTree(event, "S07")
             }
         }
-        if (!context.canContinue || !staffOne) return null
+        if (!context.canContinue) return null
         if (!traditional) {
             unsupported(start.location, "S07", "Non-traditional keys are not interpreted; key discarded")
             return null
@@ -458,7 +465,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     /** Interprets a clef sign, line and octave change; a missing G/F/C line uses its standard line. */
     private fun clef(start: ScoreXmlEvent): Attribute.Clef? {
         attributes(start, setOf("number"), "S07")
-        val staffOne = appliesToStaffOne(start, "Clef")
+        if (!appliesToStaffOne(start, "Clef")) return skipDiscarded()
         val seen = mutableSetOf<String>()
         var sign: ClefSign? = null
         var line: Int? = null
@@ -477,7 +484,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 else -> unsupportedTree(event, "S07")
             }
         }
-        if (!context.canContinue || !staffOne) return null
+        if (!context.canContinue) return null
         val clefSign = sign ?: run {
             invalid(start, "A clef requires a sign")
             return null
@@ -499,7 +506,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
     /** Interprets the staff-line count; other staff details are reported as discarded. */
     private fun staffDetails(start: ScoreXmlEvent): Attribute.StaffLines? {
         attributes(start, setOf("number"), "S17")
-        val staffOne = appliesToStaffOne(start, "Staff details")
+        if (!appliesToStaffOne(start, "Staff details")) return skipDiscarded()
         val seen = mutableSetOf<String>()
         var lines: Int? = null
         children { event ->
@@ -512,7 +519,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 else -> unsupportedTree(event, "S17")
             }
         }
-        if (!context.canContinue || !staffOne) return null
+        if (!context.canContinue) return null
         return lines?.let { Attribute.StaffLines(it) }
     }
 

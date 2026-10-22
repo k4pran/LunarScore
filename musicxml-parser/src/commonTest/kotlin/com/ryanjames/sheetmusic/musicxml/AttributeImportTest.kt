@@ -131,6 +131,17 @@ class AttributeImportTest {
     }
 
     @Test
+    fun testDiscardedStaffContentIsNotValidated() {
+        val result = success(document(
+            "<attributes><key number='2'><fifths>x</fifths></key><time number='2'><beats>0</beats></time>" +
+                "<clef number='2'><sign>H</sign><line>x</line></clef>" +
+                "<staff-details number='2'><staff-lines>-1</staff-lines></staff-details></attributes>",
+        ), ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf("S08", "S08", "S08", "S08"), result.diagnostics.map { it.unsupported?.featureId })
+        assertTrue(events(result).isEmpty())
+    }
+
+    @Test
     fun testOtherAttributesChildrenAreReportedByFeature() {
         val result = success(document(
             "<attributes><part-symbol>brace</part-symbol><transpose><chromatic>-2</chromatic></transpose>" +
