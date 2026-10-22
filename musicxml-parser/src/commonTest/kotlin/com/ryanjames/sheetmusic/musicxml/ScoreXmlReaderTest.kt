@@ -58,6 +58,37 @@ class ScoreXmlReaderTest {
     }
 
     @Test
+    fun testEmptyPrefixedNamespaceDeclarationsAreMalformed() {
+        for (policy in ParsePolicy.entries) {
+            for (xml in listOf(
+                "<p:score-partwise xmlns:p=''/>",
+                "<p:score-timewise xmlns:p=''/>",
+                "<score-partwise xmlns:p=''/>",
+                "<score-partwise><p:note xmlns:p=''/></score-partwise>",
+                "<score-partwise><note xmlns:p='' p:id='x'/></score-partwise>",
+                "<score-partwise xmlns:p='urn:extension'><p:note xmlns:p=''/></score-partwise>",
+                "<score-partwise xmlns:p='urn:extension'><note xmlns:p=''><p:note/></note></score-partwise>",
+            )) {
+                assertFailure(DiagnosticCode.MALFORMED_XML, xml, ParseOptions(policy))
+            }
+        }
+    }
+
+    @Test
+    fun testEmptyDefaultNamespaceResetRemainsValid() {
+        for (root in listOf("score-partwise", "score-timewise")) {
+            val xml = "<$root xmlns=''><section xmlns='urn:extension'><note xmlns='' id='plain'/><note/></section><note/></$root>"
+            val starts = assertIs<ParseResult.Success<List<ScoreXmlEvent>>>(events(xml)).value
+                .filter { it.kind == ScoreXmlEventKind.START_ELEMENT }
+            assertEquals(listOf(
+                XmlName("", root), XmlName("urn:extension", "section"), XmlName("", "note"),
+                XmlName("urn:extension", "note"), XmlName("", "note"),
+            ), starts.map { it.name })
+            assertEquals(listOf(ScoreXmlAttribute(XmlName("", "id"), "plain")), starts[2].attributes)
+        }
+    }
+
+    @Test
     fun testDtdEntitiesAndExpansionRejectedBeforeConsumer() {
         val declarations = listOf(
             "<!DOCTYPE score-partwise>",
