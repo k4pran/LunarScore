@@ -16,6 +16,9 @@ when (result) {
 }
 ```
 
+> MX-07 extends this entry point with [single-voice notes, rests, divisions and simple time](note-import.md);
+> the note/attributes rows below are superseded by that document.
+
 This entry point currently imports a **skeleton**, not musical events. Strict parsing accepts
 the implemented header/part/empty-measure subset; notes and other unmapped musical material
 produce errors. Explicit tolerant parsing returns a skeleton with loss warnings. Neither outcome
