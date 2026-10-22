@@ -80,7 +80,7 @@ Each `F` fixture is a small hand-verifiable file unless noted. Create F01–F08 
 | F09 | Eighth notes with beams and triplet; exact 1/3 or 2/3 rational duration as specified by fixture. |
 | F10 | Tie and slur crossing a measure; endpoints resolve by ID and notation/playback types stay distinct. Add notation-only tied, orphan endpoints and a slur stop preceding its musical start in document order. |
 | F11 | Nested tuplet/time-modification, dotted note and pickup measure; no floating-point drift. Include valid tuplet numbers 7,8,16 and invalid 17 independently of nesting depth. |
-| F12 | Partwise/timewise equivalent pair; canonical semantic projections are equal. The schema-validated [MX-00 example](reference-analysis.md#concrete-specification--importer-disagreement) is a seed, not an executable importer test. |
+| F12 | Partwise/timewise equivalent pair; canonical semantic projections are equal. The schema-validated [MX-00 example](reference-analysis.md#concrete-specification--importer-disagreement) is a seed; the executable pair is `TimewiseFixtures.kt` (MX-10), which also has a measure missing one part. |
 | F13 | Staccato, trill and dynamic on a note; annotations retained and scoped correctly. |
 | F14 | Tempo/metronome, text direction, wedge and offset; event order and span retained. |
 | F15 | Two lyric verses, elision/syllabic text and melisma; ordered text and note association. |

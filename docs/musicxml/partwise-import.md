@@ -26,8 +26,8 @@ implies full MusicXML coverage, XSD validation or a renderable/playable score.
 
 ## Structure and identities
 
-- An unnamespaced `score-partwise` root is required. The reader can recognize `score-timewise`,
-  but this semantic entry point rejects it with fatal `UNSUPPORTED_ROOT` until MX-10.
+- An unnamespaced `score-partwise` root is required here. Since MX-10 a `score-timewise` root
+  is [normalized](timewise-import.md) to the same projection.
 - Exactly one nonempty `part-list` must precede the part bodies. Each `score-part` requires a
   nonblank, unique `id` and a `part-name` (empty text is allowed). The corresponding body must
   exist exactly once. Missing/blank/whitespace-bearing IDs, duplicate declarations or bodies,

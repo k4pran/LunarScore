@@ -66,7 +66,7 @@ All importer links below use the pinned music21 commit. Source behaviour is veri
 </score-timewise>
 ```
 
-Independent expectation: P1 / measure 1 / C4 at onset 0, duration 1 quarter. This example and its equivalent partwise wrapper were validated against the pinned XSD with local imports. The music21 rejection is established by its root guards, not a runtime test. MX-10 must produce equal semantic projections for both roots. Until supported, the proposed outcome is fatal `UnsupportedRoot` with root location, never an empty successful score; see the [diagnostic ledger](risks-and-gaps.md#mx-00-audit-findings-and-diagnostic-obligations).
+Independent expectation: P1 / measure 1 / C4 at onset 0, duration 1 quarter. This example and its equivalent partwise wrapper were validated against the pinned XSD with local imports. The music21 rejection is established by its root guards, not a runtime test. MX-10 must produce equal semantic projections for both roots; it now does ([timewise import](timewise-import.md)). Before MX-10, the proposed outcome was fatal `UnsupportedRoot` with root location, never an empty successful score; see the [diagnostic ledger](risks-and-gaps.md#mx-00-audit-findings-and-diagnostic-obligations).
 
 Validation evidence (2026-10-15, Windows): .NET `XmlSchemaSet` preloaded the pinned `xml.xsd`, `xlink.xsd` and `musicxml.xsd`; `XmlResolver = null`, reader `DtdProcessing = Prohibit`. Both wrappers passed schema validation. Schema inputs are identified by the [inventory checksums](element-inventory.md#reproducible-source-pin). This validates the counterexample's structure, not an importer or any platform target.
 
