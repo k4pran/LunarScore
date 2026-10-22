@@ -27,7 +27,9 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
 /**
  * Imports a UTF-8 partwise score with ordered metadata, parts and measures, plus one sequential
  * voice of pitched notes and rests on staff 1 with exact onsets and durations from divisions,
- * plus staff-1 key, simple time, clef and staff-line changes at their exact offsets. Other musical content is not implemented yet: meaningful unmapped
+ * plus staff-1 key, simple time, clef and staff-line changes at their exact offsets. A timewise
+ * score is normalized while streaming to the same projection: a part missing from a timewise
+ * measure gets an empty measure there. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -39,26 +41,26 @@ public fun parseMusicXml(
     sourceName: String? = null,
     isCancelled: () -> Boolean = { false },
 ): ParseResult<Score> = readScoreXml(input, options, sourceName, isCancelled) { reader ->
-    PartwiseScoreParser(reader).parse()
+    ScoreParser(reader).parse()
 }
 
-private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
+private class ScoreParser(private val reader: ScoreXmlReader) {
     private val context = reader.context
     private val metadata = mutableListOf<MetadataEntry>()
     private val definitions = linkedMapOf<String, PartDefinition>()
-    private val bodies = mutableMapOf<String, List<Measure>>()
+    private val bodies = mutableMapOf<String, PartBody>()
     private var declaredPartId: String? = null
-    private var currentPartId: String? = null
     private val partsDeclaringStaves = mutableSetOf<String>()
-    private var divisions: Rational? = null
+    private val timewise = reader.root == ScoreXmlRoot.TIMEWISE
+    private val timewiseMeasures = mutableListOf<MeasureHeader>()
+
+    /** The part whose measure content is being read; timewise input switches it per measure. */
+    private lateinit var body: PartBody
 
     fun parse(): Score {
         val root = checkNotNull(reader.current)
-        if (reader.root != ScoreXmlRoot.PARTWISE) {
-            context.report(DiagnosticCode.UNSUPPORTED_ROOT, root.location, "Timewise normalization is not implemented")
-            return Score()
-        }
         attributes(root, setOf("version"), "S01")
+        val bodyElement = if (timewise) "measure" else "part"
         val seen = mutableSetOf<String>()
         var rank = -1
         children { event ->
@@ -71,11 +73,11 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 "defaults" -> 4
                 "credit" -> 5
                 "part-list" -> 6
-                "part" -> 7
+                bodyElement -> 7
                 else -> null
             }
             if (nextRank != null) {
-                if (nextRank < rank || (name != "credit" && name != "part" && !seen.add(name))) {
+                if (nextRank < rank || (name != "credit" && name != bodyElement && !seen.add(name))) {
                     invalid(event, "Duplicate or out-of-order score header element: $name")
                     return@children
                 }
@@ -88,9 +90,10 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 "identification" -> identification(event, "metadata", metadata.size, ::addScoreMetadata)
                 "credit" -> credit(event)
                 "part-list" -> partList(event)
-                "part" -> {
-                    if ("part-list" !in seen) invalid(event, "A part-list is required before parts")
-                    else part(event)
+                bodyElement -> when {
+                    "part-list" !in seen -> invalid(event, "A part-list is required before ${bodyElement}s")
+                    timewise -> timewiseMeasure(event)
+                    else -> part(event)
                 }
                 else -> unsupportedTree(event)
             }
@@ -100,17 +103,18 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
                 "part-list" !in seen -> invalid(root, "Missing required part-list")
                 definitions.isEmpty() -> invalid(root, "The part-list must declare a score-part")
                 else -> definitions.values.firstOrNull { it.id !in bodies }?.let {
-                    invalid(it.location, "Declared score-part ${it.id} has no part body")
+                    invalid(it.location, "Declared score-part ${it.id} has no ${if (timewise) "part in any measure" else "part body"}")
                 }
             }
         }
+        if (timewise) bodies.values.forEach { padMissingMeasures(it, timewiseMeasures.size) }
         val title = metadata.filterIsInstance<MetadataEntry.Text>().let { entries ->
             entries.firstOrNull { it.kind == MetadataKind.MOVEMENT_TITLE && it.text.isNotBlank() }?.text
                 ?: entries.firstOrNull { it.kind == MetadataKind.WORK_TITLE && it.text.isNotBlank() }?.text
         }
         return Score(
             parts = definitions.values.map { definition ->
-                val measures = bodies[definition.id].orEmpty().toList()
+                val measures = bodies[definition.id]?.measures.orEmpty().toList()
                 Part(
                     id = definition.id,
                     staves = if (definition.id in partsDeclaringStaves || measures.any { it.events.isNotEmpty() }) {
@@ -275,35 +279,85 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
             return
         }
         attributes(start, setOf("id"), "S01")
-        val path = "parts[${definition.index}]"
-        val measures = mutableListOf<Measure>()
-        bodies[id] = measures
-        currentPartId = id
-        divisions = null
-        provenance(path, start)
+        body = PartBody(id).also { bodies[id] = it }
+        val measures = body.measures
+        provenance("parts[${definition.index}]", start)
         children { event ->
             if (event.localName() == "measure") {
-                val number = event.attribute("number")
-                if (number == null) {
-                    invalid(event.attributeLocation("number"), "A measure requires a number")
-                    return@children
-                }
-                val implicit = when (event.attribute("implicit")) {
-                    null, "no" -> false
-                    "yes" -> true
-                    else -> {
-                        context.report(DiagnosticCode.INVALID_VALUE, event.attributeLocation("implicit"), "Expected yes or no")
-                        return@children
-                    }
-                }
-                attributes(event, setOf("number", "implicit"), "S01")
-                val measurePath = "$path.measures[${measures.size}]"
+                val header = measureHeader(event) ?: return@children
+                val measurePath = "parts[${definition.index}].measures[${measures.size}]"
                 provenance(measurePath, event)
-                measures += measure(id, measurePath, measures.size + 1, number, implicit)
+                measures += measure(id, measurePath, measures.size + 1, header.number, header.implicit)
             } else {
                 unsupportedTree(event)
             }
         }
+    }
+
+    /**
+     * Normalizes one timewise measure into the partwise projection: each child part's content is
+     * read as that part's next measure, with the part's divisions carried from its previous
+     * measure. A declared part absent from a measure gets an empty measure there, so every part
+     * keeps the timewise measure sequence, as the MusicXML timepart.xsl conversion does.
+     */
+    private fun timewiseMeasure(start: ScoreXmlEvent) {
+        val header = measureHeader(start) ?: return
+        val index = timewiseMeasures.size
+        timewiseMeasures += header
+        val seen = mutableSetOf<String>()
+        children { event ->
+            if (event.localName() != "part") {
+                unsupportedTree(event)
+                return@children
+            }
+            val id = requiredId(event) ?: return@children
+            val definition = definitions[id]
+            if (definition == null || !seen.add(id)) {
+                invalid(
+                    event.attributeLocation("id"),
+                    if (definition == null) "Unknown part ID: $id" else "Duplicate part $id in measure ${header.number}",
+                )
+                return@children
+            }
+            attributes(event, setOf("id"), "S01")
+            body = bodies.getOrPut(id) {
+                provenance("parts[${definition.index}]", event)
+                PartBody(id)
+            }
+            padMissingMeasures(body, index)
+            val measurePath = "parts[${definition.index}].measures[$index]"
+            provenance(measurePath, start, id)
+            body.measures += measure(id, measurePath, index + 1, header.number, header.implicit)
+        }
+    }
+
+    /** Appends empty measures for the timewise measures before [count] that lacked this part. */
+    private fun padMissingMeasures(part: PartBody, count: Int) {
+        val partIndex = definitions.getValue(part.id).index
+        while (part.measures.size < count && context.canContinue) {
+            val index = part.measures.size
+            val header = timewiseMeasures[index]
+            provenance("parts[$partIndex].measures[$index]", header.source, part.id)
+            part.measures += Measure("measure-${index + 1}", header.number, Rational.ZERO, emptyList(), header.implicit)
+        }
+    }
+
+    /** Reads a measure's number and implicit flag; null means a fatal diagnostic was reported. */
+    private fun measureHeader(start: ScoreXmlEvent): MeasureHeader? {
+        val number = start.attribute("number") ?: run {
+            invalid(start.attributeLocation("number"), "A measure requires a number")
+            return null
+        }
+        val implicit = when (start.attribute("implicit")) {
+            null, "no" -> false
+            "yes" -> true
+            else -> {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("implicit"), "Expected yes or no")
+                return null
+            }
+        }
+        attributes(start, setOf("number", "implicit"), "S01")
+        return MeasureHeader(number, implicit, start)
     }
 
     /**
@@ -358,7 +412,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         }
         children { event ->
             when (val name = event.localName()) {
-                "divisions" -> positiveDecimal(event, "S05", "Divisions")?.let { divisions = it }
+                "divisions" -> positiveDecimal(event, "S05", "Divisions")?.let { body.divisions = it }
                 "key" -> emit(key(event), event)
                 "time" -> emit(time(event), event)
                 "clef" -> emit(clef(event), event)
@@ -509,7 +563,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         when (val count = positiveInt(text)) {
             null -> context.report(DiagnosticCode.INVALID_VALUE, start.location, "Staves must be a positive Int")
             else -> {
-                currentPartId?.let { partsDeclaringStaves += it }
+                partsDeclaringStaves += body.id
                 if (count > 1) unsupported(start.location, "S08", "$count staves are not interpreted; only staff 1 is imported")
             }
         }
@@ -633,7 +687,7 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
             invalid(start, "A non-grace note requires a duration")
             return null
         }
-        val currentDivisions = divisions ?: run {
+        val currentDivisions = body.divisions ?: run {
             invalid(durationSource, "A duration requires preceding divisions")
             return null
         }
@@ -848,6 +902,14 @@ private class PartwiseScoreParser(private val reader: ScoreXmlReader) {
         class Pitch(val pitch: NotePitch) : NoteContent
         class Rest(val wholeMeasure: Boolean) : NoteContent
     }
+
+    /** A part's measures plus the divisions that persist across its measures. */
+    private class PartBody(val id: String) {
+        val measures = mutableListOf<Measure>()
+        var divisions: Rational? = null
+    }
+
+    private class MeasureHeader(val number: String, val implicit: Boolean, val source: ScoreXmlEvent)
 
     private class PartDefinition(val id: String, val index: Int, val location: SourceLocation) {
         var name: String? = null

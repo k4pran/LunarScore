@@ -118,6 +118,21 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-10 timewise normalization decisions and remaining gaps
+
+The importer now [normalizes timewise scores](timewise-import.md) to the partwise projection. This
+supersedes the MX-06 fatal `UNSUPPORTED_ROOT` for timewise roots.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Declared part missing from a timewise measure | Empty measure with that measure's number and implicit flag, no diagnostic (valid MusicXML); F12 and leading-gap variant compare equal to explicit empty partwise measures; padding is bounded by `PROVENANCE_LIMIT` | None |
+| Unknown, blank or duplicate part ID in a measure; declared part in no measure; measure before the part-list or without a number | Fatal `INVALID_STRUCTURE` in both policies | None |
+| Parts in a different order within a measure | Part-list order; divisions carry per part across interleaved measures (F12) | None |
+| Non-part children of a timewise measure, `part` directly under the root, unmapped timewise `part`/`measure` attributes | Feature-group `UNSUPPORTED_FEATURE` / `DISCARDED` (for example S13, S03, S01); strict rejects, tolerant warns | Measure-level semantics belong to their feature tasks |
+| Measure attributes that differ per part (partwise allows a different `implicit` or `number` per part) | Timewise has one set per measure, so the projection is identical; partwise differences are kept as written | None |
+
+F12 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-08 attribute state decisions and remaining gaps
 
 The importer now emits [key, clef and staff-line state](attribute-state.md) alongside MX-07's
@@ -172,7 +187,7 @@ part/measure structures. This supersedes earlier statements that no semantic imp
 | Missing/duplicate part-list, missing part-name/measure number, duplicate header fields | Fatal `INVALID_STRUCTURE`; actual missing-part-list F22 semantic detection now exists | Complete nested ordering/cardinality and XSD validation remain separate work |
 | Zero-measure bodies | Accepted neutral empty parts; explicit test and documentation | Not an XSD-conformance claim |
 | Invalid measure implicit flag or nonpositive/out-of-Int credit page | Fatal `INVALID_VALUE` | General schema value validation remains separate work |
-| Timewise root through public score API | Fatal `UNSUPPORTED_ROOT` in both policies; reader recognition remains intact | MX-10 normalization |
+| Timewise root through public score API | Superseded by MX-10: normalized to the partwise projection | None |
 | Credit images/symbols, text typography/language, encoding supports and unknown header content | S03 `UNSUPPORTED_FEATURE` / `DISCARDED`; plain supported text still retained; strict rejects, tolerant warns | Rich credit/layout and encoding capability semantics remain unimplemented |
 | Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations | Layout MX-18; source IDs/display text/multimetric measure semantics need explicit model mappings |
 | Part groups, part links, grouping, links/bookmarks | S25 discarded-content findings; actual grouping/link importer tests; no targets fetched | Group/editorial/link semantics and full F27 remain pending |
@@ -192,7 +207,7 @@ Proposed record shape: `UnsupportedFeature(featureId, sourceLocation, retention)
 
 | Case / evidence | Required structured outcome (proposed) | Owner / independent check |
 |---|---|---|
-| Timewise root is valid in 4.0 but rejected by both inspected music21 entry points | `UnsupportedRoot(rootName, sourceLocation)` until MX-10; thereafter normalize, not an unsupported warning | MX-05,MX-10; F12 pair. Source guards verified; music21 runtime not executed. |
+| Timewise root is valid in 4.0 but rejected by both inspected music21 entry points | Normalized since MX-10, with no unsupported warning (`UNSUPPORTED_ROOT` remains only for other roots) | MX-05,MX-10; F12 pair tested. Source guards verified; music21 runtime not executed. |
 | Missing/unknown/duplicate part ID is repaired, skipped or overwritten in reference source | `MissingPartId`, `UnknownPartId`, `DuplicatePartId`; any tolerant repair also records what was changed/lost | MX-06; F02/F22 variants |
 | Backup before measure start is clamped in reference; forward overfill allowed locally | `InvalidCursorMove` / `InconsistentMeasureDuration`, not silent clamp or inferred notation | MX-09; F05/F23; also divisions-boundary moves |
 | Numbered tuplet state uses fixed lists although 4.0 number-level permits 1–16 | Support valid labels through 16; if temporarily limited, `UnsupportedFeature("S11", location, retention)`. Never an indexing exception | MX-12,MX-20; F11 numbers 7,8,16 and invalid 17. Index failure is a source-based inference, not a reproduced crash. |

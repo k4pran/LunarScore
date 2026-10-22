@@ -161,13 +161,6 @@ class MusicXmlParserTest {
     }
 
     @Test
-    fun testTimewiseIsExplicitlyRejectedBySemanticEntryPoint() {
-        for (policy in ParsePolicy.entries) {
-            failure("<score-timewise/>", DiagnosticCode.UNSUPPORTED_ROOT, ParseOptions(policy))
-        }
-    }
-
-    @Test
     fun testMusicalSubtreesProduceFeatureDiagnostics() {
         // Interpreted note/attribute content is covered by NoteImportTest; an unmapped attributes child stays S07.
         val features = listOf("backup" to "S06", "attributes" to "S07", "direction" to "S13",
