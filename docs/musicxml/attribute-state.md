@@ -69,15 +69,16 @@ from the MusicXML 4.0 [attributes](https://www.w3.org/2021/06/musicxml40/musicxm
 [clef](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/clef/) references, intended
 schema-valid but not XSD-validated. F03 and F04 remain covered by `NoteImportTest`.
 
-`AttributeImportTest` adds 7 common tests: F07 effective state and exact offsets, missing state,
+`AttributeImportTest` adds 9 common tests: F07 effective state and exact offsets, missing state,
 key forms and unsupported key content, clef forms and standard lines, staves/staff details,
-other attributes children by feature, and changes after a cursor move. `AttributeStateTest` adds
+other attributes children by feature, changes after a cursor move, staff 1 retained from a
+`staves` declaration, and discarded-staff content left unvalidated. `AttributeStateTest` adds
 2 model tests for onset ordering, cross-measure persistence, per-staff scope and domain replacement.
 
 Windows verification on 2026-10-22:
 
 | Check | Result |
 |---|---|
-| Parser JVM / Android host tests | 100 passed per target (7 attribute, 14 note, 18 skeleton, 33 reader, 15 contract, 13 probes) |
+| Parser JVM / Android host tests | 102 passed per target (9 attribute, 14 note, 18 skeleton, 33 reader, 15 contract, 13 probes) |
 | Model tests | 14 passed (2 new state tests) on JVM, Android host, JS and Wasm Node |
 | iOS runtime | Skipped on Windows; requires macOS/Xcode |
