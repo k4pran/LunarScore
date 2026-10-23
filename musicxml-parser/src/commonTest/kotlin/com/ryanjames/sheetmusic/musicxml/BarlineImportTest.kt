@@ -251,10 +251,34 @@ class BarlineImportTest {
         assertEquals(listOf("S08", "S24"), result.diagnostics.map { it.unsupported?.featureId })
         assertNull(result.value.parts.single().measures.single().measureRepeat)
 
-        for (invalid in listOf("<measure-repeat type='start'/>", "<measure-repeat type='start' slashes='0'>1</measure-repeat>", "<measure-repeat type='begin'>1</measure-repeat>")) {
+        for (invalid in listOf("<measure-repeat type='start'>0</measure-repeat>", "<measure-repeat type='start' slashes='0'>1</measure-repeat>", "<measure-repeat type='begin'>1</measure-repeat>")) {
             failure(document(measure(left = "<attributes><measure-style>$invalid</measure-style></attributes>")), DiagnosticCode.INVALID_VALUE)
         }
         failure(document(measure(left = "<attributes><measure-style><measure-repeat>1</measure-repeat></measure-style></attributes>")), DiagnosticCode.INVALID_STRUCTURE)
+    }
+
+    @Test
+    fun testEmptyMeasureRepeatCountDefaultsToOne() {
+        val xml = document(measure(left = "<attributes><measure-style><measure-repeat type='start'/></measure-style></attributes>"))
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(MeasureRepeat(1, 1), result.value.parts.single().measures.single().measureRepeat)
+    }
+
+    @Test
+    fun testTimewisePaddedMeasuresKeepActiveMeasureRepeat() {
+        val note = "<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>"
+        val xml = "<score-timewise version='4.0'><part-list>" +
+            "<score-part id='P1'><part-name>A</part-name></score-part><score-part id='P2'><part-name>B</part-name></score-part></part-list>" +
+            "<measure number='1'><part id='P1'><attributes><divisions>1</divisions></attributes>$note</part>" +
+            "<part id='P2'><attributes><divisions>1</divisions><measure-style><measure-repeat type='start'>1</measure-repeat></measure-style></attributes>$note</part></measure>" +
+            "<measure number='2'><part id='P1'>$note</part></measure>" +
+            "<measure number='3'><part id='P1'>$note</part>" +
+            "<part id='P2'><attributes><measure-style><measure-repeat type='stop'/></measure-style></attributes>$note</part></measure>" +
+            "</score-timewise>"
+        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+        val measures = result.value.parts.single { it.id == "P2" }.measures
+        assertEquals(listOf(MeasureRepeat(1, 1), MeasureRepeat(1, 1), null), measures.map { it.measureRepeat })
     }
 
     @Test
