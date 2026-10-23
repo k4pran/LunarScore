@@ -23,9 +23,9 @@ reference point (usually the start of the measure and the top staff line).
 | `page-layout` | `PageLayout(height, width, margins)`; height and width are positive and given together |
 | `page-margins type` (`odd`, `even`, `both`, default `both`) | `PageMargins(MarginType, left, right, top, bottom)`; one `both`, or at most one each of `odd` and `even` |
 | `system-layout` | `SystemLayout(leftMargin, rightMargin, systemDistance, topSystemDistance)`; system margins need left and right |
-| `staff-layout number`, `staff-distance` | `StaffLayout(staff, staffDistance)`; a null staff means the source named none |
+| `staff-layout number`, `staff-distance` | `StaffLayout(staff, staffDistance)`; an omitted `number` gives staff 1 |
 | `print` (first one in a measure) | `Measure.print: PrintHints?`; null when the measure has no `print` |
-| `print new-system`, `new-page` | `newSystem`, `newPage` (default false) |
+| `print new-system`, `new-page` | `newSystem`, `newPage`: `yes` is true (force a break), `no` is false (forbid one), omitted is null (renderer decides) |
 | `print blank-page`, `page-number` | `blankPages` (positive, default 0), `pageNumber` (text as given) |
 | `print` `page-layout`, `system-layout`, `staff-layout` | Same types as in `defaults`, overriding them from this measure |
 | `print/measure-layout/measure-distance` | `PrintHints.measureDistance` |

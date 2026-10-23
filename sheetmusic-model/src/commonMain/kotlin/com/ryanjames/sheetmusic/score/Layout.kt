@@ -25,7 +25,7 @@ public data class PageMargins(
     val bottom: Rational,
 )
 
-/** Page size and margins in tenths; null or empty means unspecified. */
+/** Page size and margins in tenths; null or empty means unspecified. [height] and [width] are given together or not at all. */
 public data class PageLayout(
     val height: Rational? = null,
     val width: Rational? = null,
@@ -34,6 +34,7 @@ public data class PageLayout(
     init {
         require(height == null || height > Rational.ZERO)
         require(width == null || width > Rational.ZERO)
+        require((height == null) == (width == null)) { "Page height and width must be given together" }
     }
 }
 
@@ -51,11 +52,11 @@ public data class SystemLayout(
 
 /**
  * Distance in tenths from the bottom line of the previous staff to the top line of [staff] within
- * a system. A null [staff] means the source did not name a staff.
+ * a system. [staff] is 1-based and defaults to the first staff.
  */
-public data class StaffLayout(val staff: Int? = null, val staffDistance: Rational? = null) {
+public data class StaffLayout(val staff: Int = 1, val staffDistance: Rational? = null) {
     init {
-        require(staff == null || staff > 0)
+        require(staff > 0)
     }
 }
 
@@ -71,11 +72,12 @@ public data class LayoutDefaults(
  * Layout requested at the start of a measure: system and page breaks, [blankPages] inserted before
  * it, the displayed [pageNumber], and layout overriding [LayoutDefaults] from here on.
  * [measureDistance] is the horizontal distance in tenths from the previous measure, for the first
- * measure of a system only.
+ * measure of a system only. [newSystem] and [newPage] are true to force a break, false to forbid
+ * one, and null to leave breaking to the renderer.
  */
 public data class PrintHints(
-    val newSystem: Boolean = false,
-    val newPage: Boolean = false,
+    val newSystem: Boolean? = null,
+    val newPage: Boolean? = null,
     val blankPages: Int = 0,
     val pageNumber: String? = null,
     val page: PageLayout? = null,

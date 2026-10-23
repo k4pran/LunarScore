@@ -430,12 +430,12 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return SystemLayout(margins["left-margin"], margins["right-margin"], distance, topDistance)
     }
 
-    /** Reads a staff-layout's optional positive staff `number` and staff distance. */
+    /** Reads a staff-layout's positive staff `number` (default 1) and staff distance. */
     private fun staffLayout(start: ScoreXmlEvent): StaffLayout? {
         attributes(start, setOf("number"), "S17")
         val numberText = start.attribute("number")
-        val staff = numberText?.let { positiveInt(it) }
-        if (numberText != null && staff == null) {
+        val staff = if (numberText == null) 1 else positiveInt(numberText)
+        if (staff == null) {
             context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "Staff-layout number must be a positive Int")
             return null
         }
@@ -475,8 +475,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      */
     private fun print(start: ScoreXmlEvent): PrintHints? {
         attributes(start, setOf("new-system", "new-page", "blank-page", "page-number"), "S17")
-        val newSystem = yesNo(start, "new-system") ?: return null
-        val newPage = yesNo(start, "new-page") ?: return null
+        val newSystem = optionalYesNo(start, "new-system")
+        val newPage = optionalYesNo(start, "new-page")
+        if (!context.canContinue) return null
         val blankPageText = start.attribute("blank-page")
         val blankPages = blankPageText?.let { positiveInt(it) } ?: 0
         if (blankPageText != null && blankPages == 0) {
@@ -2065,6 +2066,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         return Accidental(name, cautionary, editorial)
     }
+
+    /** A yes/no attribute that stays null when omitted, unlike [yesNo]; null also after `INVALID_VALUE`. */
+    private fun optionalYesNo(start: ScoreXmlEvent, name: String): Boolean? =
+        start.attribute(name)?.let { yesNo(start, name) }
 
     private fun yesNo(start: ScoreXmlEvent, name: String): Boolean? = when (start.attribute(name)) {
         null, "no" -> false
