@@ -49,6 +49,10 @@ does not depend on that module.
   source order, optional `DirectionSound` playback tempo/dynamics/offset and `DirectionDisplay`
   placement/directive/offset, kept separately. Wedge endpoints are linked by `WEDGE` relationships.
   See [directions and note expressions](direction-import.md).
+- MX-14 adds `NotatedValue.lyrics`: each `Lyric` has an optional verse number and name, ordered
+  `LyricSyllable`s (text, `Syllabic`, joining elision symbol), an optional `LyricExtend` melisma
+  line and a separate `Placement`. The containing event's ID links a lyric to its note. See
+  [lyrics](lyric-import.md).
 - Relationships have their own IDs and typed endpoint event IDs. Sound ties, printed ties and slurs
   remain independent; multiple/nested spans may share endpoints. Missing endpoints remain null.
   IDs must be assigned independently of source XML IDs so anonymous elements remain addressable.
@@ -76,7 +80,7 @@ repair or omit records. Source positions, strict/tolerant import policy and unsu
 retention belong to MX-03, outside the neutral model. Chord-reference duration rules, meter fullness,
 pitch agreement for ties and other musical consistency checks remain feature tasks.
 
-Additive meters, non-traditional keys, unsupported direction types, layout hints, lyrics, rich annotations and opaque source content
+Additive meters, non-traditional keys, unsupported direction types, layout hints, non-text lyrics, rich annotations and opaque source content
 are not accepted as import input by this change; no parser API exists here. Their future adapters
 must implement them or emit the S01–S27 unsupported diagnostics in the coverage/risk ledger.
 

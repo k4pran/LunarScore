@@ -66,6 +66,7 @@ public data class Beam(val level: Int, val type: BeamType) {
  * [timeModification] is the note's cumulative ratio, including every enclosing nested tuplet.
  * [beams] are listed in source order with distinct levels; an empty list means no printed beam.
  * [expressions] are articulations, ornaments and dynamics attached to the note, in source order.
+ * [lyrics] are the lyric lines sung on the note or rest, in source order; the event's ID links them.
  */
 public data class NotatedValue(
     val value: NoteValue? = null,
@@ -75,6 +76,7 @@ public data class NotatedValue(
     val stem: StemDirection? = null,
     val beams: List<Beam> = emptyList(),
     val expressions: List<NoteExpression> = emptyList(),
+    val lyrics: List<Lyric> = emptyList(),
 ) {
     init {
         require(dots >= 0)

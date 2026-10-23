@@ -83,7 +83,7 @@ Each `F` fixture is a small hand-verifiable file unless noted. Create F01–F08 
 | F12 | Partwise/timewise equivalent pair; canonical semantic projections are equal. The schema-validated [MX-00 example](reference-analysis.md#concrete-specification--importer-disagreement) is a seed; the executable pair is `TimewiseFixtures.kt` (MX-10), which also has a measure missing one part. |
 | F13 | Staccato, trill and dynamic on a note; annotations retained and scoped correctly. Implemented in `DirectionFixtures.kt` (MX-13). |
 | F14 | Tempo/metronome, text direction, wedge and offset; event order and span retained. Implemented in `DirectionFixtures.kt` (MX-13); a direction after backup is an inline discard test until MX-09 interprets backup. |
-| F15 | Two lyric verses, elision/syllabic text and melisma; ordered text and note association. |
+| F15 | Two lyric verses, elision/syllabic text and melisma; ordered text and note association. Implemented in `LyricFixtures.kt` (MX-14), with an unnumbered lyric split into text runs. |
 | F16 | Repeat start/end, two endings and a nonstandard barline; structural and playback fields distinct. |
 | F17 | Transposing instrument plus unpitched percussion; written and sounding fields must not be conflated. |
 | F18 | Page/system/staff layout, print break and explicit positioning; retain supported hints. |
