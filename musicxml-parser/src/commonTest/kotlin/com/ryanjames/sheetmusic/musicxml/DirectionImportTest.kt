@@ -193,6 +193,24 @@ class DirectionImportTest {
     }
 
     @Test
+    fun testWedgeIdsFollowSourceOrderWithinOneDirection() {
+        val xml = document(
+            "<direction><direction-type><wedge type='crescendo'/></direction-type>" +
+                "<direction-type><wedge type='stop' number='2'/></direction-type></direction>" +
+                note("C") + direction("<wedge type='stop'/>") + note("D"),
+        )
+        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf(DiagnosticCode.UNMATCHED_SPAN), result.diagnostics.map { it.code })
+        assertEquals(
+            listOf(
+                Relationship("P1:wedge-1", RelationshipKind.WEDGE, event(1, 1), event(1, 3)),
+                Relationship("P1:wedge-2", RelationshipKind.WEDGE, null, event(1, 1)),
+            ),
+            result.value.relationships,
+        )
+    }
+
+    @Test
     fun testWedgeBeforeNoteSpanKeepsSourceOrder() {
         val xml = document(
             direction("<wedge type='crescendo'/>") + note("C", "<slur type='start'/>") +
@@ -256,6 +274,7 @@ class DirectionImportTest {
                 direction("<wedge type='louder'/>"),
                 direction("<wedge type='crescendo' number='17'/>"),
                 direction("<words>x</words>", attributes = " placement='middle'"),
+                direction("<dynamics placement='sideways'><p/></dynamics>"),
                 direction("<words>x</words>", attributes = " directive='maybe'"),
                 direction("<metronome><beat-unit>crotchet</beat-unit><per-minute>60</per-minute></metronome>"),
                 direction("<metronome><beat-unit>quarter</beat-unit><per-minute> </per-minute></metronome>"),
