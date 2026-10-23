@@ -11,7 +11,10 @@ internal data class XmlName(val namespaceUri: String, val localName: String)
 
 internal data class ScoreXmlAttribute(val name: XmlName, val value: String)
 
-internal enum class ScoreXmlRoot { PARTWISE, TIMEWISE }
+/** Document roots the bounded reader can start on; [CONTAINER] is the `.mxl` `META-INF/container.xml` root. */
+internal enum class ScoreXmlRoot { PARTWISE, TIMEWISE, CONTAINER }
+
+internal val SCORE_ROOTS: Set<ScoreXmlRoot> = setOf(ScoreXmlRoot.PARTWISE, ScoreXmlRoot.TIMEWISE)
 
 internal enum class ScoreXmlEventKind { START_ELEMENT, END_ELEMENT, TEXT }
 
@@ -29,12 +32,14 @@ internal data class ScoreXmlEvent(
  * start event. Unread input is drained before success, so malformed tails cannot yield a value.
  * Fatal findings discard the consumer's value/provenance. Consumer exceptions propagate unchanged.
  * Input bytes are caller-owned; decoding and individual tokens are bounded by maxInputBytes.
+ * Any other root than [acceptedRoots] is `UNSUPPORTED_ROOT`.
  */
 internal fun <T : Any> readScoreXml(
     input: ByteArray,
     options: ParseOptions = ParseOptions(),
     sourceName: String? = null,
     isCancelled: () -> Boolean = { false },
+    acceptedRoots: Set<ScoreXmlRoot> = SCORE_ROOTS,
     consume: (ScoreXmlReader) -> T,
 ): ParseResult<T> {
     val context = ParseContext(options)
@@ -85,7 +90,7 @@ internal fun <T : Any> readScoreXml(
         return fail(DiagnosticCode.MALFORMED_XML, "Cannot initialize XML reader")
     }
     try {
-        val cursor = ScoreXmlReader(reader, context, options.limits, sourceName, ::cancellationRequested)
+        val cursor = ScoreXmlReader(reader, context, options.limits, sourceName, ::cancellationRequested, acceptedRoots)
         if (cursor.next() == null) return context.failure()
         val value = consume(cursor)
         while (cursor.next() != null) {
@@ -108,6 +113,7 @@ internal class ScoreXmlReader(
     private val limits: ParseLimits,
     private val sourceName: String?,
     private val isCancelled: () -> Boolean,
+    private val acceptedRoots: Set<ScoreXmlRoot> = SCORE_ROOTS,
 ) {
     var root: ScoreXmlRoot? = null
         private set
@@ -235,10 +241,12 @@ internal class ScoreXmlReader(
             root = when (name.localName) {
                 "score-partwise" -> ScoreXmlRoot.PARTWISE
                 "score-timewise" -> ScoreXmlRoot.TIMEWISE
-                else -> return stop(DiagnosticCode.UNSUPPORTED_ROOT, startLocation, "Unsupported score root: ${name.localName}")
-            }
+                "container" -> ScoreXmlRoot.CONTAINER
+                else -> null
+            }?.takeIf { it in acceptedRoots }
+                ?: return stop(DiagnosticCode.UNSUPPORTED_ROOT, startLocation, "Unsupported document root: ${name.localName}")
             if (name.namespaceUri.isNotEmpty()) {
-                return stop(DiagnosticCode.UNSUPPORTED_NAMESPACE, startLocation, "MusicXML score elements require no namespace")
+                return stop(DiagnosticCode.UNSUPPORTED_NAMESPACE, startLocation, "MusicXML score and container elements require no namespace")
             }
         }
         val attributeNames = mutableSetOf<XmlName>()
