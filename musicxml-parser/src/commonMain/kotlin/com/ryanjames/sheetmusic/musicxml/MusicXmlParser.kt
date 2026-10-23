@@ -1133,14 +1133,18 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /**
      * Passes one measure's wedge endpoints to the part's resolver in display-position order, keeping
      * document order at equal positions, so an offset cannot pair a stop with a later-displayed start.
+     * Each endpoint keeps its document order for numbering, so offsets do not change wedge IDs.
      */
     private fun registerWedges(endpoints: List<Pair<SpanType, SpanEndpoint>>) {
         val resolver = body.spans
-        endpoints.sortedBy { (_, endpoint) -> endpoint.position }.forEach { (type, endpoint) ->
+        val firstOrder = resolver.reserveOrders(endpoints.size)
+        endpoints.withIndex().sortedBy { (_, entry) -> entry.second.position }.forEach { (index, entry) ->
+            val (type, endpoint) = entry
+            val order = firstOrder + index
             when (type) {
-                SpanType.STOP -> resolver.stop(endpoint)
+                SpanType.STOP -> resolver.stop(endpoint, order)
                 SpanType.CONTINUE -> resolver.continuePoint(endpoint)
-                SpanType.START -> resolver.start(endpoint)
+                SpanType.START -> resolver.start(endpoint, order)
                 SpanType.LET_RING -> Unit
             }
         }

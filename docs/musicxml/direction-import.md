@@ -32,7 +32,9 @@ with no printed marks. A direction whose content is all discarded produces no ev
 
 Wedges pair by `number` (1–16, default 1) through the shared [span resolver](span-import.md),
 preferring the same voice; `continue` is a mid-span check like a slur continue. A wedge may cross
-barlines. Unmatched endpoints are `UNMATCHED_SPAN` and keep a null partner.
+barlines. Within a measure, endpoints pair in display position (onset plus offset) order, so an
+offset cannot pair a stop with a later-displayed start; IDs still follow source order. Unmatched
+endpoints are `UNMATCHED_SPAN` and keep a null partner.
 
 ### Offsets and backup
 
