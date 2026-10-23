@@ -910,11 +910,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /**
      * Reads a `dynamics` element in notations or a direction. Each standard marking keeps its
      * element name and `other-dynamics` its text, in source order. Without a marking it is discarded.
-     * In a direction its own placement is ignored, as MusicXML specifies; the direction's governs.
+     * In a direction its own placement is validated but ignored, as MusicXML specifies; the direction's governs.
      */
     private fun dynamics(start: ScoreXmlEvent, feature: String, inDirection: Boolean = false): Dynamics? {
         attributes(start, setOf("placement"), feature)
-        val placement = if (inDirection) null else placement(start)
+        val placement = placement(start).takeUnless { inDirection }
         val markings = mutableListOf<String>()
         children { event ->
             val name = event.localName()
@@ -1124,17 +1124,19 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     /**
      * A direction's wedge endpoints at [position]: stops, then continue points, then starts. Their
-     * source orders are reserved now, as the direction is read, so they interleave correctly with
+     * source orders are reserved now in document order, as the direction is read, so they interleave correctly with
      * note spans in the same measure even though registration waits for [registerWedges].
      */
     private fun wedgeEndpoints(event: DirectionEvent, marks: List<SpanMark>, position: SpanPosition): List<WedgeEndpoint> {
-        val endpoints = listOf(SpanType.STOP, SpanType.CONTINUE, SpanType.START).flatMap { type ->
-            marks.filter { it.type == type }.map { mark ->
-                type to SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), position, mark.location)
+        val matchOrder = listOf(SpanType.STOP, SpanType.CONTINUE, SpanType.START)
+        val wedgeMarks = marks.filter { it.type in matchOrder }
+        val firstOrder = body.spans.reserveOrders(wedgeMarks.size)
+        return wedgeMarks
+            .mapIndexed { index, mark ->
+                val endpoint = SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), position, mark.location)
+                WedgeEndpoint(mark.type, endpoint, firstOrder + index)
             }
-        }
-        val firstOrder = body.spans.reserveOrders(endpoints.size)
-        return endpoints.mapIndexed { index, (type, endpoint) -> WedgeEndpoint(type, endpoint, firstOrder + index) }
+            .sortedBy { matchOrder.indexOf(it.type) }
     }
 
     /**
