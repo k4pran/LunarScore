@@ -463,14 +463,17 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         context.report(DiagnosticCode.UNMATCHED_SPAN, location, message)
     })
 
-    /** Appends empty measures for the timewise measures before [count] that lacked this part. */
+    /**
+     * Appends empty measures for the timewise measures before [count] that lacked this part. They
+     * keep the part's active measure repeat, as they lie between its start and stop.
+     */
     private fun padMissingMeasures(part: PartBody, count: Int) {
         val partIndex = definitions.getValue(part.id).index
         while (part.measures.size < count && context.canContinue) {
             val index = part.measures.size
             val header = timewiseMeasures[index]
             provenance("parts[$partIndex].measures[$index]", header.source, part.id)
-            part.measures += Measure("measure-${index + 1}", header.number, Rational.ZERO, emptyList(), header.implicit)
+            part.measures += Measure("measure-${index + 1}", header.number, Rational.ZERO, emptyList(), header.implicit, measureRepeat = part.measureRepeat)
         }
     }
 
@@ -979,8 +982,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             } ?: 1
             when (val type = event.attribute("type")) {
                 "start" -> {
-                    val measures = positiveInt(text) ?: run {
-                        context.report(DiagnosticCode.INVALID_VALUE, event.location, "A measure-repeat start needs a positive measure count")
+                    // An empty count means one measure (positive-integer-or-empty).
+                    val measures = if (text.isEmpty()) 1 else positiveInt(text) ?: run {
+                        context.report(DiagnosticCode.INVALID_VALUE, event.location, "A measure-repeat start count must be a positive Int")
                         return@children
                     }
                     body.measureRepeat = MeasureRepeat(measures, slashes)
