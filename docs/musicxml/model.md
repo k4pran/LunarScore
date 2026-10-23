@@ -52,6 +52,10 @@ does not depend on that module.
   source order, optional `DirectionSound` playback tempo/dynamics/offset and `DirectionDisplay`
   placement/directive/offset, kept separately. Wedge endpoints are linked by `WEDGE` relationships.
   See [directions and note expressions](direction-import.md).
+- MX-14 adds `NotatedValue.lyrics`: each `Lyric` has an optional verse number and name, ordered
+  `LyricSyllable`s (text, `Syllabic`, joining elision symbol), an optional `LyricExtend` melisma
+  line and a separate `Placement`. The containing event's ID links a lyric to its note. See
+  [lyrics](lyric-import.md).
 - MX-17 adds `Measure.barlines` (`Barline` location, middle-barline onset, `BarStyle`, `Repeat` and
   `EndingMark` as notated), `Measure.measureRepeat` and part-level `Ending`s spanning whole
   measures (a null stop preserves an unstopped ending). `Part.playbackOrder()` derives playback
@@ -89,7 +93,7 @@ repair or omit records. Source positions, strict/tolerant import policy and unsu
 retention belong to MX-03, outside the neutral model. Chord-reference duration rules, meter fullness,
 pitch agreement for ties and other musical consistency checks remain feature tasks.
 
-Additive meters, non-traditional keys, unsupported direction types, layout hints (now MX-18, see [layout-import.md](layout-import.md)), lyrics, rich annotations and opaque source content
+Additive meters, non-traditional keys, unsupported direction types, layout hints (now MX-18, see [layout-import.md](layout-import.md)), non-text lyrics, rich annotations and opaque source content
 are not accepted as import input by this change; no parser API exists here. Their future adapters
 must implement them or emit the S01–S27 unsupported diagnostics in the coverage/risk ledger.
 

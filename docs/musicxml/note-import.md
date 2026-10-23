@@ -53,7 +53,7 @@ All of these are `UNSUPPORTED_FEATURE` with `DISCARDED` retention: strict reject
 | `grace` notes | S18 | Superseded by [MX-15](grace-import.md): imported as untimed `GRACE` notes |
 | `staff` other than 1 | S06 | Superseded by [MX-09](polyphony.md): the note keeps its declared staff |
 | `backup`/`forward` | S06 | Superseded by [MX-09](polyphony.md): they move the measure-local cursor |
-| `lyric` | S14 | Child discarded; note and exact duration kept. `tie` and `notations` are interpreted by [MX-11](span-import.md); `time-modification`, `stem`, `beam` and `tuplet` by [MX-12](tuplet-import.md) |
+| `lyric` | S14 | Child discarded; note and exact duration kept. Lyrics are interpreted by [MX-14](lyric-import.md); `tie` and `notations` are interpreted by [MX-11](span-import.md); `time-modification`, `stem`, `beam` and `tuplet` by [MX-12](tuplet-import.md) |
 | `footnote`/`level`; `play`/`listen` | S25; S26 | Child discarded (`instrument` is interpreted since [MX-16](instrument-import.md)) |
 | `notehead`, rest display-step/octave, dot attributes | S17 | Child/attribute discarded |
 | Note attributes (`default-x`, `dynamics`, `print-object`, …), unknown note children | S04 | Discarded |

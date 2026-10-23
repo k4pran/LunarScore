@@ -1,5 +1,8 @@
 package com.ryanjames.sheetmusic.musicxml
 
+import com.ryanjames.sheetmusic.score.Lyric
+import com.ryanjames.sheetmusic.score.LyricExtend
+import com.ryanjames.sheetmusic.score.LyricSyllable
 import com.ryanjames.sheetmusic.score.NoteEvent
 import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.NoteRole
@@ -7,6 +10,7 @@ import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.RelationshipKind
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.SoundingPitch
+import com.ryanjames.sheetmusic.score.Syllabic
 import com.ryanjames.sheetmusic.score.validate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,7 +57,8 @@ class MixedFeatureImportTest {
 
     @Test
     fun testGraceWithLyricsStaysLinkedAndUntimed() {
-        val result = success(mixedGraceAndLyric, TOLERANT)
+        val result = success(mixedGraceAndLyric)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
         val (grace, principal) = result.value.parts.single().measures.single().events.map { assertIs<NoteEvent>(it) }
         assertEquals(NoteRole.GRACE, grace.role)
         assertEquals(null, grace.duration)
@@ -62,11 +67,14 @@ class MixedFeatureImportTest {
         val link = result.value.relationships.single()
         assertEquals(RelationshipKind.GRACE_NOTE, link.kind)
         assertEquals(grace.id to principal.id, link.startEventId to link.endEventId)
+        // Each note keeps its own lyric; the grace's lyric stays on the untimed grace note.
         assertEquals(
-            listOf("S14" to "$MEASURE/note[1]/lyric[1]", "S14" to "$MEASURE/note[2]/lyric[1]"),
-            features(result),
+            listOf(
+                Lyric(listOf(LyricSyllable("Al", Syllabic.BEGIN)), verse = "1"),
+                Lyric(listOf(LyricSyllable("le", Syllabic.END)), verse = "1", extend = LyricExtend()),
+            ),
+            listOf(grace, principal).map { it.notation.lyrics.single() },
         )
-        rejectedWhenStrict(mixedGraceAndLyric)
     }
 
     @Test

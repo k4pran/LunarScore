@@ -9,7 +9,7 @@ Audit date: 2026-10-23. Scope: the `musicxml-parser` score importer after MX-10�
 
 | Suite | What it asserts | Runs on |
 |---|---|---|
-| `ComplianceAuditTest` (`AuditCorpus.kt`) | Every executable fixture (F01–F14, F16–F19, F21, the F12 pair, the F21 concert-score subset and the six mixed-feature fixtures) imports under both policies. Deterministic mutants of each fixture: every non-blank text node and attribute value replaced by boundary values (empty, blanks, no-break space, zero, negative, `Int` overflow, exponent, `NaN`, 17, enumeration words), every element removed, duplicated and swapped with its sibling, a foreign-namespace element inserted in every element, and a truncation every 7 characters. Each outcome must be well formed: no exception escapes, a failure carries an error, a strict success carries no findings, every unsupported finding names an S01–S27 group or `foreign-extension`, and a successful score passes model `validate()`, `effectiveStates()` and `playbackOrder()`. Every truncation fails, every foreign element produces a diagnostic, each resource budget fails with its typed code and cancellation at every check fails with `CANCELLED`. | Common: JVM, Android host; iOS compiled |
+| `ComplianceAuditTest` (`AuditCorpus.kt`) | Every executable fixture (F01–F19, F21, the F12 pair, the F21 concert-score subset and the six mixed-feature fixtures) imports under both policies. Deterministic mutants of each fixture: every non-blank text node and attribute value replaced by boundary values (empty, blanks, no-break space, zero, negative, `Int` overflow, exponent, `NaN`, 17, enumeration words), every element removed, duplicated and swapped with its sibling, a foreign-namespace element inserted in every element, and a truncation every 7 characters. Each outcome must be well formed: no exception escapes, a failure carries an error, a strict success carries no findings, every unsupported finding names an S01–S27 group or `foreign-extension`, and a successful score passes model `validate()`, `effectiveStates()` and `playbackOrder()`. Every truncation fails, every foreign element produces a diagnostic, each resource budget fails with its typed code and cancellation at every check fails with `CANCELLED`. | Common: JVM, Android host; iOS compiled |
 | `MixedFeatureImportTest` (`MixedFeatureFixtures.kt`) | Test-plan pairs: divisions change + backup, tied chord + changing staff, grace + lyric, mid-measure transposition + divisions change, timewise + two staves (equal to its partwise twin). Repeat ending + pickup is F16. Supported content keeps exact timing, links and sounding pitch; the other feature gets exactly the expected `UNSUPPORTED_FEATURE` paths, and strict parsing rejects it. Since MX-09 the backup, tied-chord and two-staff pairs import fully with no diagnostics. | Common |
 | `ScoreXmlReaderTest`, `NoteImportTest`, `DirectionImportTest` regressions | Standard DOCTYPE header, missing divisions (see below). | Common |
 | `PublicCorpusTest` | Opt-in. With `MUSICXML_CORPUS_DIR` set, parses every `.xml`/`.musicxml` file under both policies, fails on an escaped exception or an error-free failure, and prints per-file outcomes, the first error, and per-feature unsupported counts. Corpus files are not committed. | JVM only |
@@ -40,7 +40,7 @@ The most frequent tolerant losses in the LilyPond suite, by files reporting each
 mostly `time/@symbol`), S06 (50, voices/backup/chords), S14 (31, lyrics), S08 (21, `part-group` and
 staves), S03 (19, credits and part-name display), S13 (16), S12 (15) and S17 (15). Each loss is an
 `UNSUPPORTED_FEATURE` with a source path; see the domain documents for the per-element list.
-These counts were taken before MX-09 imported voices, chords and staves and have not been re-run.
+These counts were taken before MX-09 and MX-14 imported voices, chords, staves and lyrics and have not been re-run.
 
 ## Gaps found and resolved
 
@@ -63,6 +63,6 @@ These counts were taken before MX-09 imported voices, chords and staves and have
 ## Not covered
 
 - No XSD validation. Fixtures are implementation-authored and not schema-validated.
-- F15 remains planned because lyrics are not imported; F05, F06 and F08 are covered by `PolyphonyImportTest` (MX-09); F20 waits for `.mxl` (MX-19); F22/F23 are covered inline and by the mutants above, not as files.
+- F05, F06 and F08 are covered by `PolyphonyImportTest` (MX-09) and F15 by `LyricImportTest` (MX-14); F20 waits for `.mxl` (MX-19); F22/F23 are covered inline and by the mutants above, not as files.
 - No legal exporter corpus beyond the two public suites: real-world exporter files are only used when redistribution rights are known.
 - Mutations are lexical, not schema-aware, and do not prove that every invalid input is rejected; they prove that every outcome is structured.
