@@ -175,6 +175,24 @@ class DirectionImportTest {
     }
 
     @Test
+    fun testWedgeIdsFollowSourceOrderWhenOffsetsReverseDisplayOrder() {
+        val xml = document(
+            direction("<wedge type='crescendo'/>", "<offset>2</offset>") +
+                direction("<wedge type='diminuendo' number='2'/>") + note("C") + note("D") +
+                direction("<wedge type='stop' number='2'/>") + direction("<wedge type='stop'/>") + note("E"),
+        )
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(
+            listOf(
+                Relationship("P1:wedge-1", RelationshipKind.WEDGE, event(1, 1), event(1, 6)),
+                Relationship("P1:wedge-2", RelationshipKind.WEDGE, event(1, 2), event(1, 5)),
+            ),
+            result.value.relationships,
+        )
+    }
+
+    @Test
     fun testUnsupportedVariantsAreDiscardedWithFeatureIds() {
         val xml = document(
             direction("<rehearsal>A</rehearsal><words font-weight='bold'>cresc.</words>") +
@@ -276,8 +294,8 @@ class DirectionImportTest {
         )
         assertEquals(
             listOf(
-                Relationship("P1:wedge-1", RelationshipKind.WEDGE, null, event(1, 3)),
-                Relationship("P1:wedge-2", RelationshipKind.WEDGE, event(1, 1), null),
+                Relationship("P1:wedge-1", RelationshipKind.WEDGE, event(1, 1), null),
+                Relationship("P1:wedge-2", RelationshipKind.WEDGE, null, event(1, 3)),
             ),
             result.value.relationships,
         )

@@ -31,6 +31,10 @@ internal class ResolvedSpan(val relationship: Relationship, val startLocation: S
  * kind, key and voice as an open start leaves the earlier one unmatched. Every unmatched endpoint is
  * reported through [unmatched] and kept as a relationship with a null partner.
  *
+ * Each endpoint has a source order, by default its arrival order. Spans are numbered and returned
+ * in the source order of their first endpoint, so a caller that passes endpoints out of source order
+ * (see [reserveOrders]) keeps stable IDs.
+ *
  * Endpoints must arrive in measure order. Pending endpoints are indexed by kind, key and voice so
  * each endpoint resolves in constant or logarithmic time, keeping resolution of untrusted input
  * near-linear.
@@ -46,14 +50,19 @@ internal class SpanResolver(
     private val waitingStopsByVoice = mutableMapOf<VoiceKey, WaitingQueue>()
     private var waitingMeasure = 0
     private val counters = mutableMapOf<RelationshipKind, Int>()
+    private var nextOrder = 0
 
-    fun start(endpoint: SpanEndpoint) {
+    /** Reserves [count] consecutive source orders for endpoints passed out of source order, returning the first. */
+    fun reserveOrders(count: Int): Int = nextOrder.also { nextOrder += count }
+
+    fun start(endpoint: SpanEndpoint, order: Int = nextOrder++) {
         dropStaleStops(endpoint)
         val stop = waitingStopsByVoice[endpoint.voiceKey()]?.firstAfter(endpoint.position)
             ?: waitingStops[endpoint.spanKey()]?.firstAfter(endpoint.position)
         if (stop != null) {
             removeWaitingStop(stop)
             stop.start = endpoint
+            stop.order = minOf(stop.order, order)
             return
         }
         openStartsByVoice[endpoint.voiceKey()]?.let { duplicate ->
@@ -61,19 +70,20 @@ internal class SpanResolver(
             duplicate.reported = true
             unmatched(duplicate.start!!.location, "${label(endpoint)} start has no stop before the next start of the same span")
         }
-        val span = PendingSpan(endpoint.kind, start = endpoint).also { spans += it }
+        val span = PendingSpan(endpoint.kind, order, start = endpoint).also { spans += it }
         openStarts.getOrPut(endpoint.spanKey()) { LinkedHashSet() } += span
         openStartsByVoice[endpoint.voiceKey()] = span
     }
 
-    fun stop(endpoint: SpanEndpoint) {
+    fun stop(endpoint: SpanEndpoint, order: Int = nextOrder++) {
         dropStaleStops(endpoint)
         val start = openStartsByVoice[endpoint.voiceKey()] ?: openStarts[endpoint.spanKey()]?.firstOrNull()
         if (start != null) {
             removeOpenStart(start)
             start.end = endpoint
+            start.order = minOf(start.order, order)
         } else {
-            val span = PendingSpan(endpoint.kind, end = endpoint).also { spans += it }
+            val span = PendingSpan(endpoint.kind, order, end = endpoint).also { spans += it }
             span.waitingIndex = waitingStops.getOrPut(endpoint.spanKey()) { WaitingQueue() }.add(span)
             span.waitingVoiceIndex = waitingStopsByVoice.getOrPut(endpoint.voiceKey()) { WaitingQueue() }.add(span)
         }
@@ -81,7 +91,7 @@ internal class SpanResolver(
 
     /** Records a span whose endpoints are already paired, such as a tuplet on a single note. */
     fun pair(start: SpanEndpoint, end: SpanEndpoint) {
-        spans += PendingSpan(start.kind, start = start, end = end)
+        spans += PendingSpan(start.kind, nextOrder++, start = start, end = end)
     }
 
     /** Checks a mid-span point such as a slur `continue`; it is not an endpoint. */
@@ -93,6 +103,7 @@ internal class SpanResolver(
 
     /** Reports the remaining unmatched endpoints in source order and returns all spans. */
     fun finish(): List<ResolvedSpan> {
+        val spans = spans.sortedBy { it.order }
         spans.filterNot { it.reported }.forEach { span ->
             when {
                 span.start == null -> unmatched(span.end!!.location, "${label(span.end!!)} stop has no start")
@@ -143,7 +154,7 @@ internal class SpanResolver(
 
     private data class VoiceKey(val kind: RelationshipKind, val key: String, val voice: String)
 
-    private class PendingSpan(val kind: RelationshipKind, var start: SpanEndpoint? = null, var end: SpanEndpoint? = null) {
+    private class PendingSpan(val kind: RelationshipKind, var order: Int, var start: SpanEndpoint? = null, var end: SpanEndpoint? = null) {
         var reported = false
         var waitingIndex = -1
         var waitingVoiceIndex = -1
