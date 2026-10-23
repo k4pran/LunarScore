@@ -25,7 +25,8 @@ public data class ArchiveLimits(
  * Imports a compressed MusicXML 4.0 `.mxl` archive. The whole ZIP directory is validated first
  * (see [ArchiveLimits]); unsafe names, duplicates, encryption, ZIP64 and other unsupported archives
  * are fatal under both policies. An optional `mimetype` entry must contain
- * `application/vnd.recordare.musicxml`; when it is not the first, uncompressed entry this is a
+ * `application/vnd.recordare.musicxml`; when it is not the physically first, uncompressed entry (by
+ * local-header offset, not central-directory order) this is a
  * `RECOVERED_VALUE`. `META-INF/container.xml` is read with the same secure XML reader, and its first
  * `rootfile` must be MusicXML; later rootfiles (other renditions) are validated but not read. The
  * selected entry is passed to [parseMusicXml] unchanged, so the score equals that of the
@@ -57,7 +58,7 @@ public fun parseMxl(
             if (mimetype.size != expected.size || !archive.read(mimetype, expected.size).contentEquals(expected)) {
                 return fail(DiagnosticCode.INVALID_STRUCTURE, MIMETYPE_PATH, "mimetype is not $MXL_MIMETYPE")
             }
-            if (archive.entries.first() !== mimetype || mimetype.method != METHOD_STORED) {
+            if (archive.entries.minBy { it.localOffset } !== mimetype || mimetype.method != METHOD_STORED) {
                 context.report(
                     DiagnosticCode.RECOVERED_VALUE,
                     SourceLocation(sourceName = label(MIMETYPE_PATH)),

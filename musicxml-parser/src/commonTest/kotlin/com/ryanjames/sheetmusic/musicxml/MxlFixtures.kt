@@ -92,11 +92,15 @@ internal fun scoreEntries(score: String = f20Score, deflate: Boolean = true): Li
     TestZipEntry("score.musicxml", score, deflate),
 )
 
-/** Writes a single-disk ZIP; [endRecordEdit] may patch the 22-byte end record before [trailing]. */
+/**
+ * Writes a single-disk ZIP; [endRecordEdit] may patch the 22-byte end record before [trailing].
+ * [directoryOrder] lists entry indices in central-directory order; local records follow [entries].
+ */
 internal fun buildZip(
     entries: List<TestZipEntry>,
     prefix: ByteArray = ByteArray(0),
     trailing: ByteArray = ByteArray(0),
+    directoryOrder: List<Int> = entries.indices.toList(),
     endRecordEdit: (ByteArray) -> Unit = {},
 ): ByteArray {
     val body = Buffer().write(prefix)
@@ -104,7 +108,8 @@ internal fun buildZip(
         entry.offset ?: body.size.toInt().also { body.write(entry.localRecord()) }
     }
     val directoryOffset = body.size.toInt()
-    entries.forEachIndexed { index, entry ->
+    for (index in directoryOrder) {
+        val entry = entries[index]
         body.writeIntLe(0x02014b50); body.writeShortLe(20); body.writeShortLe(20); body.writeShortLe(entry.flags)
         body.writeShortLe(entry.recordedMethod); body.writeIntLe(0); body.writeIntLe(entry.recordedCrc)
         body.writeIntLe(entry.data.size); body.writeIntLe(entry.recordedSize.toInt()); body.writeShortLe(entry.nameBytes.size)
