@@ -91,6 +91,14 @@ class LayoutImportTest {
     }
 
     @Test
+    fun testExplicitNoBreaksDifferFromOmittedBreaks() {
+        val forbidden = success(document("<print new-system='no' new-page='no'/>"))
+        assertEquals(PrintHints(newSystem = false, newPage = false), forbidden.value.parts.single().measures.single().print)
+        val omitted = success(document("<print/>"))
+        assertEquals(PrintHints(newSystem = null, newPage = null), omitted.value.parts.single().measures.single().print)
+    }
+
+    @Test
     fun testOmittedDefaultsAndPrintLeaveHintsAbsent() {
         val plain = success(document("<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>"))
         assertNull(plain.value.layout)
