@@ -13,7 +13,11 @@ import com.ryanjames.sheetmusic.score.DirectionMark
 import com.ryanjames.sheetmusic.score.DirectionSound
 import com.ryanjames.sheetmusic.score.Dynamics
 import com.ryanjames.sheetmusic.score.Event
+import com.ryanjames.sheetmusic.score.ExtendType
 import com.ryanjames.sheetmusic.score.KeyMode
+import com.ryanjames.sheetmusic.score.Lyric
+import com.ryanjames.sheetmusic.score.LyricExtend
+import com.ryanjames.sheetmusic.score.LyricSyllable
 import com.ryanjames.sheetmusic.score.Measure
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
@@ -34,6 +38,7 @@ import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.StemDirection
+import com.ryanjames.sheetmusic.score.Syllabic
 import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.TimeModification
 import com.ryanjames.sheetmusic.score.WedgeType
@@ -50,7 +55,8 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * `UNMATCHED_SPAN` and kept with a null partner. Articulations, ornaments and note dynamics are
  * kept as note expressions; staff-1 directions (words, dynamics, metronome marks and wedges, with
  * separate sound tempo/dynamics and display placement/offset) become events at the cursor, and
- * wedges are paired like slurs. Other musical content is not implemented yet: meaningful unmapped
+ * wedges are paired like slurs. Lyrics (verses, syllabic text, elisions and extends) are kept on
+ * their notes. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -665,6 +671,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var untimed = false
         val marks = mutableListOf<SpanMark>()
         val expressions = mutableListOf<NoteExpression>()
+        val lyrics = mutableListOf<Lyric>()
         children { event ->
             // An untimed note's diagnostic covers its remaining children.
             if (untimed) {
@@ -723,6 +730,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 }
                 "tie" -> tie(event)?.let { marks += it }
                 "notations" -> notations(event, marks, expressions)
+                "lyric" -> lyric(event)?.let { lyrics += it }
                 "staff" -> if (once(seen, name, event)) {
                     when (val staff = positiveInt(text(event, feature = "S06"))) {
                         null -> context.report(DiagnosticCode.INVALID_VALUE, event.location, "Staff must be a positive Int")
@@ -753,7 +761,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
         if (discarded) return TimedNote(null, end, emptyList())
-        val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList())
+        val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList(), lyrics.toList())
         val event = when (val noteContent = content ?: return null) {
             is NoteContent.Rest -> RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
             is NoteContent.Pitch -> NoteEvent(id, onset, quarters, noteContent.pitch, voice = voice, notation = notation, role = role)
@@ -934,6 +942,128 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             return null
         }
         return Dynamics(markings.toList(), placement)
+    }
+
+    /**
+     * Reads a `lyric` as one verse line on its note. Syllables keep their syllabic value and the
+     * elision joining them, in source order; consecutive text runs without an elision form one
+     * syllable. An `extend` marks a melisma line and may stand alone on a continuation note. A
+     * missing `number` leaves the verse unspecified. `laughing`, `humming`, `end-line`,
+     * `end-paragraph`, typography and display attributes are S14 discarded (`footnote`/`level` S25),
+     * and a lyric restricted by `time-only` is discarded. Out-of-order content is invalid. A null
+     * result means the lyric was discarded or a fatal diagnostic was reported.
+     */
+    private fun lyric(start: ScoreXmlEvent): Lyric? {
+        if (start.attribute("time-only") != null) {
+            unsupportedTree(start, "S14", "A lyric restricted by time-only is not interpreted; the lyric is discarded")
+            return null
+        }
+        attributes(start, setOf("number", "name", "placement"), "S14")
+        val verse = start.attribute("number")?.trim { it in WHITESPACE }
+        if (verse != null && verse.isEmpty()) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "Lyric number must be nonblank")
+            return null
+        }
+        val placement = placement(start)
+        val syllables = mutableListOf<LyricSyllable>()
+        var syllabic: Syllabic? = null
+        var syllabicPending = false
+        var elision: String? = null
+        var extend: LyricExtend? = null
+        var discarded = false
+        // Set once the text content is complete; only end-line, end-paragraph and editorial content may follow.
+        var closed = false
+        fun hasContent() = syllables.isNotEmpty() || extend != null || discarded
+        children { event ->
+            val name = event.localName()
+            if (closed && name in LYRIC_CONTENT) {
+                invalid(event, "Lyric $name must precede extend, end-line, end-paragraph and editorial content")
+                return@children
+            }
+            when (name) {
+                "syllabic" -> {
+                    if (syllabicPending || (syllables.isNotEmpty() && elision == null)) {
+                        invalid(event, "A syllabic must start the lyric or follow an elision, before its text")
+                        return@children
+                    }
+                    val text = text(event, feature = "S14").trim { it in WHITESPACE }
+                    syllabic = SYLLABICS[text] ?: run {
+                        context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown syllabic: $text")
+                        return@children
+                    }
+                    syllabicPending = true
+                }
+                "elision" -> {
+                    if (syllables.isEmpty() || elision != null || syllabicPending) {
+                        invalid(event, "An elision must follow a lyric text")
+                        return@children
+                    }
+                    elision = text(event, feature = "S14")
+                }
+                "text" -> {
+                    val text = text(event, feature = "S14")
+                    if (syllables.isEmpty() || elision != null) {
+                        syllables += LyricSyllable(text, syllabic, elision)
+                        syllabic = null
+                        syllabicPending = false
+                        elision = null
+                    } else {
+                        syllables[syllables.lastIndex] = syllables.last().let { it.copy(text = it.text + text) }
+                    }
+                }
+                "extend" -> {
+                    if (elision != null || syllabicPending) {
+                        invalid(event, "An extend cannot follow an elision or syllabic without text")
+                        return@children
+                    }
+                    extend = lyricExtend(event) ?: return@children
+                    closed = true
+                }
+                "laughing", "humming" -> {
+                    if (hasContent() || syllabicPending) {
+                        invalid(event, "A $name lyric cannot have other lyric content")
+                        return@children
+                    }
+                    unsupportedTree(event, "S14", "A $name lyric is not interpreted; the lyric is discarded")
+                    discarded = true
+                    closed = true
+                }
+                "end-line", "end-paragraph", "footnote", "level" -> {
+                    if (!hasContent() || elision != null || syllabicPending) {
+                        invalid(event, "Lyric $name must follow the lyric text, extend, laughing or humming")
+                        return@children
+                    }
+                    unsupportedTree(event, if (name == "footnote" || name == "level") "S25" else "S14")
+                    closed = true
+                }
+                else -> unsupportedTree(event, "S14")
+            }
+        }
+        if (!context.canContinue) return null
+        if (elision != null || syllabicPending) {
+            invalid(start, "A lyric elision or syllabic requires a following text")
+            return null
+        }
+        if (!hasContent()) {
+            invalid(start, "A lyric requires text, extend, laughing or humming")
+            return null
+        }
+        if (discarded) return null
+        return Lyric(syllables.toList(), verse, start.attribute("name"), extend, placement)
+    }
+
+    /** A lyric `extend` with its optional start/continue/stop type; display attributes are S14 discarded. */
+    private fun lyricExtend(start: ScoreXmlEvent): LyricExtend? {
+        attributes(start, setOf("type"), "S14")
+        val text = start.attribute("type")
+        val type = text?.let { EXTEND_TYPES[it] }
+        if (text != null && type == null) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("type"), "Unknown extend type: $text")
+            return null
+        }
+        children { event -> unsupportedTree(event, "S14") }
+        if (!context.canContinue) return null
+        return LyricExtend(type)
     }
 
     /**
@@ -1525,7 +1655,7 @@ private val NOTE_TYPES: Map<String, NoteValue> = mapOf(
 
 private val NOTE_CHILD_FEATURES: Map<String, String> = mapOf(
     "instrument" to "S16", "footnote" to "S25", "level" to "S25",
-    "notehead" to "S17", "notehead-text" to "S17", "lyric" to "S14",
+    "notehead" to "S17", "notehead-text" to "S17",
     "play" to "S26", "listen" to "S26",
 )
 
@@ -1563,6 +1693,17 @@ private val DYNAMIC_MARKINGS: Set<String> = setOf(
 private val WEDGE_TYPES: Map<String, WedgeType> = mapOf(
     "crescendo" to WedgeType.CRESCENDO, "diminuendo" to WedgeType.DIMINUENDO,
     "continue" to WedgeType.CONTINUE, "stop" to WedgeType.STOP,
+)
+
+/** Lyric children that make up its text content; none may follow `extend` or trailing content. */
+private val LYRIC_CONTENT: Set<String?> = setOf("syllabic", "elision", "text", "extend", "laughing", "humming")
+
+private val SYLLABICS: Map<String, Syllabic> = mapOf(
+    "single" to Syllabic.SINGLE, "begin" to Syllabic.BEGIN, "middle" to Syllabic.MIDDLE, "end" to Syllabic.END,
+)
+
+private val EXTEND_TYPES: Map<String, ExtendType> = mapOf(
+    "start" to ExtendType.START, "continue" to ExtendType.CONTINUE, "stop" to ExtendType.STOP,
 )
 
 private val ATTRIBUTES_CHILD_FEATURES: Map<String, String> = mapOf(

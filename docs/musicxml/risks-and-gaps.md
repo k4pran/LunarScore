@@ -118,6 +118,24 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-14 lyric decisions and remaining gaps
+
+The importer now keeps [lyrics](lyric-import.md) on their notes. This supersedes the MX-07 S14
+discard of a note's `lyric` child.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Missing verse `number` | `Lyric.verse` is null; not merged into verse 1 (F15) | Consumers decide how to group unnumbered lines |
+| Melisma (`extend`) | Kept per note as `LyricExtend(type)`, including extend-only continuations (F15) | Resolve melisma lines into spans and check start/stop pairing |
+| Consecutive `text` runs | Joined into one syllable; their typography is S14 `DISCARDED` | Rich text runs if formatting is modeled (MX-18) |
+| `laughing`, `humming`; `lyric` with `time-only` | S14 `DISCARDED`; the lyric is dropped | Model non-text lyrics and repeat-pass lyrics |
+| `end-line`, `end-paragraph`; display/typography attributes (`justify`, positions, fonts, `color`, `xml:lang`, `print-object`, `id`) | S14 `DISCARDED`; the lyric is kept | Karaoke line breaks and layout hints (MX-18) |
+| `footnote`, `level` in a lyric | S25 `DISCARDED` | Editorial model |
+| Syllabic consistency across notes (for example `begin` without `end`) | Not checked | Semantic lyric validation |
+| Lyrics on discarded chord, grace, unpitched, other-staff or post-backup notes | Dropped with their note under that note's diagnostic | MX-09, MX-15, MX-16 |
+| Unknown syllabic, extend type or placement; blank number | Fatal `INVALID_VALUE` | None |
+| Empty lyric; misplaced or dangling `elision`/`syllabic`; content after `extend` or trailing elements; `laughing`/`humming` mixed with text | Fatal `INVALID_STRUCTURE` | None |
+
 ## MX-13 direction and note expression decisions and remaining gaps
 
 The importer now keeps [directions and note expressions](direction-import.md). This supersedes the
@@ -231,7 +249,7 @@ obligation is met for durations and divisions.
 | Chord and grace notes | S06/S18 `DISCARDED`; whole note dropped and cursor not advanced | MX-09 chords, MX-15 grace |
 | Unpitched notes; staff other than 1 | S16/S06 `DISCARDED`; note dropped, cursor still advances so later onsets stay exact | MX-16 percussion, MX-09 staves |
 | Backup/forward | S06 `DISCARDED`; later notes/time signatures in that measure are each reported and dropped instead of mistimed; divisions still apply | MX-09 cursor interpretation and `INVALID_CURSOR_MOVE` |
-| Ties, tuplet time-modification, stems/beams (superseded by MX-11/MX-12 above), notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
+| Ties, tuplet time-modification, stems/beams (superseded by MX-11/MX-12 above), notations, lyrics (superseded by MX-14 above), noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
 | Key, clef, staves and other attributes children; complex or annotated time | S07 `DISCARDED`; a simple time keeps its signature even if its attributes are discarded | Key/clef/staves/staff details superseded by MX-08 above; complex time remains |
 | Voice labels without backup | Labels retained; events stay sequential in one timeline | MX-09 |
 | Measure fullness versus time signature | Not checked; extent is the observed end of timed content | `INCONSISTENT_MEASURE_DURATION` policy remains later work |
