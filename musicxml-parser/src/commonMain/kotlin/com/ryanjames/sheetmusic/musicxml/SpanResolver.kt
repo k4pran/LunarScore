@@ -90,8 +90,14 @@ internal class SpanResolver(
     }
 
     /** Records a span whose endpoints are already paired, such as a tuplet on a single note. */
-    fun pair(start: SpanEndpoint, end: SpanEndpoint) {
-        spans += PendingSpan(start.kind, nextOrder++, start = start, end = end)
+    fun pair(start: SpanEndpoint, end: SpanEndpoint, order: Int = nextOrder++) {
+        spans += PendingSpan(start.kind, order, start = start, end = end)
+    }
+
+    /** Records a span that cannot be paired, reporting [message] now and keeping a null end. */
+    fun unresolved(start: SpanEndpoint, message: String, order: Int = nextOrder++) {
+        spans += PendingSpan(start.kind, order, start = start).also { it.reported = true }
+        unmatched(start.location, message)
     }
 
     /** Checks a mid-span point such as a slur `continue`; it is not an endpoint. */
@@ -219,6 +225,7 @@ internal class SpanResolver(
             RelationshipKind.SLUR to "slur",
             RelationshipKind.TUPLET to "tuplet",
             RelationshipKind.WEDGE to "wedge",
+            RelationshipKind.GRACE_NOTE to "grace-note",
         )
         val LABELS = mapOf(
             RelationshipKind.SOUND_TIE to "Sound tie on",
@@ -226,6 +233,7 @@ internal class SpanResolver(
             RelationshipKind.SLUR to "Slur",
             RelationshipKind.TUPLET to "Tuplet",
             RelationshipKind.WEDGE to "Wedge",
+            RelationshipKind.GRACE_NOTE to "Grace note",
         )
     }
 }

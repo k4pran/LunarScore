@@ -155,13 +155,12 @@ class NoteImportTest {
         val xml = document(
             "<note default-x='10'><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><stem default-y='5'>up</stem></note>" +
                 "<note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>" +
-                "<note><grace/><pitch><step>D</step><octave>4</octave></pitch></note>" +
                 "<note><unpitched/><duration>1</duration></note>" +
                 "<note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><staff>2</staff></note>" +
                 "<note><rest><display-step>B</display-step></rest><duration>1</duration><notations><fermata/></notations></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S04", "S10", "S06", "S18", "S16", "S06", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S04", "S10", "S06", "S16", "S06", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.severity == DiagnosticSeverity.WARNING && it.unsupported?.retention == ContentRetention.DISCARDED })
         val events = events(result)
         assertEquals(listOf(Rational.ZERO, Rational.of(3)), events.map { it.onset })

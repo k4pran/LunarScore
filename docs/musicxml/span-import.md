@@ -39,7 +39,7 @@ partwise and timewise input. Each kind is paired on its own:
 | Start with no stop by the end of the part; stop with no start; a slur `continue` with no open slur | `UNMATCHED_SPAN` at the endpoint element; error under strict, warning under tolerant. The relationship is kept with a null partner, which `Score.validate()` reports as `MISSING_ENDPOINT` |
 | A second start with the same kind, key and voice while one is open (duplicate endpoint) | The earlier start gets `UNMATCHED_SPAN` straight away and keeps a null end; the new start opens |
 | Tie pitches that differ (for example C4 to C#4) | Not paired: both ends are unmatched |
-| Endpoint on a discarded note (chord, grace, unpitched, staff other than 1, after backup/forward) | No endpoint is registered, so its partner is reported as `UNMATCHED_SPAN` |
+| Endpoint on a discarded note (chord, unpitched, staff other than 1, after backup/forward) | No endpoint is registered, so its partner is reported as `UNMATCHED_SPAN` |
 | Missing `type` | Fatal `INVALID_STRUCTURE` |
 | Unknown `type` (including `continue` on `tie` and `let-ring` on `slur`); `number` outside 1–16 | Fatal `INVALID_VALUE` |
 | `tie` with `time-only`; `tied type="let-ring"`; a `tie` or `tied` on a rest | S09 `DISCARDED`; that mark is dropped. A slur on a rest is kept |

@@ -118,6 +118,23 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-15 grace and cue note decisions and remaining gaps
+
+The importer now keeps [grace notes](grace-import.md) as untimed `GRACE` events linked to their
+principal notes. This supersedes the MX-07 S18 discard of grace notes.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Missing grace `duration` | Normal per the 4.0 schema: null duration, cursor and extent unchanged, no divisions required (F19) | None |
+| `duration` on a grace note | S18 `DISCARDED`; grace note kept without a duration | None |
+| Principal note | Next imported note in the voice; else the previous note (after-grace) at a rest or measure end (F19) | Cross-measure principals; explicit after-grace semantics when MX-09 interprets backup |
+| Grace before a discarded timed note, or with no note in its voice | `UNMATCHED_SPAN`; relationship kept with a null end (model `MISSING_ENDPOINT`) | MX-09 staves, MX-16 percussion |
+| `steal-time-previous`/`-following` | Kept as exact percentages on `Grace`; playback time is not stolen | Performance timeline |
+| `make-time`; cue-sized grace; grace rest | S18 `DISCARDED` (attribute, cue size, or whole rest) | Model if a consumer needs them |
+| Grace chord tones | S06 `DISCARDED` with other chord notes; first grace kept | MX-09 chords |
+| Cue or grace notes after `backup`/`forward` | S06 `DISCARDED` with other post-move content | MX-09 cursor interpretation |
+| Invalid `slash` or steal-time; duplicate `grace` | Fatal `INVALID_VALUE`; fatal `INVALID_STRUCTURE` | None |
+
 ## MX-13 direction and note expression decisions and remaining gaps
 
 The importer now keeps [directions and note expressions](direction-import.md). This supersedes the
@@ -172,7 +189,7 @@ supersedes MX-07's S09 discard of `tie` and its S12 discard of the whole `notati
 | Duplicate start (same kind, key and voice while open) | Earlier start reported as `UNMATCHED_SPAN` immediately and kept with a null end | None |
 | Stop before its start in document order | Paired when the start is musically earlier (measure, onset); resolver unit test | XML evidence needs MX-09 backup/forward |
 | Ties across voices; concurrent same-pitch ties | Pair by written pitch, preferring the same voice | Chord-tone ties need MX-09 chords |
-| Endpoint on a discarded chord/grace/unpitched/other-staff note | Not registered; the partner becomes `UNMATCHED_SPAN` | MX-09, MX-15, MX-16 |
+| Endpoint on a discarded chord/unpitched/other-staff note (grace notes are imported since MX-15) | Not registered; the partner becomes `UNMATCHED_SPAN` | MX-09, MX-16 |
 | Enharmonic ties; tie stop not at the tied note's end | Not paired / not checked | Optional semantic check |
 | Missing `type`; unknown `type`; `number` outside 1–16 | Fatal `INVALID_STRUCTURE`; fatal `INVALID_VALUE` | None |
 | `tie time-only`; `tied type="let-ring"`; tie or tied on a rest | S09 `DISCARDED`; mark dropped (a slur on a rest is kept) | Repeat-pass playback (MX-17); let-ring model |
@@ -228,7 +245,7 @@ obligation is met for durations and divisions.
 | Zero, negative or malformed duration/divisions; invalid step/octave/alter/type/voice/staff/yes-no flags | Fatal `INVALID_VALUE` at the element/attribute location under both policies | Full XSD lexical validation remains separate |
 | Duration or divisions outside reduced Int bounds; overflowing quotient or cursor sum | Fatal `NUMERIC_OVERFLOW` at the duration/divisions location; boundary `Int.MAX_VALUE` accepted | Wider numeric support is not promised |
 | Missing divisions before a duration; missing duration/pitch-or-rest/step/octave; duplicates | Fatal `INVALID_STRUCTURE`; no default divisions or duration inferred | MX-08 state resolution across parts/staves |
-| Chord and grace notes | S06/S18 `DISCARDED`; whole note dropped and cursor not advanced | MX-09 chords, MX-15 grace |
+| Chord and grace notes | S06/S18 `DISCARDED`; whole note dropped and cursor not advanced (grace superseded by MX-15 above) | MX-09 chords |
 | Unpitched notes; staff other than 1 | S16/S06 `DISCARDED`; note dropped, cursor still advances so later onsets stay exact | MX-16 percussion, MX-09 staves |
 | Backup/forward | S06 `DISCARDED`; later notes/time signatures in that measure are each reported and dropped instead of mistimed; divisions still apply | MX-09 cursor interpretation and `INVALID_CURSOR_MOVE` |
 | Ties, tuplet time-modification, stems/beams (superseded by MX-11/MX-12 above), notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |

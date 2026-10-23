@@ -13,6 +13,7 @@ import com.ryanjames.sheetmusic.score.DirectionMark
 import com.ryanjames.sheetmusic.score.DirectionSound
 import com.ryanjames.sheetmusic.score.Dynamics
 import com.ryanjames.sheetmusic.score.Event
+import com.ryanjames.sheetmusic.score.Grace
 import com.ryanjames.sheetmusic.score.KeyMode
 import com.ryanjames.sheetmusic.score.Measure
 import com.ryanjames.sheetmusic.score.MetadataEntry
@@ -50,7 +51,8 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * `UNMATCHED_SPAN` and kept with a null partner. Articulations, ornaments and note dynamics are
  * kept as note expressions; staff-1 directions (words, dynamics, metronome marks and wedges, with
  * separate sound tempo/dynamics and display placement/offset) become events at the cursor, and
- * wedges are paired like slurs. Other musical content is not implemented yet: meaningful unmapped
+ * wedges are paired like slurs. Grace notes take no time: they sit at the cursor without a duration and are linked
+ * to their principal note by a `GRACE_NOTE` relationship; cue notes are timed. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -402,6 +404,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var extent = Rational.ZERO
         var cursorLost = false
         val wedges = mutableListOf<WedgeEndpoint>()
+        val graces = GraceLinker(body.spans)
         fun eventId() = "$partId:measure-$number:event-${events.size + 1}"
         fun add(event: Event, source: ScoreXmlEvent) {
             provenance("$path.events[${events.size}]", source)
@@ -417,6 +420,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                         add(it, event)
                         registerSpans(it, note.marks, number)
                     }
+                    graces.add(note, SpanPosition(number, cursor), event.location)
                     cursor = note.end
                     if (cursor > extent) extent = cursor
                 }
@@ -440,6 +444,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             }
         }
         registerWedges(wedges)
+        graces.finish()
         return Measure("measure-$number", displayNumber, extent, events.toList(), implicit)
     }
 
@@ -644,8 +649,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     /**
      * Parses a note in the current voice. A null result means it cannot be timed (an error, or an
-     * untimed chord/grace note that was reported as discarded). A timed but discarded note keeps
-     * its end cursor without an event, so later onsets stay exact.
+     * untimed chord note that was reported as discarded). A timed but discarded note keeps its end
+     * cursor without an event, so later onsets stay exact. A grace note has no duration: it is
+     * placed at [onset] and leaves the cursor there; a `duration` on it is reported and ignored.
      */
     private fun note(start: ScoreXmlEvent, onset: Rational, id: String): TimedNote? {
         attributes(start, feature = "S04")
@@ -654,6 +660,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var duration: Rational? = null
         var durationEvent: ScoreXmlEvent? = null
         var role = NoteRole.NORMAL
+        var grace: Grace? = null
+        var cue: ScoreXmlEvent? = null
         var voice = "1"
         var value: NoteValue? = null
         var dots = 0
@@ -672,14 +680,15 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 return@children
             }
             when (val name = event.localName()) {
-                "chord", "grace" -> {
-                    val feature = if (name == "chord") "S06" else "S18"
-                    unsupportedTree(event, feature, "A $name note is not interpreted; the note is discarded")
+                "chord" -> {
+                    unsupportedTree(event, "S06", "A chord note is not interpreted; the note is discarded")
                     untimed = true
                 }
+                "grace" -> if (once(seen, name, event)) grace = grace(event)
                 "cue" -> if (once(seen, name, event)) {
                     attributes(event, feature = "S18")
                     skipTree()
+                    cue = event
                     role = NoteRole.CUE
                 }
                 "pitch", "unpitched", "rest" -> if ("content" in seen) {
@@ -741,6 +750,16 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             invalid(start, "A note requires pitch, unpitched or rest")
             return null
         }
+        if ("grace" in seen) {
+            durationEvent?.let { unsupported(it.location, "S18", "A grace note has no duration; the duration is ignored") }
+            cue?.let { unsupported(it.location, "S18", "Cue size of a grace note is not interpreted; it is discarded") }
+            if (content is NoteContent.Rest) unsupported(start.location, "S18", "A grace rest is not interpreted; the note is discarded")
+            val pitch = (content as? NoteContent.Pitch)?.pitch
+            if (discarded || pitch == null || grace == null || !context.canContinue) return TimedNote(null, onset, emptyList())
+            val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList())
+            val event = NoteEvent(id, onset, null, pitch, voice = voice, notation = notation, role = NoteRole.GRACE, grace = grace)
+            return TimedNote(event, onset, marks.toList())
+        }
         val durationSource = durationEvent ?: run {
             invalid(start, "A non-grace note requires a duration")
             return null
@@ -752,13 +771,39 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val sourceDuration = duration ?: return null
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
-        if (discarded) return TimedNote(null, end, emptyList())
+        if (discarded) return TimedNote(null, end, emptyList(), principalVoice = voice)
         val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList())
         val event = when (val noteContent = content ?: return null) {
             is NoteContent.Rest -> RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
             is NoteContent.Pitch -> NoteEvent(id, onset, quarters, noteContent.pitch, voice = voice, notation = notation, role = role)
         }
-        return TimedNote(event, end, marks.toList())
+        return TimedNote(event, end, marks.toList(), principalVoice = voice)
+    }
+
+    /**
+     * Reads a `grace` element's slash and steal-time percentages; `make-time` and other attributes
+     * are reported as discarded. Returns null after reporting an invalid value.
+     */
+    private fun grace(start: ScoreXmlEvent): Grace? {
+        attributes(start, setOf("slash", "steal-time-previous", "steal-time-following"), "S18")
+        var valid = true
+        fun percent(name: String): Rational? {
+            val text = start.attribute(name) ?: return null
+            val location = start.attributeLocation(name)
+            val value = exact(location) { parseDecimal(text) ?: Rational.of(-1) }
+            if (value != null && (value < Rational.ZERO || value > HUNDRED)) {
+                context.report(DiagnosticCode.INVALID_VALUE, location, "$name must be a percentage from 0 to 100")
+            }
+            return value?.takeIf { it >= Rational.ZERO && it <= HUNDRED } ?: run {
+                valid = false
+                null
+            }
+        }
+        val slash = yesNo(start, "slash")
+        val previous = percent("steal-time-previous")
+        val following = percent("steal-time-following")
+        children { event -> unsupportedTree(event, "S18") }
+        return if (slash != null && valid) Grace(slash, previous, following) else null
     }
 
     /**
@@ -1468,7 +1513,55 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     private fun SourceLocation.withDeclaredPart(): SourceLocation = copy(partId = declaredPartId ?: partId)
 
-    private class TimedNote(val event: Event?, val end: Rational, val marks: List<SpanMark>)
+    /**
+     * A read note; a null [event] was discarded with a diagnostic. [principalVoice] is the voice of
+     * a timed (non-grace) note, imported or discarded, which can be the principal of grace notes.
+     */
+    private class TimedNote(val event: Event?, val end: Rational, val marks: List<SpanMark>, val principalVoice: String? = null)
+
+    /**
+     * Links each imported grace note in one measure to its principal note: the next imported note
+     * in the same voice. Grace notes followed in their voice by a rest or the end of the measure
+     * are after-graces of the previous note in that voice. Grace notes whose next timed note was
+     * discarded, or that have no note to attach to, keep a null principal and are reported as
+     * `UNMATCHED_SPAN`. Relationship numbers follow the grace notes' source order.
+     */
+    private class GraceLinker(private val spans: SpanResolver) {
+        private val pending = mutableMapOf<String, MutableList<Pair<SpanEndpoint, Int>>>()
+        private val previousNotes = mutableMapOf<String, SpanEndpoint>()
+
+        fun add(note: TimedNote, position: SpanPosition, location: SourceLocation) {
+            val event = note.event
+            if (event is NoteEvent && event.role == NoteRole.GRACE) {
+                val endpoint = SpanEndpoint(RelationshipKind.GRACE_NOTE, event.id, event.id, event.voice, position, location)
+                pending.getOrPut(event.voice) { mutableListOf() } += endpoint to spans.reserveOrders(1)
+                return
+            }
+            val voice = note.principalVoice ?: return
+            when (event) {
+                is NoteEvent -> {
+                    val principal = SpanEndpoint(RelationshipKind.GRACE_NOTE, event.id, event.id, voice, position, location)
+                    pending.remove(voice)?.forEach { (grace, order) -> spans.pair(grace, principal, order) }
+                    previousNotes[voice] = principal
+                }
+                is RestEvent -> attachAfter(voice)
+                else -> pending.remove(voice)?.forEach { (grace, order) ->
+                    spans.unresolved(grace, "Grace note ${grace.eventId} precedes a discarded note and has no principal note", order)
+                }
+            }
+        }
+
+        /** Resolves the grace notes still waiting at the end of the measure. */
+        fun finish() = pending.keys.toList().forEach(::attachAfter)
+
+        private fun attachAfter(voice: String) {
+            val previous = previousNotes[voice]
+            pending.remove(voice)?.forEach { (grace, order) ->
+                if (previous != null) spans.pair(grace, previous, order)
+                else spans.unresolved(grace, "Grace note ${grace.eventId} has no principal note in voice $voice", order)
+            }
+        }
+    }
 
     /**
      * A read direction; a null [event] means it was discarded with a diagnostic. [wedgeOnset] is
@@ -1514,6 +1607,8 @@ private fun ScoreXmlEvent.attributeLocation(name: XmlName): SourceLocation = loc
 )
 
 private const val WHITESPACE = " \t\r\n"
+
+private val HUNDRED = Rational.of(100)
 
 private val NOTE_TYPES: Map<String, NoteValue> = mapOf(
     "maxima" to NoteValue.MAXIMA, "long" to NoteValue.LONG, "breve" to NoteValue.BREVE,

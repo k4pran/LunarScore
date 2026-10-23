@@ -34,7 +34,7 @@ notated value is kept, because MusicXML treats `duration` as the sounding length
 | Tuplet start without stop, stop without start, second start with the same number and voice | `UNMATCHED_SPAN`, relationship kept with a null partner (see [span import](span-import.md)) |
 | `tuplet-actual`/`tuplet-normal` display ratio; tuplet `bracket`, `show-number`, `show-type`, `line-shape`, `placement` and position attributes | S11 `DISCARDED`; the tuplet span is kept |
 | Beam `fan`, `repeater`, `color`, `id`; stem `default-y`, `relative-y`, `color` | S10 `DISCARDED` per attribute; the beam or stem is kept |
-| Beam, stem or tuplet on a discarded note (chord, grace, unpitched, staff ≠ 1, after backup/forward) | Dropped with the note; a tuplet partner becomes `UNMATCHED_SPAN` |
+| Beam, stem or tuplet on a discarded note (chord, unpitched, staff ≠ 1, after backup/forward) | Dropped with the note; a tuplet partner becomes `UNMATCHED_SPAN` |
 
 Beam continuity (a `begin` without an `end`) and agreement between `time-modification`, tuplet
 brackets and durations are not checked.
