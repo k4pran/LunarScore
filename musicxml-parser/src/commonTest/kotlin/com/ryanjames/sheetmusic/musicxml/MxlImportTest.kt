@@ -192,6 +192,11 @@ class MxlImportTest {
             val warning = tolerant.diagnostics.single()
             assertEquals(DiagnosticCode.RECOVERED_VALUE to DiagnosticSeverity.WARNING, warning.code to warning.severity)
         }
+        // "First" means physically first in the archive, not first in the central directory.
+        val physicallyFirst = buildZip(listOf(mimetype) + scoreEntries(), directoryOrder = listOf(1, 2, 0))
+        assertEquals(expected, success(physicallyFirst).value)
+        val listedFirst = buildZip(scoreEntries() + mimetype, directoryOrder = listOf(2, 0, 1))
+        failure(listedFirst, DiagnosticCode.RECOVERED_VALUE)
     }
 
     @Test
