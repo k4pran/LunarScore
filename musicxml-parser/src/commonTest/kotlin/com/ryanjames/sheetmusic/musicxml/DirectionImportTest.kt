@@ -263,6 +263,27 @@ class DirectionImportTest {
         assertTrue(assertIs<NoteEvent>(events.last()).notation.expressions.isEmpty())
     }
 
+    @Test
+    fun testOffsetStartDisplayedAfterStopDoesNotPairBackwards() {
+        val xml = document(
+            direction("<wedge type='crescendo'/>", "<offset>2</offset>") + note("C") +
+                direction("<wedge type='stop'/>") + note("D") + note("E"),
+        )
+        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(
+            listOf(DiagnosticCode.UNMATCHED_SPAN, DiagnosticCode.UNMATCHED_SPAN),
+            result.diagnostics.map { it.code },
+        )
+        assertEquals(
+            listOf(
+                Relationship("P1:wedge-1", RelationshipKind.WEDGE, null, event(1, 3)),
+                Relationship("P1:wedge-2", RelationshipKind.WEDGE, event(1, 1), null),
+            ),
+            result.value.relationships,
+        )
+        failure(xml, DiagnosticCode.UNMATCHED_SPAN)
+    }
+
     private fun event(measure: Int, index: Int) = "P1:measure-$measure:event-$index"
 
     private fun direction(types: String, children: String = "", attributes: String = ""): String =

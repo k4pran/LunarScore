@@ -401,6 +401,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var cursor = Rational.ZERO
         var extent = Rational.ZERO
         var cursorLost = false
+        val wedges = mutableListOf<Pair<SpanType, SpanEndpoint>>()
         fun eventId() = "$partId:measure-$number:event-${events.size + 1}"
         fun add(event: Event, source: ScoreXmlEvent) {
             provenance("$path.events[${events.size}]", source)
@@ -428,7 +429,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     val direction = direction(event, cursor, eventId()) ?: return@children
                     direction.event?.let {
                         add(it, event)
-                        registerWedges(it, direction.wedges, SpanPosition(number, direction.wedgeOnset))
+                        wedges += wedgeEndpoints(it, direction.wedges, SpanPosition(number, direction.wedgeOnset))
                     }
                 }
                 "backup", "forward" -> {
@@ -438,6 +439,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 else -> unsupportedTree(event)
             }
         }
+        registerWedges(wedges)
         return Measure("measure-$number", displayNumber, extent, events.toList(), implicit)
     }
 
@@ -1120,15 +1122,28 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return DirectionSound(tempo, dynamics)
     }
 
-    /** Passes a direction's wedge marks at [position] to the part's resolver: stops, then continue points, then starts. */
-    private fun registerWedges(event: DirectionEvent, marks: List<SpanMark>, position: SpanPosition) {
-        val endpoints = marks.map { mark ->
-            mark to SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), position, mark.location)
+    /** A direction's wedge endpoints at [position]: stops, then continue points, then starts. */
+    private fun wedgeEndpoints(event: DirectionEvent, marks: List<SpanMark>, position: SpanPosition): List<Pair<SpanType, SpanEndpoint>> =
+        listOf(SpanType.STOP, SpanType.CONTINUE, SpanType.START).flatMap { type ->
+            marks.filter { it.type == type }.map { mark ->
+                type to SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), position, mark.location)
+            }
         }
+
+    /**
+     * Passes one measure's wedge endpoints to the part's resolver in display-position order, keeping
+     * document order at equal positions, so an offset cannot pair a stop with a later-displayed start.
+     */
+    private fun registerWedges(endpoints: List<Pair<SpanType, SpanEndpoint>>) {
         val resolver = body.spans
-        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.STOP) resolver.stop(endpoint) }
-        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.CONTINUE) resolver.continuePoint(endpoint) }
-        endpoints.forEach { (mark, endpoint) -> if (mark.type == SpanType.START) resolver.start(endpoint) }
+        endpoints.sortedBy { (_, endpoint) -> endpoint.position }.forEach { (type, endpoint) ->
+            when (type) {
+                SpanType.STOP -> resolver.stop(endpoint)
+                SpanType.CONTINUE -> resolver.continuePoint(endpoint)
+                SpanType.START -> resolver.start(endpoint)
+                SpanType.LET_RING -> Unit
+            }
+        }
     }
 
     private fun placement(start: ScoreXmlEvent): Placement? = when (val text = start.attribute("placement")) {
