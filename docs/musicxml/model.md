@@ -52,6 +52,11 @@ does not depend on that module.
   source order, optional `DirectionSound` playback tempo/dynamics/offset and `DirectionDisplay`
   placement/directive/offset, kept separately. Wedge endpoints are linked by `WEDGE` relationships.
   See [directions and note expressions](direction-import.md).
+- MX-17 adds `Measure.barlines` (`Barline` location, middle-barline onset, `BarStyle`, `Repeat` and
+  `EndingMark` as notated), `Measure.measureRepeat` and part-level `Ending`s spanning whole
+  measures (a null stop preserves an unstopped ending). `Part.playbackOrder()` derives playback
+  order with pass numbers separately and never rewrites the notation. See
+  [barlines, repeats and endings](barline-import.md).
 - Relationships have their own IDs and typed endpoint event IDs. Sound ties, printed ties and slurs
   remain independent; multiple/nested spans may share endpoints. Missing endpoints remain null.
   IDs must be assigned independently of source XML IDs so anonymous elements remain addressable.
@@ -66,14 +71,15 @@ orphan spans can be represented without discarding data. Call `Score.validate()`
 
 | Code | Meaning |
 |---|---|
-| `DUPLICATE_ID` | Duplicate part, staff, instrument, measure, event or relationship identity |
+| `DUPLICATE_ID` | Duplicate part, staff, instrument, measure, event, relationship or ending identity |
 | `UNKNOWN_STAFF` | Event references an undeclared staff in its part |
 | `UNKNOWN_INSTRUMENT` | Note/instrument change references an undeclared instrument in its part |
-| `MISSING_ENDPOINT` | Span has a null start or end |
+| `MISSING_ENDPOINT` | Span has a null start or end, or an ending has a null stop |
 | `UNKNOWN_EVENT` | Span endpoint does not resolve to an event |
+| `UNKNOWN_MEASURE` | Ending start/stop does not resolve to a measure in its part |
 
 Part IDs are score-local; staff numbers, instrument IDs and measure IDs are part-local; event IDs
-and relationship IDs each have a separate score-global namespace. Voice/chord labels belong to
+relationship IDs and ending IDs each have a separate score-global namespace. Voice/chord labels belong to
 their containing part/measure. Validation reports all findings in encounter order and does not
 repair or omit records. Source positions, strict/tolerant import policy and unsupported source
 retention belong to MX-03, outside the neutral model. Chord-reference duration rules, meter fullness,

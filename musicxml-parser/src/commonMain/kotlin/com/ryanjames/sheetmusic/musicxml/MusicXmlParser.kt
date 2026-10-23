@@ -2,6 +2,9 @@ package com.ryanjames.sheetmusic.musicxml
 
 import com.ryanjames.sheetmusic.score.Accidental
 import com.ryanjames.sheetmusic.score.Attribute
+import com.ryanjames.sheetmusic.score.BarStyle
+import com.ryanjames.sheetmusic.score.Barline
+import com.ryanjames.sheetmusic.score.BarlineLocation
 import com.ryanjames.sheetmusic.score.Beam
 import com.ryanjames.sheetmusic.score.BeamType
 import com.ryanjames.sheetmusic.score.AttributeEvent
@@ -12,11 +15,15 @@ import com.ryanjames.sheetmusic.score.DirectionEvent
 import com.ryanjames.sheetmusic.score.DirectionMark
 import com.ryanjames.sheetmusic.score.DirectionSound
 import com.ryanjames.sheetmusic.score.Dynamics
+import com.ryanjames.sheetmusic.score.Ending
+import com.ryanjames.sheetmusic.score.EndingMark
+import com.ryanjames.sheetmusic.score.EndingType
 import com.ryanjames.sheetmusic.score.Event
 import com.ryanjames.sheetmusic.score.Grace
 import com.ryanjames.sheetmusic.score.Instrument
 import com.ryanjames.sheetmusic.score.KeyMode
 import com.ryanjames.sheetmusic.score.Measure
+import com.ryanjames.sheetmusic.score.MeasureRepeat
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
 import com.ryanjames.sheetmusic.score.NotatedValue
@@ -32,6 +39,8 @@ import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.RationalError
 import com.ryanjames.sheetmusic.score.RationalException
 import com.ryanjames.sheetmusic.score.RelationshipKind
+import com.ryanjames.sheetmusic.score.Repeat
+import com.ryanjames.sheetmusic.score.RepeatDirection
 import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.SoundingPitch
@@ -59,7 +68,10 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * (with MIDI percussion keys) are part instruments; notes keep their instrument, and sound
  * `instrument-change`s and staff-1 `transpose` become attribute events. Written pitch is kept and
  * sounding pitch is derived from the current transposition (as written without one); unpitched
- * notes keep only their display position. Other musical content is not implemented yet: meaningful unmapped
+ * notes keep only their display position. Barline styles, repeat signs and ending marks are kept
+ * on their measures, ending start/stop marks are paired into part endings (orphans are
+ * `UNMATCHED_SPAN`), and staff-1 measure-repeat signs mark their measures; playback order is
+ * derived separately by `playbackOrder`. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -142,6 +154,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             }
         }
         if (timewise) bodies.values.forEach { padMissingMeasures(it, timewiseMeasures.size) }
+        if (context.canContinue) definitions.values.forEach { definition -> bodies[definition.id]?.let(::finishEndings) }
         val spans = if (context.canContinue) definitions.values.flatMap { bodies[it.id]?.spans?.finish().orEmpty() } else emptyList()
         spans.forEachIndexed { index, span ->
             span.startLocation?.let { context.addProvenance(SourceProvenance("relationships[$index].startEventId", it)) }
@@ -166,6 +179,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     instruments = definition.instruments.values.map { Instrument(it.id, it.name, it.percussionKey) },
                     abbreviation = definition.abbreviation,
                     metadata = definition.metadata.toList(),
+                    endings = bodies[definition.id]?.endings.orEmpty().toList(),
                 )
             },
             relationships = spans.map { it.relationship },
@@ -490,6 +504,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var cursorLost = false
         val wedges = mutableListOf<WedgeEndpoint>()
         val graces = GraceLinker(body.spans)
+        val barlines = mutableListOf<Barline>()
         fun eventId() = "$partId:measure-$number:event-${events.size + 1}"
         fun add(event: Event, source: ScoreXmlEvent) {
             provenance("$path.events[${events.size}]", source)
@@ -525,12 +540,17 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     unsupportedTree(event, "S06", "Cursor move is not interpreted; later timed content in this measure is discarded")
                     cursorLost = true
                 }
+                "barline" -> barline(event, cursor, cursorLost)?.let { read ->
+                    provenance("$path.barlines[${barlines.size}]", event)
+                    barlines += read.barline
+                    read.barline.ending?.let { resolveEnding(it, "measure-$number", checkNotNull(read.endingSource)) }
+                }
                 else -> unsupportedTree(event)
             }
         }
         registerWedges(wedges)
         graces.finish()
-        return Measure("measure-$number", displayNumber, extent, events.toList(), implicit)
+        return Measure("measure-$number", displayNumber, extent, events.toList(), implicit, barlines.toList(), body.measureRepeat)
     }
 
     /**
@@ -558,6 +578,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 "staves" -> staves(event)
                 "staff-details" -> emit(staffDetails(event), event)
                 "transpose" -> emit(transpose(event), event)
+                "measure-style" -> measureStyle(event)
                 else -> unsupportedTree(event, ATTRIBUTES_CHILD_FEATURES[name] ?: "S07")
             }
         }
@@ -792,6 +813,186 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         } catch (exception: RationalException) {
             unsupported(location, "S16", "Sounding pitch is outside the supported exact range; it is not derived")
             null
+        }
+    }
+
+    /**
+     * Reads a barline's location, style, repeat sign and ending mark as notated. Segno, coda,
+     * fermata and wavy-line children, playback attributes and display attributes are S15
+     * discarded. A middle barline after an uninterpreted cursor move is discarded, like notes.
+     */
+    private fun barline(start: ScoreXmlEvent, cursor: Rational, cursorLost: Boolean): ReadBarline? {
+        val location = when (val text = start.attribute("location")) {
+            null, "right" -> BarlineLocation.RIGHT
+            "left" -> BarlineLocation.LEFT
+            "middle" -> BarlineLocation.MIDDLE
+            else -> {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("location"), "Unknown barline location: $text")
+                return null
+            }
+        }
+        if (location == BarlineLocation.MIDDLE && cursorLost) {
+            unsupportedTree(start, "S06", "Middle barline after an uninterpreted cursor move is discarded")
+            return null
+        }
+        attributes(start, setOf("location"), "S15")
+        val seen = mutableSetOf<String>()
+        var style: BarStyle? = null
+        var repeat: Repeat? = null
+        var ending: EndingMark? = null
+        var endingSource: ScoreXmlEvent? = null
+        children { event ->
+            when (val name = event.localName()) {
+                "bar-style" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S15").trim { it in WHITESPACE }
+                    style = BAR_STYLES[text]
+                    if (style == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown bar-style: $text")
+                }
+                "repeat" -> if (once(seen, name, event)) repeat = repeat(event)
+                "ending" -> if (once(seen, name, event)) {
+                    ending = ending(event)
+                    endingSource = event
+                }
+                "segno", "coda" -> unsupportedTree(event, "S15", "Barline $name navigation is not interpreted; it is discarded")
+                "fermata", "wavy-line" -> unsupportedTree(event, "S15", "Barline $name is not interpreted; it is discarded")
+                "footnote", "level" -> unsupportedTree(event, "S25")
+                else -> unsupportedTree(event, "S15")
+            }
+        }
+        if (!context.canContinue) return null
+        return ReadBarline(Barline(location, cursor.takeIf { location == BarlineLocation.MIDDLE }, style, repeat, ending), endingSource)
+    }
+
+    /** A repeat's direction and `times`; `after-jump` and `winged` are S15 discarded. */
+    private fun repeat(start: ScoreXmlEvent): Repeat? {
+        attributes(start, setOf("direction", "times"), "S15")
+        children { event -> unsupportedTree(event, "S15") }
+        val direction = when (val text = start.attribute("direction")) {
+            null -> {
+                invalid(start, "A repeat requires a direction")
+                return null
+            }
+            "forward" -> RepeatDirection.FORWARD
+            "backward" -> RepeatDirection.BACKWARD
+            else -> {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("direction"), "Unknown repeat direction: $text")
+                return null
+            }
+        }
+        val times = start.attribute("times")?.let { text ->
+            text.trim { it in WHITESPACE }.toIntOrNull()?.takeIf { it >= 0 } ?: run {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("times"), "Repeat times must be a non-negative Int")
+                return null
+            }
+        }
+        return Repeat(direction, times)
+    }
+
+    /** An ending's pass numbers, type and differing text; display attributes are S15 discarded. */
+    private fun ending(start: ScoreXmlEvent): EndingMark? {
+        val text = text(start, setOf("number", "type"), "S15").trim { it in WHITESPACE }
+        if (!context.canContinue) return null
+        val number = start.attribute("number") ?: run {
+            invalid(start, "An ending requires a number")
+            return null
+        }
+        val numbers = endingNumbers(number) ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "Invalid ending number: $number")
+            return null
+        }
+        val type = when (val value = start.attribute("type")) {
+            null -> {
+                invalid(start, "An ending requires a type")
+                return null
+            }
+            "start" -> EndingType.START
+            "stop" -> EndingType.STOP
+            "discontinue" -> EndingType.DISCONTINUE
+            else -> {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("type"), "Unknown ending type: $value")
+                return null
+            }
+        }
+        return EndingMark(type, numbers, text.ifEmpty { null })
+    }
+
+    /**
+     * Pairs ending marks in part order into whole-measure endings. Endings cannot nest: a start
+     * while another ending is open leaves that one unstopped. A stop whose numbers differ from the
+     * open ending, or with nothing open, is an orphan. Both cases are `UNMATCHED_SPAN`; the marks
+     * stay on their barlines and an unstopped ending keeps a null stop.
+     */
+    private fun resolveEnding(mark: EndingMark, measureId: String, source: ScoreXmlEvent) {
+        val open = body.openEnding
+        if (mark.type == EndingType.START) {
+            if (open != null) reportOpenEnding(body, open)
+            val index = body.endings.size
+            provenance("parts[${definitions.getValue(body.id).index}].endings[$index]", source)
+            body.openEnding = index to source
+            body.endings += Ending("${body.id}:ending-${index + 1}", mark.numbers, measureId, null, mark.text)
+            return
+        }
+        val ending = open?.let { body.endings[it.first] }
+        if (open == null || ending == null || ending.numbers != mark.numbers) {
+            val numbers = mark.numbers.joinToString(",")
+            context.report(DiagnosticCode.UNMATCHED_SPAN, source.location.withDeclaredPart(), "Ending $numbers stop has no matching start")
+            return
+        }
+        body.endings[open.first] = ending.copy(stopMeasureId = measureId, discontinued = mark.type == EndingType.DISCONTINUE)
+        body.openEnding = null
+    }
+
+    /** Reports an ending still open at the end of its part. */
+    private fun finishEndings(part: PartBody) {
+        part.openEnding?.let { reportOpenEnding(part, it) }
+        part.openEnding = null
+    }
+
+    private fun reportOpenEnding(part: PartBody, open: Pair<Int, ScoreXmlEvent>) {
+        val numbers = part.endings[open.first].numbers.joinToString(",")
+        context.report(DiagnosticCode.UNMATCHED_SPAN, open.second.location.withDeclaredPart(), "Ending $numbers has no stop")
+    }
+
+    /**
+     * Interprets a staff-1 `measure-repeat`: a start marks this and following measures until a
+     * stop, which is the first measure without the sign. Multiple rests, beat repeats and slashes
+     * stay S24 discarded. A stop with no sign in effect is `UNMATCHED_SPAN`.
+     */
+    private fun measureStyle(start: ScoreXmlEvent) {
+        attributes(start, setOf("number"), "S24")
+        if (!appliesToStaffOne(start, "Measure style")) {
+            skipTree()
+            return
+        }
+        children { event ->
+            if (event.localName() != "measure-repeat") {
+                unsupportedTree(event, "S24")
+                return@children
+            }
+            val text = text(event, setOf("type", "slashes"), "S24").trim { it in WHITESPACE }
+            if (!context.canContinue) return@children
+            val slashes = event.attribute("slashes")?.let { value ->
+                positiveInt(value) ?: run {
+                    context.report(DiagnosticCode.INVALID_VALUE, event.attributeLocation("slashes"), "Slashes must be a positive Int")
+                    return@children
+                }
+            } ?: 1
+            when (val type = event.attribute("type")) {
+                "start" -> {
+                    val measures = positiveInt(text) ?: run {
+                        context.report(DiagnosticCode.INVALID_VALUE, event.location, "A measure-repeat start needs a positive measure count")
+                        return@children
+                    }
+                    body.measureRepeat = MeasureRepeat(measures, slashes)
+                }
+                "stop" -> if (body.measureRepeat == null) {
+                    context.report(DiagnosticCode.UNMATCHED_SPAN, event.location.withDeclaredPart(), "Measure-repeat stop has no matching start")
+                } else {
+                    body.measureRepeat = null
+                }
+                null -> invalid(event, "A measure-repeat requires a type")
+                else -> context.report(DiagnosticCode.INVALID_VALUE, event.attributeLocation("type"), "Unknown measure-repeat type: $type")
+            }
         }
     }
 
@@ -1823,6 +2024,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
     }
 
+    /** A read barline and the `ending` element its ending mark came from, if any. */
+    private class ReadBarline(val barline: Barline, val endingSource: ScoreXmlEvent?)
+
     /**
      * A read direction; a null [event] means it was discarded with a diagnostic. [wedgeOnset] is
      * the measure-local position, including the display offset, that orders its wedge endpoints.
@@ -1857,6 +2061,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var divisions: Rational? = null
         var transposition: Transposition? = null
         var ambiguousTransposition = false
+        val endings = mutableListOf<Ending>()
+
+        /** The index in [endings] of an ending started but not yet stopped, and its start mark. */
+        var openEnding: Pair<Int, ScoreXmlEvent>? = null
+
+        /** The measure-repeat sign in effect, which marks each measure until it is stopped. */
+        var measureRepeat: MeasureRepeat? = null
     }
 
     private class MeasureHeader(val number: String, val implicit: Boolean, val source: ScoreXmlEvent)
@@ -1941,10 +2152,28 @@ private val WEDGE_TYPES: Map<String, WedgeType> = mapOf(
 
 private val ATTRIBUTES_CHILD_FEATURES: Map<String, String> = mapOf(
     "part-symbol" to "S08", "instruments" to "S16", "for-part" to "S16",
-    "measure-style" to "S24",
 )
 
 private enum class SpanType { START, STOP, CONTINUE, LET_RING }
+
+private val BAR_STYLES: Map<String, BarStyle> = mapOf(
+    "regular" to BarStyle.REGULAR, "dotted" to BarStyle.DOTTED, "dashed" to BarStyle.DASHED, "heavy" to BarStyle.HEAVY,
+    "light-light" to BarStyle.LIGHT_LIGHT, "light-heavy" to BarStyle.LIGHT_HEAVY, "heavy-light" to BarStyle.HEAVY_LIGHT,
+    "heavy-heavy" to BarStyle.HEAVY_HEAVY, "tick" to BarStyle.TICK, "short" to BarStyle.SHORT, "none" to BarStyle.NONE,
+)
+
+/**
+ * Parses a MusicXML ending-number, `([ ]*)|([1-9][0-9]*(, ?[1-9][0-9]*)*)`: blank means no
+ * numbers. Null means the value does not match.
+ */
+private fun endingNumbers(text: String): List<Int>? {
+    if (text.all { it == ' ' }) return emptyList()
+    return text.split(',').mapIndexed { index, part ->
+        val digits = if (index > 0 && part.startsWith(' ')) part.substring(1) else part
+        if (digits.isEmpty() || digits.first() !in '1'..'9' || !digits.all { it in '0'..'9' }) return null
+        digits.toIntOrNull() ?: return null
+    }
+}
 
 private val TIE_TYPES: Map<String, SpanType> = mapOf("start" to SpanType.START, "stop" to SpanType.STOP)
 
