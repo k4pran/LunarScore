@@ -50,10 +50,10 @@ All of these are `UNSUPPORTED_FEATURE` with `DISCARDED` retention: strict reject
 |---|---|---|
 | `chord` notes | S06 | Whole note discarded; cursor not advanced (chord tones share the previous onset) |
 | `grace` notes | S18 | Superseded by [MX-15](grace-import.md): imported as untimed `GRACE` notes |
-| `unpitched` notes; `staff` other than 1 | S16; S06 | Note discarded; cursor still advances by its duration so later onsets stay exact |
+| `staff` other than 1 | S06 | Note discarded; cursor still advances by its duration so later onsets stay exact (unpitched notes are imported since [MX-16](instrument-import.md)) |
 | `backup`/`forward` | S06 | Later notes and time signatures in that measure are each reported and discarded rather than placed at a wrong onset; divisions changes still apply |
 | `lyric` | S14 | Child discarded; note and exact duration kept. `tie` and `notations` are interpreted by [MX-11](span-import.md); `time-modification`, `stem`, `beam` and `tuplet` by [MX-12](tuplet-import.md) |
-| `instrument`; `footnote`/`level`; `play`/`listen` | S16; S25; S26 | Child discarded |
+| `footnote`/`level`; `play`/`listen` | S25; S26 | Child discarded (`instrument` is interpreted since [MX-16](instrument-import.md)) |
 | `notehead`, rest display-step/octave, dot attributes | S17 | Child/attribute discarded |
 | Note attributes (`default-x`, `dynamics`, `print-object`, …), unknown note children | S04 | Discarded |
 | `time` with `number` other than 1 | S08 (S07 before MX-08) | Whole time signature discarded so a meter scoped to another staff is never applied to staff 1; a non-positive `number` is `INVALID_VALUE` |

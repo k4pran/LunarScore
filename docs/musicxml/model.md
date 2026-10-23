@@ -30,7 +30,8 @@ does not depend on that module.
   parser diagnostics (MX-03/MX-07), never approximate the value or return a silently truncated score.
 - Written pitch uses step, octave and rational semitone alteration. Sounding pitch is an optional
   independent semitone number (middle C = 60). Absence means unknown. Transposition is a separate
-  staff-scoped attribute event; the model does not derive or respell pitches. Unpitched percussion
+  staff-scoped attribute event; the model does not derive or respell pitches (the MusicXML importer
+  derives sounding pitch, see [instrument-import.md](instrument-import.md)). Unpitched percussion
   keeps display step/octave and instrument identity separately; MIDI percussion keys are 0–127.
 - Note duration is performed musical duration, distinct from printed base value, dots, accidental
   and time modification. MX-12 adds the printed `StemDirection` and per-level `Beam`s to

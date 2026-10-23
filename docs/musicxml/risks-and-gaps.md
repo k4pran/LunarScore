@@ -7,7 +7,7 @@ Status: open design risks, audited 2026-10-15 for MX-00. Review against the [Mus
 | Public model loses format details | Keep written pitch, performed duration, notation and playback fields separate; log unsupported data with source location. Round-trip is not promised. Test accidentals, print hints and notes with different notated/performed values. |
 | Timing drift with changing divisions, backup/forward and tuplets | Rational quarter-note offsets; measure-local cursor; explicit state timeline. Assert exact onset/duration across changes and overlapping voices. |
 | Chord children can have different durations | Store noteheads independently at one onset; a chord tone may be shorter but cannot be longer than its reference note per the [chord definition](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/chord/). Test shorter/equal members and diagnose a longer member. |
-| Written versus sounding pitch confusion | Preserve written pitch and transposition separately; derive sounding pitch only when possible. Test transposing and concert-score cases. |
+| Written versus sounding pitch confusion | Preserve written pitch and transposition separately; derive sounding pitch only when possible. Test transposing and concert-score cases. MX-16 implements this; see its decisions below. |
 | Spans missing an endpoint or crossing measures | Stable event IDs and a resolver with explicit unmatched-span diagnostics; test ties, slurs and endings across boundaries. |
 | Valid XML but inconsistent music | Separate XSD validation, semantic validation and tolerant import. Test overfilled/underfilled measures, orphaned part IDs and conflicting attributes with documented policy. |
 | Malicious XML or large scores | Disable external entities/DTD, bound bytes/depth/elements/time/diagnostics, and test bombs and malformed encoding. |
@@ -62,7 +62,7 @@ Model-only F01/F05/F10/F17 projections now exist; no XML importer or source diag
 | Duplicate IDs, unknown staff/instrument | `DUPLICATE_ID`, `UNKNOWN_STAFF`, `UNKNOWN_INSTRUMENT` with neutral paths; graph tests | MX-03 source locations; MX-06/MX-09 importer policies |
 | Simple meter/state vocabulary only | No source import or implicit loss; additive meters/keys/other domains remain unimplemented | Their feature adapters must retain data or emit structured unsupported diagnostics before claiming support |
 | Rich model cannot yet be rendered | Existing renderer-to-neutral adapter preserves its complete current subset; legacy tests retained | Later neutral-to-layout adapter must report each unsupported case; no reverse adapter is exposed now |
-| Transposition, spans and chord consistency | Separate fields represent facts exactly; model does not infer sounding pitches or repair spans | MX-09/MX-11/MX-16 semantic validation and derivation remain |
+| Transposition, spans and chord consistency | Separate fields represent facts exactly; model does not infer sounding pitches or repair spans | The MX-16 importer derives sounding pitch; MX-09/MX-11 semantic validation remains |
 
 No new source-content discard branch is introduced. `ModelDiagnostic` is a neutral graph check,
 not the MX-03 importer diagnostic/provenance contract. The model has no dependency on the
@@ -118,6 +118,30 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-16 instrument and pitch interpretation decisions and remaining gaps
+
+The importer now reads [instruments, transposition and unpitched percussion](instrument-import.md)
+and derives sounding pitch. This supersedes the S16 discards of score-instrument, `transpose`,
+note `instrument` and unpitched notes. It also supersedes the S26 discard of a direction's
+`sound/instrument-change`.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Transposing part | Written pitch kept; sounding = written + `chromatic` + 12 × `octave-change` at the note's offset, persisting across measures (F17, microtone variant) | Respelling by `diatonic` is not attempted |
+| Part without `transpose` | Sounding pitch equals written pitch, as MusicXML defines | None |
+| `concert-score` | Written pitch is concert pitch; octave transpositions still apply (F21 subset) | Remaining F21 4.0 cases (MX-20) |
+| Non-octave transpose in a concert score (forbidden by 4.0, so ambiguous) | S16 `DISCARDED` at the transpose; transpose kept, sounding null until the next transpose | None |
+| Sounding semitones outside the exact range | S16 `DISCARDED` at the note; written pitch kept, sounding null | Wider numeric support is not promised |
+| Several score-instruments and a note without `instrument` | `instrumentId` null (unknown), not guessed | None |
+| Mid-score instrument change | Direction `sound/instrument-change` → `InstrumentChange` attribute event at its exact offset (F17); notes keep their own `instrument` | Measure-level `sound` stays S26; a change does not reassign notes |
+| Note shared by several instruments; `instrument` on a rest | S16 `DISCARDED`; first instrument kept / rest kept | Shared-note model |
+| `transpose/double`; `for-part`; `attributes/instruments`; abbreviation/sound/solo/ensemble | S16 `DISCARDED` | Octave doubling and part-generation model |
+| `virtual-instrument`, MIDI settings other than `midi-unpitched`, `instrument-change` sound data | S26 `DISCARDED` | MX-20/MX-21 playback |
+| Transpose for staff ≠ 1 | S08 `DISCARDED` | MX-09 |
+| Unknown or missing instrument references; missing instrument name; half a display position; `midi-unpitched` outside 1–128 | Fatal `INVALID_STRUCTURE` / `INVALID_VALUE` | None |
+
+F17 and the F21 subset are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-15 grace and cue note decisions and remaining gaps
 
 The importer now keeps [grace notes](grace-import.md) as untimed `GRACE` events linked to their
@@ -151,7 +175,7 @@ MX-06 S13 discard of a measure's `direction` element, MX-11's S12 discard of `ar
 | Metric modulation, `beat-unit-tied`, `metronome-note` metronome forms | S13 `DISCARDED`; metronome dropped | Complex metronome model |
 | Display attributes (fonts, enclosure, position, color, `parentheses`, wedge `spread`/`niente`/line style, `strong-accent type`, trill-sound and mordent attributes) | S13 or S12 `DISCARDED` per attribute; mark kept | Layout hints (MX-18); ornament realization |
 | Other notations: `fermata`, `technical`, `arpeggiate`, `glissando`, `slide`, `accidental-mark`, `non-arpeggiate`, `other-notation`; other articulations/ornaments (`breath-mark`, `caesura`, `scoop`, `plop`, `doit`, `falloff`, `wavy-line`, `tremolo`, `other-ornament`, …) | S12 `DISCARDED` per element | Fermata, tremolo and wavy-line models |
-| Other `sound` attributes and children; `listening` in a direction | S26 `DISCARDED`; tempo/dynamics kept | MX-16 instrument change, MX-20/21 listening and playback |
+| Other `sound` attributes and children; `listening` in a direction | S26 `DISCARDED`; tempo/dynamics kept (instrument change superseded by MX-16 below) | MX-20/21 listening and playback |
 | Unmatched wedge endpoints or `continue` without an open wedge | `UNMATCHED_SPAN`; relationship kept with a null partner | None |
 | Unknown placement, wedge type or beat unit; wedge number outside 1–16; malformed offset or sound values; blank per-minute | Fatal `INVALID_VALUE` | None |
 | Direction without `direction-type`; wedge without type; metronome without beat-unit/per-minute; duplicate offset/voice/staff/sound | Fatal `INVALID_STRUCTURE` | None |
@@ -189,7 +213,7 @@ supersedes MX-07's S09 discard of `tie` and its S12 discard of the whole `notati
 | Duplicate start (same kind, key and voice while open) | Earlier start reported as `UNMATCHED_SPAN` immediately and kept with a null end | None |
 | Stop before its start in document order | Paired when the start is musically earlier (measure, onset); resolver unit test | XML evidence needs MX-09 backup/forward |
 | Ties across voices; concurrent same-pitch ties | Pair by written pitch, preferring the same voice | Chord-tone ties need MX-09 chords |
-| Endpoint on a discarded chord/unpitched/other-staff note (grace notes are imported since MX-15) | Not registered; the partner becomes `UNMATCHED_SPAN` | MX-09, MX-16 |
+| Endpoint on a discarded chord/other-staff note (grace notes are imported since MX-15, unpitched notes since MX-16) | Not registered; the partner becomes `UNMATCHED_SPAN` | MX-09 |
 | Enharmonic ties; tie stop not at the tied note's end | Not paired / not checked | Optional semantic check |
 | Missing `type`; unknown `type`; `number` outside 1–16 | Fatal `INVALID_STRUCTURE`; fatal `INVALID_VALUE` | None |
 | `tie time-only`; `tied type="let-ring"`; tie or tied on a rest | S09 `DISCARDED`; mark dropped (a slur on a rest is kept) | Repeat-pass playback (MX-17); let-ring model |
@@ -229,7 +253,7 @@ MX-07's S07 discard of key, clef, staves and staff details.
 | `staves` > 1, `part-symbol`, key/time/clef/staff details scoped to staff ≠ 1 | S08 `DISCARDED` (time scope moved from S07 to S08) | MX-09 multi-staff |
 | Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | S07 `DISCARDED`; non-traditional key dropped, otherwise key/clef kept (unknown mode null) | Non-traditional key model |
 | `staff-tuning`/`capo`; other staff details | S23 / S17 `DISCARDED`; staff-line count kept | MX-13/MX-18/MX-21 |
-| `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` | MX-16, MX-17, MX-13 |
+| `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` (`transpose` superseded by MX-16 below) | MX-17, MX-13 |
 | State change after uninterpreted backup/forward | S06 `DISCARDED` for each key/time/clef/staff-lines change | MX-09 |
 
 F07 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
@@ -246,7 +270,7 @@ obligation is met for durations and divisions.
 | Duration or divisions outside reduced Int bounds; overflowing quotient or cursor sum | Fatal `NUMERIC_OVERFLOW` at the duration/divisions location; boundary `Int.MAX_VALUE` accepted | Wider numeric support is not promised |
 | Missing divisions before a duration; missing duration/pitch-or-rest/step/octave; duplicates | Fatal `INVALID_STRUCTURE`; no default divisions or duration inferred | MX-08 state resolution across parts/staves |
 | Chord and grace notes | S06/S18 `DISCARDED`; whole note dropped and cursor not advanced (grace superseded by MX-15 above) | MX-09 chords |
-| Unpitched notes; staff other than 1 | S16/S06 `DISCARDED`; note dropped, cursor still advances so later onsets stay exact | MX-16 percussion, MX-09 staves |
+| Unpitched notes; staff other than 1 | S16/S06 `DISCARDED`; note dropped, cursor still advances so later onsets stay exact (unpitched superseded by MX-16 below) | MX-09 staves |
 | Backup/forward | S06 `DISCARDED`; later notes/time signatures in that measure are each reported and dropped instead of mistimed; divisions still apply | MX-09 cursor interpretation and `INVALID_CURSOR_MOVE` |
 | Ties, tuplet time-modification, stems/beams (superseded by MX-11/MX-12 above), notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
 | Key, clef, staves and other attributes children; complex or annotated time | S07 `DISCARDED`; a simple time keeps its signature even if its attributes are discarded | Key/clef/staves/staff details superseded by MX-08 above; complex time remains |
@@ -271,7 +295,7 @@ part/measure structures. This supersedes earlier statements that no semantic imp
 | Credit images/symbols, text typography/language, encoding supports and unknown header content | S03 `UNSUPPORTED_FEATURE` / `DISCARDED`; plain supported text still retained; strict rejects, tolerant warns | Rich credit/layout and encoding capability semantics remain unimplemented |
 | Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations | Layout MX-18; source IDs/display text/multimetric measure semantics need explicit model mappings |
 | Part groups, part links, grouping, links/bookmarks | S25 discarded-content findings; actual grouping/link importer tests; no targets fetched | Group/editorial/link semantics and full F27 remain pending |
-| Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
+| Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree (score-instrument and `midi-instrument` superseded by MX-16) | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
 | Foreign subtrees or namespaced attributes resemble supported names | Expanded-name lookup prevents aliasing; `foreign-extension` subtree or owner-group attribute finding | No namespace rewriting or extension semantics |
 | Work/identification/encoding source containers | Flattened ordered semantic text metadata; credits remain grouped; source sidecar retains original leaf locations | No source-container round-trip, empty-container preservation or formatting promise |
 | F02 and implementation-authored variants | 18 common semantic tests on JVM/Android host; iOS cross-compiles | Independent MX-04 fixtures/XSD validation and macOS runtime evidence still required |

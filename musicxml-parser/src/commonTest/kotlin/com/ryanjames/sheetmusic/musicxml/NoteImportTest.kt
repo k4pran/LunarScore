@@ -13,6 +13,7 @@ import com.ryanjames.sheetmusic.score.RationalError
 import com.ryanjames.sheetmusic.score.RationalException
 import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
+import com.ryanjames.sheetmusic.score.SoundingPitch
 import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.WrittenPitch
@@ -160,11 +161,12 @@ class NoteImportTest {
                 "<note><rest><display-step>B</display-step></rest><duration>1</duration><notations><fermata/></notations></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S04", "S10", "S06", "S16", "S06", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S04", "S10", "S06", "S06", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.severity == DiagnosticSeverity.WARNING && it.unsupported?.retention == ContentRetention.DISCARDED })
         val events = events(result)
-        assertEquals(listOf(Rational.ZERO, Rational.of(3)), events.map { it.onset })
-        assertIs<RestEvent>(events[1])
+        assertEquals(listOf(Rational.ZERO, Rational.ONE, Rational.of(3)), events.map { it.onset })
+        assertEquals(NotePitch.Unpitched(), assertIs<NoteEvent>(events[1]).pitch)
+        assertIs<RestEvent>(events[2])
         assertEquals(Rational.of(4), result.value.parts.single().measures.single().extent)
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
     }
@@ -248,8 +250,11 @@ class NoteImportTest {
         }
     }
 
-    private fun pitched(step: Step, octave: Int, alter: Rational = Rational.ZERO) =
-        NotePitch.Pitched(WrittenPitch(step, octave, alter))
+    /** A pitch in a non-transposing part, which sounds as written (MIDI middle C = 60). */
+    private fun pitched(step: Step, octave: Int, alter: Rational = Rational.ZERO): NotePitch.Pitched {
+        val semitones = (octave + 1) * 12 + listOf(0, 2, 4, 5, 7, 9, 11)[step.ordinal]
+        return NotePitch.Pitched(WrittenPitch(step, octave, alter), SoundingPitch(Rational.of(semitones) + alter))
+    }
 
     private fun events(result: ParseResult.Success<Score>) = result.value.parts.single().measures.first().events
 

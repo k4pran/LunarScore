@@ -87,7 +87,7 @@ captured, and links/images/opus references are never fetched.
 | Unmapped content | Feature ID |
 |---|---|
 | Notes/rests; backup/forward; attributes | S04; S06; S07 |
-| Directions; barlines; score-instrument | S13; S15; S16 |
+| Directions; barlines; score-instrument | S13; S15; S16 (directions and score-instruments are interpreted since MX-13 and [MX-16](instrument-import.md)) |
 | Defaults/print and part-name/abbreviation display formatting | S17 |
 | Harmony/figured-bass | S22 |
 | Grouping, links/bookmarks, part-link, group, part-group | S25 |

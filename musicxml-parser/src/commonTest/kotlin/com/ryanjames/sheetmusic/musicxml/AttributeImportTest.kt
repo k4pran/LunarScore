@@ -11,6 +11,7 @@ import com.ryanjames.sheetmusic.score.NoteEvent
 import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.Score
+import com.ryanjames.sheetmusic.score.SoundingPitch
 import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.WrittenPitch
@@ -54,9 +55,9 @@ class AttributeImportTest {
         assertEquals(after.copy(clef = treble), states[third.events.single().id])
 
         // The key never rewrites written alter or infers a printed accidental.
-        assertEquals(NotePitch.Pitched(WrittenPitch(Step.F, 3, Rational.ONE)), notes[2].pitch)
+        assertEquals(NotePitch.Pitched(WrittenPitch(Step.F, 3, Rational.ONE), SoundingPitch(Rational.of(54))), notes[2].pitch)
         assertNull(notes[2].notation.accidental)
-        assertEquals(NotePitch.Pitched(WrittenPitch(Step.F, 3)), notes[3].pitch)
+        assertEquals(NotePitch.Pitched(WrittenPitch(Step.F, 3), SoundingPitch(Rational.of(53))), notes[3].pitch)
         assertEquals(Accidental("natural"), notes[3].notation.accidental)
 
         val mapping = result.provenance.associateBy { it.modelPath }
@@ -154,7 +155,7 @@ class AttributeImportTest {
     @Test
     fun testOtherAttributesChildrenAreReportedByFeature() {
         val result = success(document(
-            "<attributes><part-symbol>brace</part-symbol><transpose><chromatic>-2</chromatic></transpose>" +
+            "<attributes><part-symbol>brace</part-symbol><instruments>2</instruments>" +
                 "<measure-style><slash type='start'/></measure-style><directive>Allegro</directive></attributes>",
         ), ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(listOf("S08", "S16", "S24", "S07"), result.diagnostics.map { it.unsupported?.featureId })

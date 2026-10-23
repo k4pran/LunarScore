@@ -27,7 +27,7 @@ grace note, end = principal), numbered `<partId>:grace-note-<n>` in the grace no
   Consecutive grace notes share that principal.
 - Grace notes followed in their voice by a rest, or by the end of the measure (including an
   uninterpreted backup/forward), are after-graces of the previous note in that voice.
-- Grace notes whose next timed note in the voice is discarded (unpitched or another staff), or that
+- Grace notes whose next timed note in the voice is discarded (on another staff), or that
   have no note in their voice to attach to, keep a null end and produce `UNMATCHED_SPAN`
   (strict rejects, tolerant warns; the model reports `MISSING_ENDPOINT`).
 
@@ -43,7 +43,7 @@ notes are unchanged, and the steal-time percentages are retained for consumers.
 | `cue` on a grace note | S18 `DISCARDED` (cue size); imported as a grace note |
 | Grace rest | S18 `DISCARDED`; the note is dropped without moving the cursor |
 | Grace chord tone (`grace` plus `chord`) | S06 `DISCARDED` until MX-09 imports chords; the first grace note of the chord is kept |
-| Unpitched grace note, grace note on staff other than 1 | S16 / S06 `DISCARDED`; no cursor movement |
+| Grace note on staff other than 1 | S06 `DISCARDED`; no cursor movement (unpitched grace notes are imported since [MX-16](instrument-import.md)) |
 | Grace or cue note after `backup`/`forward` | S06 `DISCARDED` with other content after the uninterpreted cursor move, until MX-09 |
 | Invalid `slash`; steal-time outside 0–100 or not a decimal | Fatal `INVALID_VALUE` |
 | Duplicate `grace` | Fatal `INVALID_STRUCTURE` |
