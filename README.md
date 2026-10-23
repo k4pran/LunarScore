@@ -20,7 +20,7 @@ editing, beaming and system breaking remain future work. See the
 | `sheetmusic-core` | Score model (`Score`, `Measure`, `Note`, …), SMuFL glyph metrics and the layout engine. Pure Kotlin with no Compose dependency. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser, Node.js), Wasm (browser, Node.js) |
 | `sheetmusic-compose` | The `SheetMusic` composable. It bundles the Bravura font. | Android, JVM, iosArm64, iosSimulatorArm64, JS (browser), Wasm (browser) |
 | `sample` | The example score as a desktop app and as a web page (JS and Wasm), with one shared screen | JVM desktop, JS, Wasm |
-| `musicxml-parser` | Public partwise score importer with metadata, notes/rests/chords across voices and staves, key/time/clef state, ID/reference diagnostics and provenance; secure XML reader and XML/ZIP probes. See [importer scope](docs/musicxml/partwise-import.md) and [diagnostic contract](docs/musicxml/diagnostics.md). | Android, JVM, iosArm64, iosSimulatorArm64 |
+| `musicxml-parser` | Public partwise score importer with metadata, notes/rests/chords across voices and staves, key/time/clef state, ID/reference diagnostics and provenance; bounded `.mxl` archive import ([details](docs/musicxml/mxl-import.md)); secure XML reader and XML/ZIP probes. See [importer scope](docs/musicxml/partwise-import.md) and [diagnostic contract](docs/musicxml/diagnostics.md). | Android, JVM, iosArm64, iosSimulatorArm64 |
 
 ## Using it from another KMP project
 

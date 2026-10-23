@@ -20,7 +20,7 @@ Status: open design risks, audited 2026-10-15 for MX-00. Review against the [Mus
 
 The XML/ZIP dependency decisions, neutral model and MX-03 diagnostics contract are recorded below.
 Public policy and retention budgets are defined; MX-05 implements reader enforcement, and the raw
-ZIP safety layer remains MX-19 work. MX-02 chooses a staged renderer adapter.
+ZIP safety layer is implemented by [MX-19](mxl-import.md). MX-02 chooses a staged renderer adapter.
 
 ## MX-01 dependency decisions and runtime limitations
 
@@ -116,7 +116,30 @@ MX-01's provisional reader-policy entries above; the original probes remain unch
 
 JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md](xml-reader.md).
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
-MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
+MXL safety is MX-19 (below) and JS/Wasm targets remain undeclared for this module.
+
+## MX-19 compressed `.mxl` decisions and remaining gaps
+
+MX-19 supersedes the MX-01 ZIP rows above. `parseMxl` validates raw ZIP metadata itself and uses
+Okio only to inflate one validated entry; the MX-01 probe is unchanged and still not an MXL reader.
+See [mxl-import.md](mxl-import.md).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Traversal, absolute, backslash, drive/colon, control-character or empty-segment entry names | Fatal `UNSAFE_ARCHIVE`; names are never normalized | None |
+| Duplicate entries or rootfile paths, compared case-insensitively | Fatal `UNSAFE_ARCHIVE` | None |
+| Local header disagreeing with the central record; overlapping entry data | Fatal `UNSAFE_ARCHIVE` | None |
+| Encrypted (traditional, strong, central-directory, AES) entries | Fatal `UNSUPPORTED_ARCHIVE` | Decryption is out of scope |
+| ZIP64 records or sizes, multi-disk archives, methods other than STORE/DEFLATE | Fatal `UNSUPPORTED_ARCHIVE` | ZIP64 if real scores need it |
+| Expansion bomb, too many entries, oversized archive or total expansion | Fatal `ARCHIVE_LIMIT` from declared metadata before inflating; 1 MiB zero bomb and exact/excess budget tests | None |
+| Directory understating an entry's size; CRC or DEFLATE corruption; trailing data | Fatal `ARCHIVE_READ_FAILED`; inflation stops one byte past the declared size | None |
+| Container missing, malformed or without a MusicXML first rootfile; wrong mimetype content | `INVALID_STRUCTURE` or the secure reader's XML codes, located at the container entry | None |
+| `mimetype` not first or compressed | `RECOVERED_VALUE`: strict failure, tolerant warning | None |
+| Later renditions (PDF, images, other MusicXML) | Paths validated; content not read | Rendition selection API |
+| Archive larger than memory | `ARCHIVE_LIMIT` at 16 MiB by default | Streaming or file-backed input |
+
+F20 was generated with .NET `ZipArchive`; other archives come from a test-only writer. iOS runtime
+still requires macOS.
 
 ## MX-21 compliance audit decisions and remaining gaps
 
