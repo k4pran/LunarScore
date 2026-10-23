@@ -87,7 +87,7 @@ Each `F` fixture is a small hand-verifiable file unless noted. Create F01–F08 
 | F16 | Repeat start/end, two endings and a nonstandard barline; structural and playback fields distinct. |
 | F17 | Transposing instrument plus unpitched percussion; written and sounding fields must not be conflated. |
 | F18 | Page/system/staff layout, print break and explicit positioning; retain supported hints. |
-| F19 | Grace before a duration-bearing note and cue note; grace does not advance main cursor. |
+| F19 | Grace before a duration-bearing note and cue note; grace does not advance main cursor. Implemented in `GraceFixtures.kt` (MX-15); grace chord and cue after backup are inline discard tests until MX-09. |
 | F20 | `.mxl` with container and two renditions; select first MusicXML rootfile and reject unsafe paths. |
 | F21 | At least `concert-score`, `for-part`, `listening`, `assess` and packaging cases from 4.0 history; supported mapping or explicit unsupported diagnostic. |
 | F22 | XSD-invalid: wrong root, missing required part-list, illegal duration and malformed XML; expected rejection category. |

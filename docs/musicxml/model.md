@@ -37,7 +37,9 @@ does not depend on that module.
   `NotatedValue`; a time modification is the cumulative ratio for nested tuplets, while each tuplet
   bracket is a `TUPLET` relationship. Explicit performance attack/release offsets are in quarter notes.
   MX-13 adds `NotatedValue.expressions` (articulations, ornaments and `Dynamics`, each type kept
-  apart from its `Placement`). Grace duration is null and does not advance the main timeline. Cue duration is positive.
+  apart from its `Placement`). Grace duration is null and does not advance the main timeline; MX-15 adds optional `Grace`
+  slash/steal-time details and `GRACE_NOTE` relationships to the principal note (see
+  [grace and cue notes](grace-import.md)). Cue duration is positive.
   A chord is independently timed noteheads sharing a chord ID; staff and duration may differ.
 - Attribute events retain exact offsets for simple time signatures, traditional key signatures
   (fifths and optional `KeyMode`), clefs (line null when unspecified for signs without a standard

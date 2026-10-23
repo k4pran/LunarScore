@@ -68,5 +68,8 @@ public data class Relationship(
     }
 }
 
-/** Sound ties and printed ties are independent; concurrent/nested spans have separate IDs. */
-public enum class RelationshipKind { SOUND_TIE, NOTATED_TIE, SLUR, TUPLET, WEDGE, PEDAL, ENDING }
+/**
+ * Sound ties and printed ties are independent; concurrent/nested spans have separate IDs.
+ * [GRACE_NOTE] links a grace note (start) to its principal note (end).
+ */
+public enum class RelationshipKind { SOUND_TIE, NOTATED_TIE, SLUR, TUPLET, WEDGE, PEDAL, ENDING, GRACE_NOTE }

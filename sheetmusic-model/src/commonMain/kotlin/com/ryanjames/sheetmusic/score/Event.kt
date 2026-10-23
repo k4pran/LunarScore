@@ -10,6 +10,23 @@ public sealed interface Event {
 /** Ordinary/cue notes advance musical time; grace notes have no duration in the main timeline. */
 public enum class NoteRole { NORMAL, CUE, GRACE }
 
+/**
+ * Grace-note presentation and playback hints. [slash] is a printed slash (acciaccatura).
+ * [stealTimePrevious] and [stealTimeFollowing] are the percentages (0–100) of the previous or
+ * following note's time taken by the grace note in playback; null means unspecified. A grace note
+ * is linked to its principal note by a [RelationshipKind.GRACE_NOTE] relationship.
+ */
+public data class Grace(
+    val slash: Boolean = false,
+    val stealTimePrevious: Rational? = null,
+    val stealTimeFollowing: Rational? = null,
+) {
+    init {
+        require(stealTimePrevious == null || stealTimePrevious in Rational.ZERO..Rational.of(100))
+        require(stealTimeFollowing == null || stealTimeFollowing in Rational.ZERO..Rational.of(100))
+    }
+}
+
 /** Performance offsets from the nominal start/end in quarter notes; never inferred from notation. */
 public data class Performance(val attack: Rational = Rational.ZERO, val release: Rational = Rational.ZERO)
 
@@ -17,6 +34,7 @@ public data class Performance(val attack: Rational = Rational.ZERO, val release:
  * One notehead, including each chord tone independently. [duration] is performed musical time in
  * quarter notes (null only for grace), separate from [notation]. Shared [chordId] groups noteheads
  * without forcing equal durations or staves. Instrument IDs resolve within the containing part.
+ * [grace] details are only allowed on a [NoteRole.GRACE] note.
  */
 public data class NoteEvent(
     override val id: String,
@@ -30,11 +48,13 @@ public data class NoteEvent(
     val chordId: String? = null,
     val instrumentId: String? = null,
     val performance: Performance = Performance(),
+    val grace: Grace? = null,
 ) : Event {
     init {
         validateEvent(id, onset, staff)
         require(voice.isNotBlank())
         require(if (role == NoteRole.GRACE) duration == null else duration != null && duration > Rational.ZERO)
+        require(grace == null || role == NoteRole.GRACE)
     }
 }
 

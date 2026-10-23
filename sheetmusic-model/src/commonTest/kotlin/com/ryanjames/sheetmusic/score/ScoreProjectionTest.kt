@@ -100,7 +100,7 @@ class ScoreProjectionTest {
         val first = note("n1", 0, Rational.of(2, 3), notation = NotatedValue(NoteValue.QUARTER, 1, modification))
             .copy(chordId = "chord", performance = Performance(Rational.of(-1, 12), Rational.of(1, 12)))
         val second = first.copy(id = "n2", duration = Rational.of(1, 3), staff = 2)
-        val grace = first.copy(id = "grace", duration = null, role = NoteRole.GRACE, chordId = null)
+        val grace = first.copy(id = "grace", duration = null, role = NoteRole.GRACE, chordId = null, grace = Grace(slash = true, stealTimeFollowing = Rational.of(50)))
         val score = Score(listOf(Part("p", listOf(Staff(1), Staff(2)), listOf(
             Measure("pickup", "0a", Rational.of(2, 3), listOf(grace, first, second), implicit = true),
         ))))
@@ -146,6 +146,9 @@ class ScoreProjectionTest {
         assertFailsWith<IllegalArgumentException> { note("n", -1) }
         assertFailsWith<IllegalArgumentException> { note("n", 0, Rational.ZERO) }
         assertFailsWith<IllegalArgumentException> { note("n", 0).copy(role = NoteRole.GRACE) }
+        assertFailsWith<IllegalArgumentException> { note("n", 0).copy(grace = Grace(slash = true)) }
+        assertFailsWith<IllegalArgumentException> { Grace(stealTimePrevious = Rational.of(101)) }
+        assertFailsWith<IllegalArgumentException> { Grace(stealTimeFollowing = Rational.of(-1)) }
         assertFailsWith<IllegalArgumentException> { RestEvent("r", Rational.ZERO, Rational.of(-1)) }
         assertFailsWith<IllegalArgumentException> { TimeModification(0, 2) }
         assertFailsWith<IllegalArgumentException> { NotatedValue(dots = -1) }
