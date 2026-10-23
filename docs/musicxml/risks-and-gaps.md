@@ -118,6 +118,31 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-20 MusicXML 4.0 change-list decisions and remaining gaps
+
+MX-20 checks every entry in the [4.0 version history](https://www.w3.org/2021/06/musicxml40/version-history/40/).
+The item-by-item outcomes are in [version-40-changes.md](version-40-changes.md). All score-document
+additions were already reported by their domain owners; MX-20 pins each of them with F21
+(`VersionFourFixtures.kt`). Packaged part documents need the `.mxl` adapter (MX-19).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Later MusicXML rootfile in a `.mxl` (4.0 score-and-parts packaging) | Not imported: `.mxl` input waits for MX-19 | Report later MusicXML rootfiles as S19 `DISCARDED` once the adapter exists; reading linked parts; `part-link` resolution |
+| `listening`, `listen`, `assess`, `wait`, `sync`, `other-listen(ing)`, `player`, swing, `play/ipa` | S26 `DISCARDED` at the subtree (F21) | Listening/player/swing playback model |
+| `numeral*`, `bass-separator`, `arrangement`, `inversion/@text`, `function`, figured-bass alignment and placement | S22 `DISCARDED` with `harmony`/`figured-bass` (F21) | Harmony model (F24) |
+| `for-part`, `part-clef`, `part-transpose`, `double/@above`, `instrument-sound` IDs, several note instruments | S16 `DISCARDED`; the first instrument is kept (F21) | Part-generation and shared-note model |
+| `system` on `direction`/`ending`/`harmony`/`measure-numbering`; `repeat/@after-jump`; `metronome/@print-object` | Attribute-level S13/S15/S17/S22 `DISCARDED`; the element is kept, so a hidden metronome imports as visible (F21) | System-scoped display and jump semantics |
+| `line-detail`, `staff-size/@scaling`, `measure-numbering` options | S17 `DISCARDED` (F21) | Staff-line and numbering display model |
+| `pedal` `discontinue`/`resume`, percussion `@smufl`, `inverted-bracket` enclosure | S13 `DISCARDED` (F21) | Pedal and percussion pictogram model |
+| `arpeggiate/@unbroken`, `wavy-line/@smufl`, `bend/@shape`, `release/@offset` | S12 `DISCARDED` (F21) | Technical and arpeggio model (F25) |
+| `accidental/@smufl` early-music glyphs | S04 `DISCARDED` attribute; the accidental text is kept (F21) | SMuFL glyph mapping |
+| `level/@type`, `part-link` | S25 `DISCARDED`; links are not fetched (F21) | Editorial and link model (F27) |
+| `multiple-rest` (empty form removed in 4.0) | S24 `DISCARDED` whatever its content (F21) | Multiple-rest model (F26) |
+| `concert-score`, `instrument-change`, `part name` credit-type, number-level 16, deprecated `none` clef | Supported; asserted in F21 and the MX-16/MX-11/MX-12 tests | None |
+| DTD versions deprecated | Any DOCTYPE is fatal `UNSAFE_XML` (MX-05 security policy) | None |
+
+F21 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-18 layout and visual hint decisions and remaining gaps
 
 MX-18 supersedes the MX-06 S17 discard of `defaults` layout and measure `print`, and the S04/S13/S12
@@ -175,7 +200,7 @@ note `instrument` and unpitched notes. It also supersedes the S26 discard of a d
 |---|---|---|
 | Transposing part | Written pitch kept; sounding = written + `chromatic` + 12 × `octave-change` at the note's offset, persisting across measures (F17, microtone variant) | Respelling by `diatonic` is not attempted |
 | Part without `transpose` | Sounding pitch equals written pitch, as MusicXML defines | None |
-| `concert-score` | Written pitch is concert pitch; octave transpositions still apply (F21 subset) | Remaining F21 4.0 cases (MX-20) |
+| `concert-score` | Written pitch is concert pitch; octave transpositions still apply (F21 subset) | None; other F21 cases are in the MX-20 section |
 | Non-octave transpose in a concert score (forbidden by 4.0, so ambiguous) | S16 `DISCARDED` at the transpose; transpose kept, sounding null until the next transpose | None |
 | Sounding semitones outside the exact range | S16 `DISCARDED` at the note; written pitch kept, sounding null | Wider numeric support is not promised |
 | Several score-instruments and a note without `instrument` | `instrumentId` null (unknown), not guessed | None |
