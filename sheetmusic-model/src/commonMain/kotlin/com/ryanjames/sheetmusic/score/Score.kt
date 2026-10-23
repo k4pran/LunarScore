@@ -8,7 +8,10 @@ public data class Score(
     val metadata: List<MetadataEntry> = emptyList(),
 )
 
-/** Ordered measures and staff/instrument definitions; IDs are stable, not display names. */
+/**
+ * Ordered measures and staff/instrument definitions; IDs are stable, not display names. [endings]
+ * are resolved ending brackets in start order; see [playbackOrder] for derived navigation.
+ */
 public data class Part(
     val id: String,
     val staves: List<Staff>,
@@ -17,6 +20,7 @@ public data class Part(
     val instruments: List<Instrument> = emptyList(),
     val abbreviation: String? = null,
     val metadata: List<MetadataEntry.Text> = emptyList(),
+    val endings: List<Ending> = emptyList(),
 ) {
     init {
         require(id.isNotBlank())
@@ -42,6 +46,8 @@ public data class Instrument(val id: String, val name: String? = null, val percu
  * A measure with a stable part-local [id] and a separate display [number] (which need not be numeric).
  * [extent] is the observed time extent in quarter notes, not an inferred meter length. Empty and
  * pickup measures are legal. Event order is retained; it need not be sorted by onset or voice.
+ * [barlines] are the notated barlines in source order. [measureRepeat] marks a measure displayed
+ * as a measure-repeat sign; its events are still the music it sounds.
  */
 public data class Measure(
     val id: String,
@@ -49,6 +55,8 @@ public data class Measure(
     val extent: Rational,
     val events: List<Event> = emptyList(),
     val implicit: Boolean = false,
+    val barlines: List<Barline> = emptyList(),
+    val measureRepeat: MeasureRepeat? = null,
 ) {
     init {
         require(id.isNotBlank())

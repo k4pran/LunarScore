@@ -118,6 +118,30 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-17 barline, repeat and ending decisions and remaining gaps
+
+MX-17 supersedes the MX-06 S15 discard of whole barlines and the MX-08 S24 discard of
+`measure-style/measure-repeat`. Notation is kept on measures and parts. Playback order is a separate
+derived view (`Part.playbackOrder()`), so the notated structure is never unfolded or rewritten.
+See [barline-import.md](barline-import.md).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Repeat sections, `times`, first/second endings, pickup (F16) | Notated barlines kept; playback order 0, 1, 2, 1, 3, 4 derived separately with a pass number per measure | None |
+| Backward repeat without forward repeat; consecutive backward repeats | Returns to the measure after the previous completed repeat, or the first measure (the pickup is replayed) | Engraving conventions differ; no alternative policy is offered |
+| Orphan ending stop; stop whose numbers differ from the open ending | `UNMATCHED_SPAN` at the `ending`; the mark stays on its barline and no `Ending` is created | None |
+| Ending never stopped; nested ending start | `UNMATCHED_SPAN`; `Ending` kept with a null stop (model `MISSING_ENDPOINT`, playback `OPEN_ENDING` covering only its start measure) | None |
+| Ending without numbers | Kept with empty numbers; playback `UNNUMBERED_ENDING`, played on every pass | Text-only endings for D.S./D.C. passes |
+| Forward repeat not on a left barline, backward repeat not on a right barline, repeat on a middle barline | Kept as notated; playback `MISPLACED_REPEAT`, ignored | None |
+| Nested repeat sections | Not standard notation: the inner repeat completes its section, so an outer backward repeat returns to the measure after it | Explicit nested-repeat policy if real files need it |
+| Very large `times` | Playback truncated at `maxMeasures` with `LENGTH_LIMIT` | None |
+| Segno, coda, fermata and wavy-line on barlines; barline `segno`/`coda`/`divisions`/`id`; `after-jump`, `winged`; ending display attributes | S15 `DISCARDED`; repeat/ending kept | Da capo, dal segno, coda and fine navigation (MX-20/MX-21 playback) |
+| Middle barline after `backup`/`forward` | S06 `DISCARDED` | MX-09 cursor interpretation |
+| Measure-repeat sign | `MeasureRepeat` on each measure showing it, music retained, playback unchanged; orphan stop `UNMATCHED_SPAN` | None |
+| `multiple-rest`, `beat-repeat`, `slash`; measure style for staff ≠ 1 | S24 / S08 `DISCARDED` | MX-21, MX-09 |
+
+F16 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-16 instrument and pitch interpretation decisions and remaining gaps
 
 The importer now reads [instruments, transposition and unpitched percussion](instrument-import.md)
@@ -253,7 +277,7 @@ MX-07's S07 discard of key, clef, staves and staff details.
 | `staves` > 1, `part-symbol`, key/time/clef/staff details scoped to staff ≠ 1 | S08 `DISCARDED` (time scope moved from S07 to S08) | MX-09 multi-staff |
 | Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | S07 `DISCARDED`; non-traditional key dropped, otherwise key/clef kept (unknown mode null) | Non-traditional key model |
 | `staff-tuning`/`capo`; other staff details | S23 / S17 `DISCARDED`; staff-line count kept | MX-13/MX-18/MX-21 |
-| `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` (`transpose` superseded by MX-16 below) | MX-17, MX-13 |
+| `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` (`transpose` superseded by MX-16 and `measure-repeat` by MX-17 above) | MX-17, MX-13 |
 | State change after uninterpreted backup/forward | S06 `DISCARDED` for each key/time/clef/staff-lines change | MX-09 |
 
 F07 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
@@ -295,7 +319,7 @@ part/measure structures. This supersedes earlier statements that no semantic imp
 | Credit images/symbols, text typography/language, encoding supports and unknown header content | S03 `UNSUPPORTED_FEATURE` / `DISCARDED`; plain supported text still retained; strict rejects, tolerant warns | Rich credit/layout and encoding capability semantics remain unimplemented |
 | Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations | Layout MX-18; source IDs/display text/multimetric measure semantics need explicit model mappings |
 | Part groups, part links, grouping, links/bookmarks | S25 discarded-content findings; actual grouping/link importer tests; no targets fetched | Group/editorial/link semantics and full F27 remain pending |
-| Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree (score-instrument and `midi-instrument` superseded by MX-16) | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
+| Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree (score-instrument and `midi-instrument` superseded by MX-16, barline by MX-17) | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
 | Foreign subtrees or namespaced attributes resemble supported names | Expanded-name lookup prevents aliasing; `foreign-extension` subtree or owner-group attribute finding | No namespace rewriting or extension semantics |
 | Work/identification/encoding source containers | Flattened ordered semantic text metadata; credits remain grouped; source sidecar retains original leaf locations | No source-container round-trip, empty-container preservation or formatting promise |
 | F02 and implementation-authored variants | 18 common semantic tests on JVM/Android host; iOS cross-compiles | Independent MX-04 fixtures/XSD validation and macOS runtime evidence still required |

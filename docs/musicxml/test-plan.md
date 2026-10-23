@@ -84,7 +84,7 @@ Each `F` fixture is a small hand-verifiable file unless noted. Create F01–F08 
 | F13 | Staccato, trill and dynamic on a note; annotations retained and scoped correctly. Implemented in `DirectionFixtures.kt` (MX-13). |
 | F14 | Tempo/metronome, text direction, wedge and offset; event order and span retained. Implemented in `DirectionFixtures.kt` (MX-13); a direction after backup is an inline discard test until MX-09 interprets backup. |
 | F15 | Two lyric verses, elision/syllabic text and melisma; ordered text and note association. |
-| F16 | Repeat start/end, two endings and a nonstandard barline; structural and playback fields distinct. |
+| F16 | Repeat start/end, two endings and a nonstandard barline; structural and playback fields distinct. Implemented in `BarlineFixtures.kt` (MX-17) with a pickup; nested, orphan and mismatched endings are inline variants in `BarlineImportTest`, and navigation rules are model tests in `PlaybackOrderTest`. |
 | F17 | Transposing instrument plus unpitched percussion; written and sounding fields must not be conflated. Model-only (MX-02) and XML with a mid-measure instrument change (MX-16, `InstrumentFixtures.kt`). |
 | F18 | Page/system/staff layout, print break and explicit positioning; retain supported hints. |
 | F19 | Grace before a duration-bearing note and cue note; grace does not advance main cursor. Implemented in `GraceFixtures.kt` (MX-15); grace chord and cue after backup are inline discard tests until MX-09. |

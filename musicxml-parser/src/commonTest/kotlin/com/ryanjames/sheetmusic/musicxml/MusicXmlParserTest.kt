@@ -225,7 +225,7 @@ class MusicXmlParserTest {
     fun testFatalTailDiscardsSkeletonAndProvenance() {
         failure(document() + "<tail/>", DiagnosticCode.MALFORMED_XML)
         failure(document().dropLast(4), DiagnosticCode.MALFORMED_XML)
-        val result = failure(document("<measure number='1'><barline/></measure>") + "<tail/>",
+        val result = failure(document("<measure number='1'><print/></measure>") + "<tail/>",
             DiagnosticCode.MALFORMED_XML, ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(listOf(DiagnosticCode.UNSUPPORTED_FEATURE, DiagnosticCode.MALFORMED_XML), result.diagnostics.map { it.code })
     }
@@ -241,7 +241,7 @@ class MusicXmlParserTest {
 
     @Test
     fun testDiagnosticBudgetStopsUnsupportedContent() {
-        val result = failure(document("<measure number='1'><barline/><barline/><barline/></measure>"), DiagnosticCode.DIAGNOSTIC_LIMIT,
+        val result = failure(document("<measure number='1'><print/><print/><print/></measure>"), DiagnosticCode.DIAGNOSTIC_LIMIT,
             ParseOptions(ParsePolicy.TOLERANT, ParseLimits(maxDiagnostics = 2)))
         assertEquals(listOf(DiagnosticCode.UNSUPPORTED_FEATURE, DiagnosticCode.DIAGNOSTIC_LIMIT), result.diagnostics.map { it.code })
     }
