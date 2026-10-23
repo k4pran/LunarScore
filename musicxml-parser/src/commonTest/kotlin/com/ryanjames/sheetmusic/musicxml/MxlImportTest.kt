@@ -175,6 +175,31 @@ class MxlImportTest {
     }
 
     @Test
+    fun testLaterMusicXmlRootfilesReportedAsDiscarded() {
+        val expected = success(buildZip(scoreEntries())).value
+        // 4.0 score-and-parts packaging: the score is imported, each later MusicXML part is S19 loss.
+        val container = containerXml(
+            "score.musicxml" to MUSICXML_TYPE,
+            "score.pdf" to "application/pdf",
+            "part1.musicxml" to MUSICXML_TYPE,
+            "part2.musicxml" to null,
+        )
+        val archive = buildZip(withContainer(container))
+        val tolerant = success(archive, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(expected, tolerant.value)
+        assertEquals(
+            listOf("/container[1]/rootfiles[1]/rootfile[3]", "/container[1]/rootfiles[1]/rootfile[4]"),
+            tolerant.diagnostics.map { it.location.path },
+        )
+        for (diagnostic in tolerant.diagnostics) {
+            assertEquals(DiagnosticCode.UNSUPPORTED_FEATURE to DiagnosticSeverity.WARNING, diagnostic.code to diagnostic.severity)
+            assertEquals(UnsupportedContent("S19", ContentRetention.DISCARDED), diagnostic.unsupported)
+            assertEquals("song.mxl!/META-INF/container.xml", diagnostic.location.sourceName)
+        }
+        failure(archive, DiagnosticCode.UNSUPPORTED_FEATURE)
+    }
+
+    @Test
     fun testMimetypeRules() {
         val mimetype = TestZipEntry("mimetype", "application/vnd.recordare.musicxml", deflate = false)
         val expected = success(buildZip(scoreEntries())).value

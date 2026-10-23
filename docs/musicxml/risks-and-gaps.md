@@ -135,7 +135,7 @@ See [mxl-import.md](mxl-import.md).
 | Directory understating an entry's size; CRC or DEFLATE corruption; trailing data | Fatal `ARCHIVE_READ_FAILED`; inflation stops one byte past the declared size | None |
 | Container missing, malformed or without a MusicXML first rootfile; wrong mimetype content | `INVALID_STRUCTURE` or the secure reader's XML codes, located at the container entry | None |
 | `mimetype` not first or compressed | `RECOVERED_VALUE`: strict failure, tolerant warning | None |
-| Later renditions (PDF, images, other MusicXML) | Paths validated; content not read | Rendition selection API |
+| Later renditions (PDF, images, other MusicXML) | Paths validated; content not read; later MusicXML rootfiles S19 `DISCARDED` (strict failure, tolerant warning) | Rendition selection API |
 | Archive larger than memory | `ARCHIVE_LIMIT` at 16 MiB by default | Streaming or file-backed input |
 
 F20 was generated with .NET `ZipArchive`; other archives come from a test-only writer. iOS runtime
@@ -164,11 +164,11 @@ outcome was structured: no exception escaped and no failure lacked an error.
 MX-20 checks every entry in the [4.0 version history](https://www.w3.org/2021/06/musicxml40/version-history/40/).
 The item-by-item outcomes are in [version-40-changes.md](version-40-changes.md). All score-document
 additions were already reported by their domain owners; MX-20 pins each of them with F21
-(`VersionFourFixtures.kt`). Packaged part documents need the `.mxl` adapter (MX-19).
+(`VersionFourFixtures.kt`). Packaged part documents are reported by the `.mxl` adapter (MX-19).
 
 | Case | Implemented structured outcome / evidence | Remaining work |
 |---|---|---|
-| Later MusicXML rootfile in a `.mxl` (4.0 score-and-parts packaging) | Not imported: `.mxl` input waits for MX-19 | Report later MusicXML rootfiles as S19 `DISCARDED` once the adapter exists; reading linked parts; `part-link` resolution |
+| Later MusicXML rootfile in a `.mxl` (4.0 score-and-parts packaging) | S19 `DISCARDED` at each later container `rootfile` (MX-19, `MxlImportTest`); the first rootfile is imported | Reading linked parts; `part-link` resolution |
 | `listening`, `listen`, `assess`, `wait`, `sync`, `other-listen(ing)`, `player`, swing, `play/ipa` | S26 `DISCARDED` at the subtree (F21) | Listening/player/swing playback model |
 | `numeral*`, `bass-separator`, `arrangement`, `inversion/@text`, `function`, figured-bass alignment and placement | S22 `DISCARDED` with `harmony`/`figured-bass` (F21) | Harmony model (F24) |
 | `for-part`, `part-clef`, `part-transpose`, `double/@above`, `instrument-sound` IDs, several note instruments | S16 `DISCARDED`; the first instrument is kept (F21) | Part-generation and shared-note model |

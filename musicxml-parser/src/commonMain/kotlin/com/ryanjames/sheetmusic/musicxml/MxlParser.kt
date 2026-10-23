@@ -28,8 +28,9 @@ public data class ArchiveLimits(
  * `application/vnd.recordare.musicxml`; when it is not the physically first, uncompressed entry (by
  * local-header offset, not central-directory order) this is a
  * `RECOVERED_VALUE`. `META-INF/container.xml` is read with the same secure XML reader, and its first
- * `rootfile` must be MusicXML; later rootfiles (other renditions) are validated but not read. The
- * selected entry is passed to [parseMusicXml] unchanged, so the score equals that of the
+ * `rootfile` must be MusicXML; later rootfiles (other renditions) are validated but not read, and a
+ * later MusicXML rootfile, such as a 4.0 part packaged with its score, is reported as S19
+ * `UNSUPPORTED_FEATURE` content that was discarded. The selected entry is passed to [parseMusicXml] unchanged, so the score equals that of the
  * uncompressed file. Archive locations use `sourceName!/entry`, or the entry name alone.
  */
 public fun parseMxl(
@@ -81,14 +82,14 @@ public fun parseMxl(
             setOf(ScoreXmlRoot.CONTAINER),
             ::readRootfiles,
         )
-        val rootfilePath = when (containerResult) {
+        val (rootfilePath, leadingWarnings) = when (containerResult) {
             is ParseResult.Failure -> return containerResult.withLeadingDiagnostics(archiveWarnings)
-            is ParseResult.Success -> containerResult.value.first()
+            is ParseResult.Success -> containerResult.value.first() to archiveWarnings + containerResult.diagnostics
         }
         val rootfile = archive.entry(rootfilePath)?.takeUnless { it.isDirectory }
             ?: return fail(DiagnosticCode.INVALID_STRUCTURE, CONTAINER_PATH, "Rootfile entry is missing: $rootfilePath")
         val score = archive.read(rootfile, options.limits.maxInputBytes)
-        return parseMusicXml(score, options, label(rootfilePath), isCancelled).withLeadingDiagnostics(archiveWarnings)
+        return parseMusicXml(score, options, label(rootfilePath), isCancelled).withLeadingDiagnostics(leadingWarnings)
     } catch (exception: ArchiveException) {
         return fail(exception.code, exception.entryName, exception.message)
     }
@@ -141,6 +142,13 @@ private fun readRootfile(reader: ScoreXmlReader, event: ScoreXmlEvent, rootfiles
         rootfiles.isEmpty() && mediaType != MUSICXML_MEDIA_TYPE ->
             DiagnosticCode.INVALID_STRUCTURE to "First rootfile must be $MUSICXML_MEDIA_TYPE"
         else -> {
+            if (rootfiles.isNotEmpty() && mediaType == MUSICXML_MEDIA_TYPE) {
+                reader.context.unsupported(
+                    UnsupportedContent("S19", ContentRetention.DISCARDED),
+                    event.location,
+                    "Later MusicXML rootfile is not imported: $fullPath",
+                )
+            }
             rootfiles += fullPath
             return
         }

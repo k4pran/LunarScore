@@ -24,9 +24,9 @@ coverage group shown at the path given.
 
 | Change | Outcome | Evidence |
 |---|---|---|
-| Score and its parts in one `.mxl` | Not yet imported: `.mxl` input waits for the bounded adapter (MX-19). Once it exists, a later MusicXML rootfile (a linked part or score) must be reported as S19 discarded rather than skipped. | Pending MX-19 |
+| Score and its parts in one `.mxl` | `parseMxl` (MX-19) imports the first rootfile; each later MusicXML rootfile (a linked part or score) is reported as S19 `DISCARDED` at its container `rootfile` element rather than skipped. | `MxlImportTest` |
 | XML catalog for local validation | Not applicable. The importer does not validate against the XSD and never fetches external resources. | — |
-| XSD versions of the container and sounds schemas | The container is not read until MX-19. A sounds document is rejected with a fatal `UNSUPPORTED_ROOT` (S27). | `ScoreXmlReaderTest` |
+| XSD versions of the container and sounds schemas | The container is read by `parseMxl` (MX-19) with the secure reader, without schema validation. A sounds document is rejected with a fatal `UNSUPPORTED_ROOT` (S27). | `ScoreXmlReaderTest` |
 
 ## New elements
 
