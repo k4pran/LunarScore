@@ -63,6 +63,6 @@ These counts were taken before MX-09 and MX-14 imported voices, chords, staves a
 ## Not covered
 
 - No XSD validation. Fixtures are implementation-authored and not schema-validated.
-- F05, F06 and F08 are covered by `PolyphonyImportTest` (MX-09) and F15 by `LyricImportTest` (MX-14); F20 waits for `.mxl` (MX-19); F22/F23 are covered inline and by the mutants above, not as files.
+- F05, F06 and F08 are covered by `PolyphonyImportTest` (MX-09) and F15 by `LyricImportTest` (MX-14); F20 by `MxlImportTest` (MX-19); F22/F23 are covered inline and by the mutants above, not as files.
 - No legal exporter corpus beyond the two public suites: real-world exporter files are only used when redistribution rights are known.
 - Mutations are lexical, not schema-aware, and do not prove that every invalid input is rejected; they prove that every outcome is structured.

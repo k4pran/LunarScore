@@ -40,11 +40,12 @@ expanded; other renditions are checked from metadata only.
 | First `rootfile` `media-type` other than `application/vnd.recordare.musicxml+xml` (omitted means MusicXML) | `INVALID_STRUCTURE` |
 | Unsafe or duplicate (case-insensitive) `full-path` in any rootfile | `UNSAFE_ARCHIVE` at the rootfile element |
 | First rootfile entry missing or a directory | `INVALID_STRUCTURE` |
+| Later rootfile with the MusicXML media type (or none), such as a 4.0 part packaged with its score | `UNSUPPORTED_FEATURE` S19 `DISCARDED` at the `rootfile`: strict failure, tolerant warning before the score's diagnostics; the entry is not read |
 | `mimetype` present with content other than `application/vnd.recordare.musicxml` | `INVALID_STRUCTURE` |
 | `mimetype` correct but not the first entry, or compressed | `RECOVERED_VALUE`: strict failure, tolerant warning before the score's diagnostics |
 | No `mimetype` | Accepted; it is optional |
 
-Archive warnings share `ParseLimits.maxDiagnostics` with the score; overflow returns a failure ending
+Archive and container warnings share `ParseLimits.maxDiagnostics` with the score; overflow returns a failure ending
 in `DIAGNOSTIC_LIMIT`. Locations name the archive entry as `sourceName!/entry`, or the entry alone
 when no `sourceName` is given. Cancellation is checked before reading, between directory records
 and throughout the XML reads.
