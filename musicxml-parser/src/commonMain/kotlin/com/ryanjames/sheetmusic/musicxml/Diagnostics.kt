@@ -56,6 +56,12 @@ public enum class DiagnosticCode {
     ARCHIVE_READ_FAILED,
     /** An archive entry exceeded its allowed expansion budget. */
     ARCHIVE_ENTRY_LIMIT,
+    /** Archive size, entry count, total expansion or compression ratio budget exceeded. */
+    ARCHIVE_LIMIT,
+    /** An archive entry name is unsafe or ambiguous, or archive records overlap or disagree. */
+    UNSAFE_ARCHIVE,
+    /** Encryption, ZIP64, multi-disk archives or a compression method other than STORE/DEFLATE. */
+    UNSUPPORTED_ARCHIVE,
 }
 
 /** Errors prohibit a score; warnings accompany an explicitly tolerated result. */
