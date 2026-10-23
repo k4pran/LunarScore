@@ -132,8 +132,8 @@ outcome was structured: no exception escaped and no failure lacked an error.
 | Undeclared part in the part list (LilyPond 41h) | Fatal `INVALID_STRUCTURE` under both policies, deliberately | Optional tolerant recovery is not planned |
 | Repeated `accidental` on a note (MusicXML 4.1 drafts, W3C `accidentals.musicxml`) | Fatal `INVALID_STRUCTURE`, correct for 4.0 | Revisit once 4.1 is published |
 | Non-score XML with a DOCTYPE (`catalog.xml`) | Fatal `UNSAFE_XML` | None |
-| Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary); counts predate MX-09, which now imports voices, chords and staves, and have not been re-run | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
-| F15 fixture | Planned; lyrics are reported as S14 by mutants and mixed pairs. F05, F06 and F08 are implemented by MX-09 | Lyric import |
+| Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary); counts predate MX-09 and MX-14, which now import voices, chords, staves and lyrics, and have not been re-run | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
+| F05, F06, F08, F15 fixtures | Implemented by MX-09 (`PolyphonyFixtures.kt`) and MX-14 (`LyricFixtures.kt`) | None |
 | XSD validation, real exporter corpus, iOS runtime | Not run: fixtures are not schema-validated, only public test suites were used, iOS is compile-only on Windows | Run with an XSD validator, a rights-cleared exporter corpus and on macOS |
 
 ## MX-20 MusicXML 4.0 change-list decisions and remaining gaps
@@ -247,6 +247,25 @@ principal notes. This supersedes the MX-07 S18 discard of grace notes.
 | Grace chord tones | Each tone is a `GRACE` note sharing its grace reference's chord ID and principal (MX-09) | None |
 | Cue or grace notes after `backup`/`forward` | At the cursor after the move (MX-09) | None |
 | Invalid `slash` or steal-time; duplicate `grace` | Fatal `INVALID_VALUE`; fatal `INVALID_STRUCTURE` | None |
+## MX-14 lyric decisions and remaining gaps
+
+The importer now keeps [lyrics](lyric-import.md) on their notes. This supersedes the MX-07 S14
+discard of a note's `lyric` child.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Missing verse `number` | `Lyric.verse` is null; not merged into verse 1 (F15) | Consumers decide how to group unnumbered lines |
+| Melisma (`extend`) | Kept per note as `LyricExtend(type)`, including extend-only continuations (F15) | Resolve melisma lines into spans and check start/stop pairing |
+| Consecutive `text` runs | Joined into one syllable; their typography is S14 `DISCARDED` | Rich text runs if formatting is modeled (MX-18) |
+| `laughing`, `humming`; `lyric` with `time-only` | S14 `DISCARDED`; the lyric is dropped | Model non-text lyrics and repeat-pass lyrics |
+| `end-line`, `end-paragraph`; display/typography attributes (`justify`, positions, fonts, `color`, `xml:lang`, `print-object`, `id`) | S14 `DISCARDED`; the lyric is kept | Karaoke line breaks and layout hints (MX-18) |
+| `footnote`, `level` in a lyric | S25 `DISCARDED` | Editorial model |
+| Syllabic consistency across notes (for example `begin` without `end`) | Not checked | Semantic lyric validation |
+| Lyrics on grace and unpitched notes | Kept on the note (MX-21 grace + lyric mixed pair) | None |
+| Lyrics on chord tones, other staves and notes after backup/forward | Kept on their notes (MX-09) | None |
+| Verse number of only a no-break space | Fatal `INVALID_VALUE`; found by the MX-21 audit mutants after rebasing | None |
+| Unknown syllabic, extend type or placement; blank number | Fatal `INVALID_VALUE` | None |
+| Empty lyric; misplaced or dangling `elision`/`syllabic`; content after `extend` or trailing elements; `laughing`/`humming` mixed with text | Fatal `INVALID_STRUCTURE` | None |
 
 ## MX-13 direction and note expression decisions and remaining gaps
 
@@ -382,7 +401,7 @@ obligation is met for durations and divisions.
 | Chord and grace notes | Superseded: chords by MX-09, grace notes by MX-15 (above) | None |
 | Unpitched notes; staff other than 1 | Superseded: unpitched notes by MX-16, staves by MX-09 (above) | None |
 | Backup/forward | Superseded by MX-09 (above): measure-local cursor; `INVALID_CURSOR_MOVE` before zero | Measure fullness checks |
-| Ties, tuplet time-modification, stems/beams (superseded by MX-11/MX-12 above), notations, lyrics, noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
+| Ties, tuplet time-modification, stems/beams (superseded by MX-11/MX-12 above), notations, lyrics (superseded by MX-14 above), noteheads, rest display position, instruments, editorial, play/listen, note print/playback attributes | Feature-specific child/attribute `DISCARDED` findings (S09/S11/S10/S12/S14/S17/S16/S25/S26/S04); the note and its exact duration are kept | Owning feature tasks |
 | Key, clef, staves and other attributes children; complex or annotated time | S07 `DISCARDED`; a simple time keeps its signature even if its attributes are discarded | Key/clef/staves/staff details superseded by MX-08 above; complex time remains |
 | Voice labels without backup | Labels retained; voices share the cursor unless backup/forward move it (MX-09) | None |
 | Measure fullness versus time signature | Not checked; extent is the observed end of timed content | `INCONSISTENT_MEASURE_DURATION` policy remains later work |

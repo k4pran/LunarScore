@@ -181,6 +181,29 @@ class ScoreProjectionTest {
         assertFailsWith<IllegalArgumentException> { DirectionMark.Metronome(NoteValue.QUARTER, "60", beatUnitDots = -1) }
     }
 
+    @Test
+    fun testLyricsJoinElidedSyllablesAndAllowMelismaContinuations() {
+        val elided = Lyric(
+            listOf(
+                LyricSyllable("che", Syllabic.SINGLE),
+                LyricSyllable("a", Syllabic.SINGLE, elision = "‿"),
+            ),
+            verse = "1",
+        )
+        assertEquals("che‿a", elided.text)
+        val continuation = Lyric(emptyList(), verse = "1", extend = LyricExtend(ExtendType.CONTINUE))
+        assertEquals("", continuation.text)
+        val score = score(Measure("m1", "1", Rational.of(2), listOf(
+            note("n1", 0, notation = NotatedValue(NoteValue.QUARTER, lyrics = listOf(elided))),
+            note("n2", 1, notation = NotatedValue(NoteValue.QUARTER, lyrics = listOf(continuation))),
+        )))
+        assertTrue(score.validate().isEmpty())
+        assertFailsWith<IllegalArgumentException> { Lyric(emptyList()) }
+        assertFailsWith<IllegalArgumentException> { Lyric(listOf(LyricSyllable("a")), verse = " ") }
+        assertFailsWith<IllegalArgumentException> { Lyric(listOf(LyricSyllable("a", elision = "_"))) }
+        assertFailsWith<IllegalArgumentException> { Lyric(listOf(LyricSyllable("a"), LyricSyllable("b"))) }
+    }
+
     private fun score(vararg measures: Measure): Score = Score(listOf(Part("P1", listOf(Staff(1)), measures.toList())))
 
     private fun note(

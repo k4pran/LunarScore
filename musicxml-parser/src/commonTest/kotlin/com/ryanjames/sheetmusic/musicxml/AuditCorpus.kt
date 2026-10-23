@@ -21,6 +21,7 @@ internal val auditFixtures: List<Pair<String, String>> = listOf(
     "F12-partwise" to f12PartwiseScore,
     "F13" to f13NoteExpressions,
     "F14" to f14Directions,
+    "F15" to f15Lyrics,
     "F16" to f16RepeatsAndEndings,
     "F17" to f17InstrumentsAndTransposition,
     "F18" to f18LayoutHints,

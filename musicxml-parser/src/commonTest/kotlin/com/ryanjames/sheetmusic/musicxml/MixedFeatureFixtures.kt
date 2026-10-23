@@ -63,7 +63,7 @@ internal val mixedTiedChordAcrossStaves: String = """
 
 /**
  * A grace note and its principal, each with a lyric. The grace links to D5 at 0, which lasts 1;
- * lyrics are not implemented (S14).
+ * each note keeps its own lyric (MX-14).
  */
 internal val mixedGraceAndLyric: String = """
     <score-partwise version="4.0">
