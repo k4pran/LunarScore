@@ -416,11 +416,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     unsupportedTree(event, "S06", "Note after an uninterpreted cursor move is discarded")
                 } else {
                     val note = note(event, cursor, eventId()) ?: return@children
-                    note.event?.let {
-                        add(it, event)
-                        registerSpans(it, note.marks, number)
-                    }
+                    note.event?.let { add(it, event) }
+                    // A grace relationship starts at its enclosing note, so it is ordered before the note's nested spans.
                     graces.add(note, SpanPosition(number, cursor), event.location)
+                    note.event?.let { registerSpans(it, note.marks, number) }
                     cursor = note.end
                     if (cursor > extent) extent = cursor
                 }
@@ -657,7 +656,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         attributes(start, feature = "S04")
         val seen = mutableSetOf<String>()
         var content: NoteContent? = null
-        var duration: Rational? = null
+        var durationText = ""
         var durationEvent: ScoreXmlEvent? = null
         var role = NoteRole.NORMAL
         var grace: Grace? = null
@@ -706,7 +705,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 }
                 "duration" -> if (once(seen, name, event)) {
                     durationEvent = event
-                    duration = positiveDecimal(event, "S05", "Duration")
+                    // Validated only once the note is known not to be a grace note.
+                    durationText = text(event, feature = "S05")
                 }
                 "voice" -> if (once(seen, name, event)) {
                     val text = text(event, feature = "S06").trim { it in WHITESPACE }
@@ -768,7 +768,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             invalid(durationSource, "A duration requires preceding divisions")
             return null
         }
-        val sourceDuration = duration ?: return null
+        val sourceDuration = positiveDecimal(durationText, durationSource.location, "Duration") ?: return null
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
         if (discarded) return TimedNote(null, end, emptyList(), principalVoice = voice)
@@ -1379,9 +1379,15 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     private fun positiveDecimal(start: ScoreXmlEvent, feature: String, label: String): Rational? {
-        val value = decimal(start, feature, label) ?: return null
+        val text = text(start, feature = feature)
+        if (!context.canContinue) return null
+        return positiveDecimal(text, start.location, label)
+    }
+
+    private fun positiveDecimal(text: String, location: SourceLocation, label: String): Rational? {
+        val value = decimal(text, location, label) ?: return null
         if (value <= Rational.ZERO) {
-            context.report(DiagnosticCode.INVALID_VALUE, start.location, "$label must be positive")
+            context.report(DiagnosticCode.INVALID_VALUE, location, "$label must be positive")
             return null
         }
         return value
@@ -1390,11 +1396,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     private fun decimal(start: ScoreXmlEvent, feature: String, label: String, allowed: Set<String> = emptySet()): Rational? {
         val text = text(start, allowed, feature)
         if (!context.canContinue) return null
-        return exact(start.location) {
-            parseDecimal(text) ?: run {
-                context.report(DiagnosticCode.INVALID_VALUE, start.location, "$label must be a decimal number")
-                null
-            }
+        return decimal(text, start.location, label)
+    }
+
+    private fun decimal(text: String, location: SourceLocation, label: String): Rational? = exact(location) {
+        parseDecimal(text) ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, location, "$label must be a decimal number")
+            null
         }
     }
 
