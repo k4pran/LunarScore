@@ -59,7 +59,7 @@ and [schema](https://www.w3.org/2021/06/musicxml40/listings/musicxml.xsd/).
 DTD/entity declarations fail **before reader construction**: network DTDs, file entities, parameter
 entities and internal expansion attempts yield `UNSAFE_XML`. The preflight is conservative: literal
 `<!DOCTYPE`/`<!ENTITY` inside comments/CDATA is also rejected. All DOCTYPE forms, including benign
-MusicXML DTD headers, are currently unsupported. Unknown references yield `MALFORMED_XML`;
+MusicXML DTD headers, are currently unsupported (MX-21 later blanks the exact standard header before the reader; see [xml-reader.md](xml-reader.md)). Unknown references yield `MALFORMED_XML`;
 predefined escapes and numeric character references work. No resolver, file lookup or network
 access is supplied. `expandEntities = false` alone is insufficient: attribute references still
 expand and the [generic reader](https://github.com/pdvrieze/xmlutil/blob/6c42903bcb981d0e2047be757ffdcde6778ac756/core/base/src/commonMain/kotlin/nl/adaptivity/xmlutil/core/KtXmlReader.kt)

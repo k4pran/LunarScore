@@ -292,11 +292,13 @@ class DirectionImportTest {
                 direction("<metronome><beat-unit>quarter</beat-unit></metronome>"),
                 direction("<words>x</words>", "<offset>1</offset><offset>2</offset>"),
             ).forEach { failure(document(it), DiagnosticCode.INVALID_STRUCTURE, options) }
-            failure(
-                document("").replace("<attributes><divisions>1</divisions></attributes>", direction("<words>x</words>", "<offset>1</offset>")),
-                DiagnosticCode.INVALID_STRUCTURE,
-                options,
-            )
+            // An offset with no divisions assumes 1, a repair that only tolerant parsing accepts.
+            val noDivisions = document("").replace("<attributes><divisions>1</divisions></attributes>", direction("<words>x</words>", "<offset>1</offset>"))
+            if (policy == ParsePolicy.STRICT) {
+                failure(noDivisions, DiagnosticCode.RECOVERED_VALUE, options)
+            } else {
+                assertEquals(listOf(DiagnosticCode.RECOVERED_VALUE), success(noDivisions, options).diagnostics.map { it.code })
+            }
         }
     }
 

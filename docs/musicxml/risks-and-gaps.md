@@ -100,7 +100,7 @@ MX-01's provisional reader-policy entries above; the original probes remain unch
 
 | Case | Implemented structured outcome / evidence | Remaining work |
 |---|---|---|
-| All DTD/entity declarations, including benign MusicXML DTD headers | Fatal `UNSAFE_XML` before reader construction; external network/file, parameter and expansion fixtures under both policies | Supporting selected headers without resolution is deliberately deferred |
+| All DTD/entity declarations, including benign MusicXML DTD headers | Fatal `UNSAFE_XML` before reader construction; external network/file, parameter and expansion fixtures under both policies | Superseded by MX-21 for the exact standard header only |
 | Declaration tokens inside comments/CDATA/PIs | Conservative fatal `UNSAFE_XML`; comment/CDATA regressions | Lexically relaxing this compatibility restriction is deferred |
 | Non-UTF-8, invalid UTF-8, NUL-bearing source | Fatal `UNSUPPORTED_ENCODING`; optional UTF-8 BOM accepted | Broader encoding support / bounded stream acquisition deferred |
 | XML version other than 1.0 | New fatal `UNSUPPORTED_XML_VERSION`, tested in both policies | XML 1.1 deliberately unsupported |
@@ -117,6 +117,24 @@ MX-01's provisional reader-policy entries above; the original probes remain unch
 JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md](xml-reader.md).
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
+
+## MX-21 compliance audit decisions and remaining gaps
+
+The [compliance audit](compliance-audit.md) runs every executable fixture, the mixed-feature pairs
+and deterministic adversarial mutants under both policies, and an opt-in public-corpus run. Every
+outcome was structured: no exception escaped and no failure lacked an error.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Standard Recordare DOCTYPE header written by exporters | Blanked before the reader and never resolved; other DOCTYPEs stay `UNSAFE_XML` (`ScoreXmlReaderTest`; whole LilyPond suite) | None |
+| Missing `divisions` before a duration or direction offset | `RECOVERED_VALUE` once per part, divisions 1; tolerant warning, strict failure (`NoteImportTest`, `DirectionImportTest`; LilyPond 03e, 51a–d) | None |
+| Voice or part ID made only of, or containing, a no-break space | `INVALID_VALUE` at the voice / `INVALID_STRUCTURE` at `@id`; previously the model threw (`ComplianceAuditTest`) | None |
+| Undeclared part in the part list (LilyPond 41h) | Fatal `INVALID_STRUCTURE` under both policies, deliberately | Optional tolerant recovery is not planned |
+| Repeated `accidental` on a note (MusicXML 4.1 drafts, W3C `accidentals.musicxml`) | Fatal `INVALID_STRUCTURE`, correct for 4.0 | Revisit once 4.1 is published |
+| Non-score XML with a DOCTYPE (`catalog.xml`) | Fatal `UNSAFE_XML` | None |
+| Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary) | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
+| F05, F06, F08, F15 fixtures | Planned; the features are reported as S06/S08/S14 by mutants and mixed pairs | Multi-voice, chord, multi-staff and lyric import |
+| XSD validation, real exporter corpus, iOS runtime | Not run: fixtures are not schema-validated, only public test suites were used, iOS is compile-only on Windows | Run with an XSD validator, a rights-cleared exporter corpus and on macOS |
 
 ## MX-20 MusicXML 4.0 change-list decisions and remaining gaps
 
@@ -139,7 +157,7 @@ additions were already reported by their domain owners; MX-20 pins each of them 
 | `level/@type`, `part-link` | S25 `DISCARDED`; links are not fetched (F21) | Editorial and link model (F27) |
 | `multiple-rest` (empty form removed in 4.0) | S24 `DISCARDED` whatever its content (F21) | Multiple-rest model (F26) |
 | `concert-score`, `instrument-change`, `part name` credit-type, number-level 16, deprecated `none` clef | Supported; asserted in F21 and the MX-16/MX-11/MX-12 tests | None |
-| DTD versions deprecated | Any DOCTYPE is fatal `UNSAFE_XML` (MX-05 security policy) | None |
+| DTD versions deprecated | The standard header is ignored unresolved (MX-21); any other DOCTYPE is fatal `UNSAFE_XML` | None |
 
 F21 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
 

@@ -59,7 +59,8 @@ consumer exceptions propagate unchanged rather than becoming XML diagnostics.
 | Input exceeds `maxInputBytes` | Fatal `INPUT_LIMIT` before decoding/reader creation; equality is allowed |
 | Non-UTF-8 declaration, malformed UTF-8, UTF-16/32 bytes, NUL-bearing input | Fatal `UNSUPPORTED_ENCODING`; UTF-8 with optional BOM is accepted |
 | XML version other than 1.0 | Fatal `UNSUPPORTED_XML_VERSION`; 1.1 is deliberately unsupported |
-| Any DOCTYPE or ENTITY declaration | Fatal `UNSAFE_XML` before reader creation, including benign MusicXML DTD headers; no resolver or untrusted entity table |
+| Standard MusicXML DTD header (MX-21) | The exact Recordare `PUBLIC` partwise/timewise header for any version, first in the document after an optional XML declaration and without an internal subset, is blanked (line breaks kept) before reader creation and never resolved; see [compliance audit](compliance-audit.md) |
+| Any other DOCTYPE or ENTITY declaration | Fatal `UNSAFE_XML` before reader creation, including internal subsets, `SYSTEM` or other hosts, mismatched flavours and a second header; no resolver or untrusted entity table, so entity references still fail as `MALFORMED_XML` |
 | Literal `<!DOCTYPE` or `<!ENTITY` in comments, CDATA or processing instructions | Conservative fatal `UNSAFE_XML`; this policy remains intentional |
 | Predefined escapes and valid numeric references | Decoded in text/attributes; references in comments/CDATA/PIs remain literal |
 | Invalid XML 1.0 scalars or numeric-reference overflow | Fatal `MALFORMED_XML` before passing them to the dependency |

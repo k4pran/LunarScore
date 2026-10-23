@@ -18,9 +18,10 @@ val events = score.parts.single().measures.single().events // AttributeEvent, No
 - A note's `duration` is also an exact positive decimal. Performed duration in quarter notes is
   `duration / divisions`; onset is the measure-local cursor, which then advances by that duration.
   The cursor restarts at zero in each measure. `Measure.extent` is the furthest observed end.
-- Zero, negative or malformed durations/divisions produce fatal `INVALID_VALUE`. A duration with no
-  preceding divisions, a missing duration, a missing pitch/rest, or a duplicate pitch/rest/duration
-  produces fatal `INVALID_STRUCTURE`. No default divisions or duration is ever inferred.
+- Zero, negative or malformed durations/divisions produce fatal `INVALID_VALUE`. A missing duration,
+  a missing pitch/rest, or a duplicate pitch/rest/duration produces fatal `INVALID_STRUCTURE`. A
+  duration with no preceding divisions assumes the agreed default of 1 once per part with
+  `RECOVERED_VALUE` (MX-21): a warning when tolerant, a failure when strict. No duration is inferred.
 - Exact values whose reduced components exceed `Int` (long integers, more than nine significant
   fraction digits, or an overflowing quotient/cursor sum) produce fatal `NUMERIC_OVERFLOW` at the
   duration/divisions location. Nothing is rounded.

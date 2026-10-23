@@ -1311,7 +1311,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 }
                 "voice" -> if (once(seen, name, event)) {
                     val text = text(event, feature = "S06").trim { it in WHITESPACE }
-                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Voice must be nonblank")
+                    if (text.isBlank()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Voice must be nonblank")
                     else voice = text
                 }
                 "type" -> if (once(seen, name, event)) {
@@ -1370,10 +1370,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             invalid(start, "A non-grace note requires a duration")
             return null
         }
-        val currentDivisions = body.divisions ?: run {
-            invalid(durationSource, "A duration requires preceding divisions")
-            return null
-        }
+        val currentDivisions = divisionsOrDefault(body, durationSource)
         val sourceDuration = positiveDecimal(durationText, durationSource.location, "Duration") ?: return null
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
@@ -1678,7 +1675,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 }
                 "voice" -> if (once(seen, name, event)) {
                     val text = text(event, feature = "S13").trim { it in WHITESPACE }
-                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Voice must be nonblank")
+                    if (text.isBlank()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Voice must be nonblank")
                     else voice = text
                 }
                 "staff" -> if (once(seen, name, event)) {
@@ -1704,10 +1701,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         val quarters = offsetSource?.let { source ->
             val value = offset ?: return null
-            val divisions = body.divisions ?: run {
-                invalid(source, "An offset requires preceding divisions")
-                return null
-            }
+            val divisions = divisionsOrDefault(body, source)
             exact(source.location) { value / divisions } ?: return null
         } ?: Rational.ZERO
         if (discarded) return TimedDirection(null, emptyList(), onset)
@@ -2198,7 +2192,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     private fun requiredId(event: ScoreXmlEvent, label: String = "part"): String? {
         val id = event.attribute("id")?.trim { it in " \t\r\n" }
-        if (id.isNullOrEmpty() || id.any { it in " \t\r\n" }) {
+        // Model IDs reject any Unicode blank, such as a no-break space, not only XML whitespace.
+        if (id.isNullOrEmpty() || id.any { it.isWhitespace() }) {
             invalid(event.attributeLocation("id"), "A nonblank $label ID without whitespace is required")
             return null
         }
@@ -2213,6 +2208,15 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     private fun provenance(path: String, event: ScoreXmlEvent, partId: String? = event.location.partId) {
         context.addProvenance(SourceProvenance(path, event.location.copy(partId = partId).withDeclaredPart()))
+    }
+
+    /**
+     * The part's divisions. Exporters sometimes omit `divisions`; the generally agreed default of 1
+     * is then assumed once per part with `RECOVERED_VALUE`, which fails strict parsing.
+     */
+    private fun divisionsOrDefault(body: PartBody, source: ScoreXmlEvent): Rational = body.divisions ?: Rational.ONE.also {
+        context.report(DiagnosticCode.RECOVERED_VALUE, source.location.withDeclaredPart(), "No preceding divisions; assumed 1")
+        body.divisions = it
     }
 
     private fun invalid(event: ScoreXmlEvent, message: String) = invalid(event.location, message)
