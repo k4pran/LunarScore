@@ -26,6 +26,8 @@ public enum class DiagnosticCode {
     INVALID_CURSOR_MOVE,
     /** Observed measure timing conflicts with the declared musical structure. */
     INCONSISTENT_MEASURE_DURATION,
+    /** A chord tone lasts longer than the reference note that advances the cursor. */
+    INCONSISTENT_CHORD_DURATION,
     /** Meaningful content could not be mapped fully; carries [UnsupportedContent]. */
     UNSUPPORTED_FEATURE,
     /** A recoverable source defect was repaired; the message describes the change. */
@@ -46,6 +48,8 @@ public enum class DiagnosticCode {
     RETENTION_LIMIT,
     /** Model-to-source mapping budget exceeded. */
     PROVENANCE_LIMIT,
+    /** Declared staff budget exceeded. */
+    STAFF_LIMIT,
     /** The caller cancelled parsing. */
     CANCELLED,
     /** An archive could not be read safely. */

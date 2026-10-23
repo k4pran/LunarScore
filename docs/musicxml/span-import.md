@@ -24,9 +24,8 @@ partwise and timewise input. Each kind is paired on its own:
 - On each note, stops are applied before starts, so one note can end a tie or slur and begin the
   next.
 - A stop with no open start waits for a later start whose position (measure index, then onset) is
-  musically earlier. Voices can put a stop before its start in document order. With backup/forward
-  still uninterpreted (MX-09), this case only arises once cursor moves are supported; resolver unit
-  tests cover it already.
+  musically earlier. Voices can put a stop before its start in document order after a backup
+  ([MX-09](polyphony.md)); resolver unit tests cover it.
 - IDs are part-scoped and numbered per kind in the order the first endpoint was read, for example
   `P1:slur-2` or `P1:sound-tie-1`. Relationships are listed in part-list order.
 - Provenance maps `relationships[i].startEventId` and `relationships[i].endEventId` to the source

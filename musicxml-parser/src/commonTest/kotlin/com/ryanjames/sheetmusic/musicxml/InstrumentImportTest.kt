@@ -161,7 +161,7 @@ class InstrumentImportTest {
     fun testUnsupportedInstrumentContentIsReported() {
         val xml = document(
             "<attributes><instruments>2</instruments>" +
-                "<transpose><chromatic>-2</chromatic><double/></transpose><transpose number='2'><chromatic>-2</chromatic></transpose></attributes>" +
+                "<transpose><chromatic>-2</chromatic><double/></transpose></attributes>" +
                 "<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><instrument id='I1'/><instrument id='I2'/></note>" +
                 "<note><rest/><duration>1</duration><instrument id='I1'/></note>" +
                 "<direction><direction-type><words>Solo</words></direction-type>" +
@@ -172,12 +172,12 @@ class InstrumentImportTest {
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(
-            listOf("S16", "S26", "S26", "S16", "S16", "S08", "S16", "S16", "S26", "S26"),
+            listOf("S16", "S26", "S26", "S16", "S16", "S16", "S16", "S26", "S26"),
             result.diagnostics.map { it.unsupported?.featureId },
         )
         assertTrue(result.diagnostics.all { it.unsupported?.retention == ContentRetention.DISCARDED })
         val events = result.value.parts.single().measures.single().events
-        // The doubled transpose is kept; the staff-2 transpose is not.
+        // The doubled transpose is kept.
         assertEquals(
             listOf(Attribute.Transpose(Transposition(Rational.of(-2))), Attribute.InstrumentChange("I2")),
             events.filterIsInstance<AttributeEvent>().map { it.attribute },
@@ -213,6 +213,24 @@ class InstrumentImportTest {
             document("<note><unpitched><display-step>H</display-step><display-octave>4</display-octave></unpitched><duration>1</duration></note>"),
             document("<note><unpitched><display-step>E</display-step><display-octave>10</display-octave></unpitched><duration>1</duration></note>"),
         ).forEach { failure(it, DiagnosticCode.INVALID_VALUE, ParseOptions(ParsePolicy.TOLERANT)) }
+    }
+
+    @Test
+    fun testTransposeTargetsItsStaff() {
+        val xml = document(
+            "<attributes><staves>2</staves><transpose number='2'><chromatic>-2</chromatic></transpose></attributes>" +
+                note("D", 5) + "<backup><duration>1</duration></backup>" +
+                "<note><pitch><step>D</step><octave>5</octave></pitch><duration>1</duration><staff>2</staff></note>",
+        )
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(2, result.value.parts.single().measures.single().events.filterIsInstance<AttributeEvent>().single().staff)
+        // Written D5 (74) sounds as written on staff 1 and a tone lower on staff 2.
+        assertEquals(
+            listOf(74, 72).map { SoundingPitch(Rational.of(it)) },
+            notes(result).map { assertIs<NotePitch.Pitched>(it.pitch).sounding },
+        )
+        failure(xml.replace("<staves>2</staves>", ""), DiagnosticCode.INVALID_VALUE)
     }
 
     private fun note(step: String, octave: Int) =

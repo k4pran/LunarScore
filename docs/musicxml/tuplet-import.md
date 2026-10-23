@@ -57,9 +57,8 @@ and structure errors under both policies (including tuplet number 17); discarded
 content with unmatched tuplets; and default flags on a plain note. `ScoreProjectionTest` checks the
 beam level and uniqueness invariants.
 
-Mixed chord values (chord tones with different types or time modifications) need MX-09 chord
-import, which is not on this branch; chord notes are still discarded with S06, so this case is not
-yet tested.
+Chord tones ([MX-09](polyphony.md)) keep their own type, time modification, stem and beams. Mixed
+values within a chord are not checked for consistency and have no dedicated fixture yet.
 
 Windows verification on 2026-10-22:
 

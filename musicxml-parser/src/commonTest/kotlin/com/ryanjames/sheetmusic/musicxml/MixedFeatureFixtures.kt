@@ -9,7 +9,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Divisions change 2→4 mid-measure, then a backup for a second voice. C4 lasts 1 at 0 and D4 lasts
- * 1/2 at 1; the backup and the voice-2 note after it are not interpreted yet (S06).
+ * 1/2 at 1; the backup of 6 (in the new divisions) returns to 0, where voice-2 E3 lasts 3/2.
  */
 internal val mixedDivisionsAndBackup: String = """
     <score-partwise version="4.0">
@@ -29,8 +29,8 @@ internal val mixedDivisionsAndBackup: String = """
 
 /**
  * A two-staff part with a tied C4/E4 chord whose upper tone changes to staff 2. The C4 tie on
- * staff 1 resolves across the barline; `staves`, both chord tones and their ties are not
- * interpreted yet (S08/S06).
+ * staff 1 and the E4 tie on staff 2 each resolve across the barline; each chord's tones share a
+ * chord ID while keeping their own staves.
  */
 internal val mixedTiedChordAcrossStaves: String = """
     <score-partwise version="4.0">
@@ -110,8 +110,7 @@ internal val mixedTranspositionAndDivisions: String = """
 
 /**
  * A timewise two-staff part: staff 1 holds a C4 whole note and staff 2 a C3 whole note after a
- * backup. Its partwise twin must give the same projection; `staves`, the backup and the staff-2
- * note are not interpreted yet (S08/S06).
+ * backup. Its partwise twin must give the same projection.
  */
 internal val mixedTimewiseTwoStaves: String = """
     <score-timewise version="4.0">

@@ -17,40 +17,38 @@ import kotlin.test.assertTrue
 class MixedFeatureImportTest {
     @Test
     fun testDivisionsChangeBeforeBackupKeepsExactTiming() {
-        val result = success(mixedDivisionsAndBackup, TOLERANT)
+        val result = success(mixedDivisionsAndBackup)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
         val measure = result.value.parts.single().measures.single()
         val notes = measure.events.filterIsInstance<NoteEvent>()
-        assertEquals(listOf(Rational.ZERO, Rational.ONE), notes.map { it.onset })
-        assertEquals(listOf(Rational.ONE, Rational.of(1, 2)), notes.map { it.duration })
+        // The backup is measured in the divisions in effect when it is read.
+        assertEquals(listOf(Rational.ZERO, Rational.ONE, Rational.ZERO), notes.map { it.onset })
+        assertEquals(listOf(Rational.ONE, Rational.of(1, 2), Rational.of(3, 2)), notes.map { it.duration })
+        assertEquals(listOf("1", "1", "2"), notes.map { it.voice })
         assertEquals(Rational.of(3, 2), measure.extent)
-        assertEquals(
-            listOf("S06" to "$MEASURE/backup[1]", "S06" to "$MEASURE/note[3]"),
-            features(result),
-        )
-        rejectedWhenStrict(mixedDivisionsAndBackup)
     }
 
     @Test
-    fun testTiedChordChangingStaffKeepsStaffOneTie() {
-        val result = success(mixedTiedChordAcrossStaves, TOLERANT)
+    fun testTiedChordChangingStaffKeepsBothTies() {
+        val result = success(mixedTiedChordAcrossStaves)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
         val part = result.value.parts.single()
-        val notes = part.measures.map { it.events.filterIsInstance<NoteEvent>().single() }
-        assertTrue(notes.all { it.staff == 1 && it.duration == Rational.of(2) })
+        val (first, second) = part.measures.map { measure -> measure.events.filterIsInstance<NoteEvent>() }
+        for (chord in listOf(first, second)) {
+            assertEquals(listOf(1, 2), chord.map { it.staff })
+            assertTrue(chord.all { it.duration == Rational.of(2) && it.onset == Rational.ZERO })
+            assertEquals(1, chord.map { it.chordId }.distinct().size)
+        }
+        // Each tone's sound and notated ties link it to the same pitch in the next measure.
+        val links = result.value.relationships.map { it.kind to (it.startEventId to it.endEventId) }.toSet()
         assertEquals(
-            listOf(RelationshipKind.SOUND_TIE, RelationshipKind.NOTATED_TIE),
-            result.value.relationships.map { it.kind },
+            first.indices.flatMap { index ->
+                listOf(RelationshipKind.SOUND_TIE, RelationshipKind.NOTATED_TIE).map { it to (first[index].id to second[index].id) }
+            }.toSet(),
+            links,
         )
-        assertTrue(result.value.relationships.all { it.startEventId == notes[0].id && it.endEventId == notes[1].id })
+        assertEquals(4, result.value.relationships.size)
         assertTrue(result.value.validate().isEmpty())
-        assertEquals(
-            listOf(
-                "S08" to "$MEASURE/attributes[1]/staves[1]",
-                "S06" to "$MEASURE/note[2]/chord[1]",
-                "S06" to "/score-partwise[1]/part[1]/measure[2]/note[2]/chord[1]",
-            ),
-            features(result),
-        )
-        rejectedWhenStrict(mixedTiedChordAcrossStaves)
     }
 
     @Test
@@ -86,14 +84,13 @@ class MixedFeatureImportTest {
 
     @Test
     fun testTimewiseTwoStavesMatchesPartwise() {
-        val timewise = success(mixedTimewiseTwoStaves, TOLERANT)
-        val partwise = success(mixedPartwiseTwoStaves, TOLERANT)
+        val timewise = success(mixedTimewiseTwoStaves)
+        val partwise = success(mixedPartwiseTwoStaves)
         assertEquals(partwise.value, timewise.value)
-        assertEquals(features(partwise).map { it.first }, features(timewise).map { it.first })
-        assertEquals(listOf("S08", "S06", "S06"), features(timewise).map { it.first })
-        val note = assertIs<NoteEvent>(timewise.value.parts.single().measures.single().events.single())
-        assertEquals(Rational.of(4), note.duration)
-        rejectedWhenStrict(mixedTimewiseTwoStaves)
+        assertTrue(timewise.diagnostics.isEmpty() && partwise.diagnostics.isEmpty())
+        val notes = timewise.value.parts.single().measures.single().events.map { assertIs<NoteEvent>(it) }
+        assertEquals(listOf(Triple(Rational.ZERO, 1, "1"), Triple(Rational.ZERO, 2, "5")), notes.map { Triple(it.onset, it.staff, it.voice) })
+        assertTrue(notes.all { it.duration == Rational.of(4) })
     }
 
     private fun features(result: ParseResult<Score>): List<Pair<String?, String?>> =

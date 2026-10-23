@@ -80,10 +80,9 @@ class AttributeImportTest {
             "<attributes><key print-object='no'><cancel>2</cancel><fifths>-2</fifths><mode>minor</mode>" +
                 "<key-octave number='1'>4</key-octave></key>" +
                 "<key><fifths>3</fifths><mode>hypodorian</mode></key>" +
-                "<key><key-step>F</key-step><key-alter>1</key-alter></key>" +
-                "<key number='2'><fifths>4</fifths></key></attributes>",
+                "<key><key-step>F</key-step><key-alter>1</key-alter></key></attributes>",
         ), ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S07", "S07", "S07", "S07", "S07", "S08"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S07", "S07", "S07", "S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.unsupported?.retention == ContentRetention.DISCARDED })
         assertEquals(
             listOf(Attribute.KeySignature(-2, KeyMode.MINOR), Attribute.KeySignature(3)),
@@ -99,10 +98,9 @@ class AttributeImportTest {
         val result = success(document(
             "<attributes><clef><sign>G</sign></clef><clef after-barline='yes'><sign>F</sign><line>3</line></clef>" +
                 "<clef><sign>G</sign><line>2</line><clef-octave-change>-1</clef-octave-change></clef>" +
-                "<clef><sign>percussion</sign></clef><clef><sign>C</sign></clef>" +
-                "<clef number='2'><sign>F</sign></clef></attributes>",
+                "<clef><sign>percussion</sign></clef><clef><sign>C</sign></clef></attributes>",
         ), ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S07", "S08"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S07"), result.diagnostics.map { it.unsupported?.featureId })
         assertEquals(
             listOf(treble, Attribute.Clef(ClefSign.F, 3), Attribute.Clef(ClefSign.G, 2, -1),
                 Attribute.Clef(ClefSign.PERCUSSION, null), Attribute.Clef(ClefSign.C, 3)),
@@ -125,8 +123,13 @@ class AttributeImportTest {
                 "<tuning-octave>2</tuning-octave></staff-tuning><staff-size>80</staff-size></staff-details>" +
                 "<staff-details number='2'><staff-lines>5</staff-lines></staff-details><staves>2</staves></attributes>",
         ), ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S23", "S17", "S08", "S08"), result.diagnostics.map { it.unsupported?.featureId })
-        assertEquals(listOf<Attribute>(Attribute.StaffLines(1)), events(result).map { assertIs<AttributeEvent>(it).attribute })
+        assertEquals(listOf("S23", "S17"), result.diagnostics.map { it.unsupported?.featureId })
+        // The later staves declaration in the same element scopes the unnumbered details to both staves.
+        assertEquals(
+            listOf(Attribute.StaffLines(1) to 1, Attribute.StaffLines(1) to 2, Attribute.StaffLines(5) to 2),
+            events(result).map { assertIs<AttributeEvent>(it).let { event -> event.attribute to event.staff } },
+        )
+        assertEquals(listOf(Staff(1), Staff(2)), result.value.parts.single().staves)
         failure(document("<attributes><staves>0</staves></attributes>"), DiagnosticCode.INVALID_VALUE)
         failure(document("<attributes><staff-details><staff-lines>-1</staff-lines></staff-details></attributes>"),
             DiagnosticCode.INVALID_VALUE)
@@ -142,14 +145,25 @@ class AttributeImportTest {
     }
 
     @Test
-    fun testDiscardedStaffContentIsNotValidated() {
-        val result = success(document(
-            "<attributes><key number='2'><fifths>x</fifths></key><time number='2'><beats>0</beats></time>" +
-                "<clef number='2'><sign>H</sign><line>x</line></clef>" +
-                "<staff-details number='2'><staff-lines>-1</staff-lines></staff-details></attributes>",
-        ), ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S08", "S08", "S08", "S08"), result.diagnostics.map { it.unsupported?.featureId })
-        assertTrue(events(result).isEmpty())
+    fun testNumberedAttributesTargetDeclaredStaves() {
+        val numbered = "<key number='2'><fifths>2</fifths></key><time number='2'><beats>3</beats><beat-type>4</beat-type></time>" +
+            "<clef number='2'><sign>F</sign></clef><staff-details number='2'><staff-lines>4</staff-lines></staff-details>"
+        val result = success(document("<attributes><staves>2</staves>$numbered</attributes>"))
+        assertEquals(
+            listOf(Attribute.KeySignature(2), Attribute.TimeSignature(3, 4), bass, Attribute.StaffLines(4)),
+            events(result).map { assertIs<AttributeEvent>(it).attribute },
+        )
+        assertTrue(events(result).all { it.staff == 2 })
+        // Without a staves declaration, staff 2 does not exist; its content is validated, not skipped.
+        for (policy in ParsePolicy.entries) {
+            for (element in listOf("key", "time", "clef", "staff-details")) {
+                val single = Regex("<$element number='2'>.*?</$element>").find(numbered)!!.value
+                val failed = failure(document("<attributes>$single</attributes>"), DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
+                assertTrue(failed.diagnostics.single().location.path.orEmpty().endsWith("/$element[1]/@number"))
+            }
+            failure(document("<attributes><staves>2</staves><key number='2'><fifths>x</fifths></key></attributes>"),
+                DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
+        }
     }
 
     @Test
@@ -163,14 +177,16 @@ class AttributeImportTest {
     }
 
     @Test
-    fun testAttributeChangesAfterCursorMoveAreDiscarded() {
+    fun testAttributeChangesAfterBackupApplyAtTheCursor() {
         val result = success(document(
-            "<note><rest/><duration>1</duration></note><backup><duration>1</duration></backup>" +
+            "<note><rest/><duration>2</duration></note><backup><duration>1</duration></backup>" +
                 "<attributes><key><fifths>1</fifths></key><clef><sign>F</sign></clef><staff-details><staff-lines>4</staff-lines>" +
                 "</staff-details></attributes>",
-        ), ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S06", "S06", "S06", "S06"), result.diagnostics.map { it.unsupported?.featureId })
-        assertEquals(1, events(result).size)
+        ))
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val changes = events(result).drop(1).map { assertIs<AttributeEvent>(it) }
+        assertEquals(listOf(Attribute.KeySignature(1), bass, Attribute.StaffLines(4)), changes.map { it.attribute })
+        assertTrue(changes.all { it.onset == Rational.ONE })
     }
 
     private fun events(result: ParseResult.Success<Score>): List<Event> = result.value.parts.single().measures.first().events
