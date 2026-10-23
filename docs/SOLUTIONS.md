@@ -42,3 +42,26 @@ reader creation, counting namespace declarations and XML declaration fields. Ski
 and quoted equals. Report fatal `ATTRIBUTE_LIMIT` before the consumer runs, and repeat the
 per-element check before snapshot allocation. The wide-root regression failed before the fix;
 boundary, namespace/declaration and pre-reader entity-order regressions now cover the guard.
+
+## Exporter MusicXML was rejected as unsafe XML (issue #22)
+
+**Symptom**: Every file from the public LilyPond MusicXML test suite failed with `UNSAFE_XML`.
+
+**Cause**: Exporters write the standard `<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML
+x.y Partwise//EN" ...>` header, and the reader rejected any DOCTYPE to keep DTDs away from xmlutil.
+
+**Fix**: Blank only the exact Recordare header, first in the document and without an internal
+subset, before the reader; the DTD is never resolved and line numbers are kept. Every other DOCTYPE
+is still `UNSAFE_XML`. `ScoreXmlReaderTest` covers near-standard variants; see
+[the compliance audit](musicxml/compliance-audit.md).
+
+## Model constructors threw on no-break-space voices and IDs (issue #22)
+
+**Symptom**: A voice of only a no-break space (U+00A0) or a part ID containing U+00A0 threw `IllegalArgumentException`
+out of `parseMusicXml`.
+
+**Cause**: The parser trimmed and checked only XML whitespace, while the model rejects any Unicode
+blank.
+
+**Fix**: Check with `isBlank()`/`isWhitespace()` so the parser reports `INVALID_VALUE` /
+`INVALID_STRUCTURE` first. The adversarial mutants in `ComplianceAuditTest` found this.

@@ -50,14 +50,16 @@ internal fun <T : Any> readScoreXml(
     }
     if (cancellationRequested()) return fail(DiagnosticCode.CANCELLED, "XML reading cancelled")
     if (input.size > options.limits.maxInputBytes) return fail(DiagnosticCode.INPUT_LIMIT, "XML byte limit exceeded")
-    val xml = try {
+    val decoded = try {
         input.decodeToString(throwOnInvalidSequence = true).removePrefix("\uFEFF")
     } catch (_: CharacterCodingException) {
         return fail(DiagnosticCode.UNSUPPORTED_ENCODING, "Only well-formed UTF-8 input is supported")
     }
-    if ('\u0000' in xml) return fail(DiagnosticCode.UNSUPPORTED_ENCODING, "NUL-bearing input is not supported UTF-8 XML")
-    // No declaration, resolver or entity table from untrusted input may reach xmlutil. This is
-    // intentionally conservative even inside comments/CDATA; see docs/musicxml/xml-reader.md.
+    if ('\u0000' in decoded) return fail(DiagnosticCode.UNSUPPORTED_ENCODING, "NUL-bearing input is not supported UTF-8 XML")
+    val xml = blankMusicXmlDoctype(decoded)
+    // No declaration, resolver or entity table from untrusted input may reach xmlutil; only the
+    // standard MusicXML header was blanked above, unresolved. This is intentionally conservative
+    // even inside comments/CDATA; see docs/musicxml/xml-reader.md.
     if ("<!DOCTYPE" in xml || "<!ENTITY" in xml) {
         return fail(DiagnosticCode.UNSAFE_XML, "DTD and entity declarations are disabled")
     }
@@ -95,6 +97,28 @@ internal fun <T : Any> readScoreXml(
     } finally {
         reader.close()
     }
+}
+
+/**
+ * The standard MusicXML public DTD header that exporters write: an optional XML declaration, then
+ * a Recordare `PUBLIC` identifier for any version, with no internal subset. Group 2 is the header.
+ */
+private val musicXmlDoctype = Regex(
+    """^(<\?xml\s[^?]*\?>)?\s*(<!DOCTYPE\s+score-(partwise|timewise)\s+PUBLIC\s+(["'])-//Recordare//DTD MusicXML \d+\.\d+ """ +
+        """(Partwise|Timewise)//EN\4\s+(["'])https?://www\.musicxml\.org/dtds/(partwise|timewise)\.dtd\6\s*>)""",
+)
+
+/**
+ * Blanks the standard MusicXML DTD header so the dependency never sees a DOCTYPE. The DTD is never
+ * resolved or applied; line breaks are kept so source positions stay exact. Any other DOCTYPE,
+ * including one with an internal subset or a different identifier, is left for the `UNSAFE_XML` check.
+ */
+internal fun blankMusicXmlDoctype(xml: String): String {
+    val match = musicXmlDoctype.find(xml) ?: return xml
+    val flavours = listOf(3, 5, 7).map { match.groupValues[it].lowercase() }.toSet()
+    if (flavours.size != 1) return xml
+    val header = match.groups[2]!!.range
+    return xml.replaceRange(header, xml.substring(header).replace(Regex("[^\r\n]"), " "))
 }
 
 /**

@@ -92,7 +92,6 @@ class ScoreXmlReaderTest {
     fun testDtdEntitiesAndExpansionRejectedBeforeConsumer() {
         val declarations = listOf(
             "<!DOCTYPE score-partwise>",
-            "<!DOCTYPE score-partwise PUBLIC '-//Recordare//DTD MusicXML 4.0 Partwise//EN' 'http://www.musicxml.org/dtds/partwise.dtd'>",
             "<!DOCTYPE score-partwise SYSTEM 'https://example.invalid/must-not-fetch.dtd'>",
             "<!DOCTYPE score-partwise [<!ENTITY secret SYSTEM 'file:///must-not-read'>]>",
             "<!DOCTYPE score-partwise [<!ENTITY % remote SYSTEM 'https://example.invalid/entity'>%remote;]>",
@@ -109,6 +108,49 @@ class ScoreXmlReaderTest {
         }
         assertFailure(DiagnosticCode.UNSAFE_XML, "<score-partwise><!-- <!DOCTYPE literal> --></score-partwise>")
         assertFailure(DiagnosticCode.UNSAFE_XML, "<score-partwise><![CDATA[<!ENTITY literal>]]></score-partwise>")
+    }
+
+    @Test
+    fun testStandardMusicXmlDoctypeIsIgnoredWithoutResolution() {
+        val headers = listOf(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE score-partwise PUBLIC \"-//Recordare//DTD MusicXML 4.0 Partwise//EN\"\n" +
+                "    \"http://www.musicxml.org/dtds/partwise.dtd\">\n<score-partwise/>" to 4,
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>\n<!DOCTYPE score-partwise PUBLIC '-//Recordare//DTD MusicXML 1.1 Partwise//EN'\n" +
+                "    'http://www.musicxml.org/dtds/partwise.dtd'>\n<score-partwise/>" to 4,
+            "<!DOCTYPE score-timewise PUBLIC \"-//Recordare//DTD MusicXML 3.1 Timewise//EN\" \"https://www.musicxml.org/dtds/timewise.dtd\">\n\n" +
+                "<score-timewise/>" to 3,
+        )
+        for (policy in ParsePolicy.entries) {
+            for ((xml, rootLine) in headers) {
+                val result = assertIs<ParseResult.Success<List<ScoreXmlEvent>>>(events(xml, ParseOptions(policy)), xml)
+                assertTrue(result.diagnostics.isEmpty())
+                // The header is blanked, not removed, so the root keeps its source line.
+                assertEquals(rootLine, result.value.first().location.line, xml)
+            }
+        }
+    }
+
+    @Test
+    fun testNearStandardDoctypesRemainUnsafe() {
+        val standard = "<!DOCTYPE score-partwise PUBLIC \"-//Recordare//DTD MusicXML 4.0 Partwise//EN\" \"http://www.musicxml.org/dtds/partwise.dtd\">"
+        val variants = listOf(
+            standard.replace(">", " [<!ENTITY x 'y'>]>"),
+            standard.replace("www.musicxml.org", "example.invalid"),
+            standard.replace("Partwise//EN", "Timewise//EN"),
+            standard.replace("partwise.dtd", "timewise.dtd"),
+            standard.replace("\"http://www.musicxml.org/dtds/partwise.dtd\"", "'http://www.musicxml.org/dtds/partwise.dtd\""),
+            standard.replace("PUBLIC \"-//Recordare//DTD MusicXML 4.0 Partwise//EN\"", "SYSTEM"),
+            "<!-- comment -->$standard",
+            "$standard$standard",
+        )
+        for (policy in ParsePolicy.entries) {
+            for (header in variants) {
+                assertFailure(DiagnosticCode.UNSAFE_XML, "$header<score-partwise/>", ParseOptions(policy))
+            }
+            assertFailure(DiagnosticCode.UNSAFE_XML, "<score-partwise><!-- $standard --></score-partwise>", ParseOptions(policy))
+            // An entity reference is never resolved through the ignored DTD.
+            assertFailure(DiagnosticCode.MALFORMED_XML, "$standard<score-partwise>&nbsp;</score-partwise>", ParseOptions(policy))
+        }
     }
 
     @Test

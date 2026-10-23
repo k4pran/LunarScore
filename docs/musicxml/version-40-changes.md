@@ -86,7 +86,7 @@ coverage group shown at the path given.
 
 | Change | Outcome | Evidence |
 |---|---|---|
-| DTDs deprecated | Any DOCTYPE is fatal `UNSAFE_XML` (a security decision from MX-05) | `ScoreXmlReaderTest` |
+| DTDs deprecated | The standard Recordare header is ignored without resolution (MX-21); any other DOCTYPE is fatal `UNSAFE_XML` (MX-05 security decision) | `ScoreXmlReaderTest` |
 | Empty `multiple-rest` no longer allowed | `multiple-rest` is S24 discarded whatever its content | F21 |
 | `function` deprecated in favour of `numeral` | S22 discarded with `harmony` | `MusicXmlParserTest` harmony discard |
 | Clef sign `none` deprecated | **Supported:** `ClefSign.NONE` with no standard line | F21 |

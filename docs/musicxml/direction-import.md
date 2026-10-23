@@ -73,7 +73,8 @@ realization (trill speed, beats, accidentals) is not modeled.
 | Dynamics without a marking | Discarded under the containing feature (S12 or S13) |
 | Direction on staff ≠ 1, or after an uninterpreted backup/forward | S06 `DISCARDED`; no event |
 | Unknown `placement`, wedge `type` or beat unit; wedge `number` outside 1–16; non-`yes`/`no` `directive` or offset `sound`; malformed offset; negative or malformed sound tempo/dynamics; blank `per-minute` or voice; nonpositive staff | Fatal `INVALID_VALUE` |
-| Direction without `direction-type`; wedge without `type`; metronome without `beat-unit` or `per-minute`; duplicate `offset`, `voice`, `staff`, `sound` or `per-minute`; an offset before any divisions | Fatal `INVALID_STRUCTURE` |
+| Direction without `direction-type`; wedge without `type`; metronome without `beat-unit` or `per-minute`; duplicate `offset`, `voice`, `staff`, `sound` or `per-minute` | Fatal `INVALID_STRUCTURE` |
+| An offset before any divisions | Divisions 1 assumed with `RECOVERED_VALUE`, as for note durations (MX-21) |
 | Wedge start without stop, stop without start, `continue` without an open wedge | `UNMATCHED_SPAN`; relationship kept with a null partner |
 
 ## Fixtures and verification
