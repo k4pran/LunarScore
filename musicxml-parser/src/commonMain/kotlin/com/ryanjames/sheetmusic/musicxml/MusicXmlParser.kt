@@ -401,7 +401,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var cursor = Rational.ZERO
         var extent = Rational.ZERO
         var cursorLost = false
-        val wedges = mutableListOf<Pair<SpanType, SpanEndpoint>>()
+        val wedges = mutableListOf<WedgeEndpoint>()
         fun eventId() = "$partId:measure-$number:event-${events.size + 1}"
         fun add(event: Event, source: ScoreXmlEvent) {
             provenance("$path.events[${events.size}]", source)
@@ -1122,29 +1122,33 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return DirectionSound(tempo, dynamics)
     }
 
-    /** A direction's wedge endpoints at [position]: stops, then continue points, then starts. */
-    private fun wedgeEndpoints(event: DirectionEvent, marks: List<SpanMark>, position: SpanPosition): List<Pair<SpanType, SpanEndpoint>> =
-        listOf(SpanType.STOP, SpanType.CONTINUE, SpanType.START).flatMap { type ->
+    /**
+     * A direction's wedge endpoints at [position]: stops, then continue points, then starts. Their
+     * source orders are reserved now, as the direction is read, so they interleave correctly with
+     * note spans in the same measure even though registration waits for [registerWedges].
+     */
+    private fun wedgeEndpoints(event: DirectionEvent, marks: List<SpanMark>, position: SpanPosition): List<WedgeEndpoint> {
+        val endpoints = listOf(SpanType.STOP, SpanType.CONTINUE, SpanType.START).flatMap { type ->
             marks.filter { it.type == type }.map { mark ->
                 type to SpanEndpoint(mark.kind, mark.number, event.id, event.voice.orEmpty(), position, mark.location)
             }
         }
+        val firstOrder = body.spans.reserveOrders(endpoints.size)
+        return endpoints.mapIndexed { index, (type, endpoint) -> WedgeEndpoint(type, endpoint, firstOrder + index) }
+    }
 
     /**
      * Passes one measure's wedge endpoints to the part's resolver in display-position order, keeping
      * document order at equal positions, so an offset cannot pair a stop with a later-displayed start.
-     * Each endpoint keeps its document order for numbering, so offsets do not change wedge IDs.
+     * Each endpoint keeps its reserved source order for numbering, so offsets do not change wedge IDs.
      */
-    private fun registerWedges(endpoints: List<Pair<SpanType, SpanEndpoint>>) {
+    private fun registerWedges(endpoints: List<WedgeEndpoint>) {
         val resolver = body.spans
-        val firstOrder = resolver.reserveOrders(endpoints.size)
-        endpoints.withIndex().sortedBy { (_, entry) -> entry.second.position }.forEach { (index, entry) ->
-            val (type, endpoint) = entry
-            val order = firstOrder + index
-            when (type) {
-                SpanType.STOP -> resolver.stop(endpoint, order)
-                SpanType.CONTINUE -> resolver.continuePoint(endpoint)
-                SpanType.START -> resolver.start(endpoint, order)
+        endpoints.sortedBy { it.endpoint.position }.forEach { wedge ->
+            when (wedge.type) {
+                SpanType.STOP -> resolver.stop(wedge.endpoint, wedge.order)
+                SpanType.CONTINUE -> resolver.continuePoint(wedge.endpoint)
+                SpanType.START -> resolver.start(wedge.endpoint, wedge.order)
                 SpanType.LET_RING -> Unit
             }
         }
@@ -1469,6 +1473,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * the measure-local position, including the display offset, that orders its wedge endpoints.
      */
     private class TimedDirection(val event: DirectionEvent?, val wedges: List<SpanMark>, val wedgeOnset: Rational)
+
+    /** A wedge endpoint awaiting display-position registration, with its reserved source [order]. */
+    private class WedgeEndpoint(val type: SpanType, val endpoint: SpanEndpoint, val order: Int)
 
     /** A span endpoint read from a note, before the note's event identity is known. */
     private class SpanMark(val kind: RelationshipKind, val type: SpanType, val number: String, val location: SourceLocation)
