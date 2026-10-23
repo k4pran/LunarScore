@@ -154,7 +154,7 @@ class NoteImportTest {
     @Test
     fun testUnsupportedNoteContentIsReportedWhileLaterOnsetsStayExact() {
         val xml = document(
-            "<note default-x='10'><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><stem default-y='5'>up</stem></note>" +
+            "<note print-object='no'><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><stem default-y='5'>up</stem></note>" +
                 "<note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>" +
                 "<note><unpitched/><duration>1</duration></note>" +
                 "<note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><staff>2</staff></note>" +

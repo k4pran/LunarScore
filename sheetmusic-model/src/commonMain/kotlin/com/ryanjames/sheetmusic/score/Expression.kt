@@ -31,34 +31,42 @@ public enum class OrnamentType {
 /**
  * A printed dynamic, either on a note or in a direction. [markings] are kept in source order, so
  * `sf` followed by `p` is an sfp; a nonstandard dynamic keeps its text verbatim. No playback
- * velocity is inferred from the markings.
+ * velocity is inferred from the markings. [visual] is optional position and colour.
  */
 public data class Dynamics(
     val markings: List<String>,
     override val placement: Placement? = null,
+    override val visual: VisualHints? = null,
 ) : NoteExpression, DirectionMark {
     init {
         require(markings.isNotEmpty())
     }
 }
 
-/** One printed component of a direction, in source order. */
+/** One printed component of a direction, in source order, with its optional position and colour. */
 public sealed interface DirectionMark {
+    public val visual: VisualHints?
+
     /** Free text such as "dolce" or "rit."; whitespace is preserved and typography is not modeled. */
-    public data class Words(val text: String) : DirectionMark
+    public data class Words(val text: String, override val visual: VisualHints? = null) : DirectionMark
 
     /**
      * A printed metronome mark: [beatUnit] with [beatUnitDots] equals [perMinute], which is kept as
      * text because it may be a range or approximation such as "c. 120". Playback tempo is separate.
      */
-    public data class Metronome(val beatUnit: NoteValue, val perMinute: String, val beatUnitDots: Int = 0) : DirectionMark {
+    public data class Metronome(
+        val beatUnit: NoteValue,
+        val perMinute: String,
+        val beatUnitDots: Int = 0,
+        override val visual: VisualHints? = null,
+    ) : DirectionMark {
         init {
             require(beatUnitDots >= 0)
         }
     }
 
     /** A hairpin endpoint; the start and stop directions are linked by a `WEDGE` relationship. */
-    public data class Wedge(val type: WedgeType) : DirectionMark
+    public data class Wedge(val type: WedgeType, override val visual: VisualHints? = null) : DirectionMark
 }
 
 /** A hairpin opening ([CRESCENDO]) or closing ([DIMINUENDO]) at its start, a [CONTINUE] point or its [STOP]. */

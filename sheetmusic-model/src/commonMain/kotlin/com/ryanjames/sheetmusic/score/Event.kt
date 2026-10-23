@@ -34,7 +34,7 @@ public data class Performance(val attack: Rational = Rational.ZERO, val release:
  * One notehead, including each chord tone independently. [duration] is performed musical time in
  * quarter notes (null only for grace), separate from [notation]. Shared [chordId] groups noteheads
  * without forcing equal durations or staves. Instrument IDs resolve within the containing part.
- * [grace] details are only allowed on a [NoteRole.GRACE] note.
+ * [grace] details are only allowed on a [NoteRole.GRACE] note. [visual] is optional position and colour.
  */
 public data class NoteEvent(
     override val id: String,
@@ -49,6 +49,7 @@ public data class NoteEvent(
     val instrumentId: String? = null,
     val performance: Performance = Performance(),
     val grace: Grace? = null,
+    val visual: VisualHints? = null,
 ) : Event {
     init {
         validateEvent(id, onset, staff)
@@ -58,7 +59,10 @@ public data class NoteEvent(
     }
 }
 
-/** A timed rest; a gap/forward movement is represented by the absence of events, not a fake rest. */
+/**
+ * A timed rest; a gap/forward movement is represented by the absence of events, not a fake rest.
+ * [visual] is optional position and colour.
+ */
 public data class RestEvent(
     override val id: String,
     override val onset: Rational,
@@ -67,6 +71,7 @@ public data class RestEvent(
     val voice: String = "1",
     val notation: NotatedValue = NotatedValue(),
     val wholeMeasure: Boolean = false,
+    val visual: VisualHints? = null,
 ) : Event {
     init {
         validateEvent(id, onset, staff)
