@@ -31,7 +31,7 @@ truncated score. Failure codes and their meaning are stable; message prose is no
 | `UNSUPPORTED_FEATURE` | Error/failure | Warning/accepted candidate | Include coverage feature ID, location and explicit retention outcome for each meaningful unmapped subtree/attribute |
 | `RECOVERED_VALUE` | Error/failure | Warning/accepted candidate | Message describes the actual repair; use unsupported-content records as well when meaningful source material is lost |
 | `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `PATH_LIMIT`, `ATTRIBUTE_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |
-| `CANCELLED`, `ARCHIVE_READ_FAILED`, `ARCHIVE_ENTRY_LIMIT` | Error/failure, stop | Error/failure, stop | Cancellation and detailed archive detection remain reader/archive adapter work |
+| `CANCELLED`, `ARCHIVE_READ_FAILED`, `ARCHIVE_ENTRY_LIMIT`, `ARCHIVE_LIMIT`, `UNSAFE_ARCHIVE`, `UNSUPPORTED_ARCHIVE` | Error/failure, stop | Error/failure, stop | MX-19 emits the archive codes from `parseMxl`; see [mxl-import.md](mxl-import.md) |
 
 Semantic findings may be collected after strict rejection to provide useful ordered diagnostics;
 fatal findings stop collection. A tolerant candidate is accepted only if it contains no error.
@@ -94,7 +94,7 @@ bound capture before constructing a fragment; this collector alone is not a stre
 Provenance overflow is fatal `PROVENANCE_LIMIT`. Returned snapshots stay within their budgets.
 The collector is internal so public callers cannot manufacture accepted parse results directly.
 
-Archive count/ratio/global expansion budgets remain MX-19 work. MX-05 implements cooperative
+MX-19 adds archive size, entry count, ratio and total expansion budgets (`ArchiveLimits`). MX-05 implements cooperative
 cancellation before decoding, during preflight and between events. Wall-clock deadlines and bounded
 stream acquisition remain input-adapter work; a dependency token read cannot be interrupted.
 The old dependency probes do not automatically inherit these public option defaults.

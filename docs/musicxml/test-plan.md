@@ -88,7 +88,7 @@ Each `F` fixture is a small hand-verifiable file unless noted. Create F01–F08 
 | F17 | Transposing instrument plus unpitched percussion; written and sounding fields must not be conflated. Model-only (MX-02) and XML with a mid-measure instrument change (MX-16, `InstrumentFixtures.kt`). |
 | F18 | Page/system/staff layout, print break and explicit positioning; retain supported hints. Implemented in `LayoutFixtures.kt` (MX-18) with negative offsets and colours; omitted defaults, discarded and invalid layout content are inline variants in `LayoutImportTest`. |
 | F19 | Grace before a duration-bearing note and cue note; grace does not advance main cursor. Implemented in `GraceFixtures.kt` (MX-15); grace chord and cue after backup are inline discard tests until MX-09. |
-| F20 | `.mxl` with container and two renditions; select first MusicXML rootfile and reject unsafe paths. |
+| F20 | `.mxl` with container and two renditions; select first MusicXML rootfile and reject unsafe paths. Implemented in `MxlFixtures.kt` (MX-19), generated with .NET `ZipArchive`; traversal, duplicate, encrypted, bomb and corrupt archives are built inline in `MxlImportTest`. |
 | F21 | At least `concert-score`, `for-part`, `listening`, `assess` and packaging cases from 4.0 history; supported mapping or explicit unsupported diagnostic. The `concert-score`/`for-part` subset is implemented in `InstrumentFixtures.kt` (MX-16); the rest remains MX-20. |
 | F22 | XSD-invalid: wrong root, missing required part-list, illegal duration and malformed XML; expected rejection category. |
 | F23 | XSD-valid but semantically inconsistent: orphan span, overlapping cursor, incompatible measure length; expected diagnostics/policy. |
