@@ -1,5 +1,6 @@
 package com.ryanjames.sheetmusic.musicxml
 
+import com.ryanjames.sheetmusic.score.Instrument
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
 import com.ryanjames.sheetmusic.score.Rational
@@ -189,13 +190,13 @@ class MusicXmlParserTest {
             <credit><link href='file:///never-read'/><credit-image source='https://example.invalid/never-fetch'/></credit>
         """).replace("<part-name>Flute", "<part-name print-object='no'>Flute")
             .replace("<measure number='1'/>", "<measure number='1' width='20'/>")
-            .replace("<part-name print-object='no'>", "<score-instrument id='I1'><instrument-name>Flute</instrument-name></score-instrument><part-name print-object='no'>")
+            .replace("<part-name print-object='no'>", "<score-instrument id='I1'><instrument-name>Flute</instrument-name><solo/></score-instrument><part-name print-object='no'>")
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(listOf("S27", "S03", "S17", "S25", "S03", "S16", "S03", "S01"),
             result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.severity == DiagnosticSeverity.WARNING })
         assertTrue(result.diagnostics.any { it.location.path?.endsWith("/@print-object") == true })
-        assertTrue(result.value.parts.single().instruments.isEmpty())
+        assertEquals(listOf(Instrument("I1", "Flute")), result.value.parts.single().instruments)
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
     }
 

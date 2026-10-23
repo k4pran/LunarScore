@@ -54,7 +54,7 @@ Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from
 | Key `cancel`, `key-octave`, an unknown `mode` value; key/clef display attributes (`print-object`, `after-barline`, `size`, …) | S07 `DISCARDED`; the key or clef itself is kept (unknown mode becomes null) |
 | `staff-tuning`, `capo` | S23 `DISCARDED` |
 | `staff-type`, `line-detail`, `staff-size`, staff-details attributes | S17 `DISCARDED` |
-| `transpose`, `instruments`, `for-part` | S16 `DISCARDED` |
+| `instruments`, `for-part` | S16 `DISCARDED` (`transpose` is interpreted since [MX-16](instrument-import.md)) |
 | `measure-style` | S24 `DISCARDED` |
 | `directive` and other unknown children | S07 `DISCARDED` |
 | Any state change after an uninterpreted `backup`/`forward` | S06 `DISCARDED`, rather than placed at a wrong offset |

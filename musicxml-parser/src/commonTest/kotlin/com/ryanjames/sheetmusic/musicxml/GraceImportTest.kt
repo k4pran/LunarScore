@@ -4,6 +4,7 @@ import com.ryanjames.sheetmusic.score.Beam
 import com.ryanjames.sheetmusic.score.BeamType
 import com.ryanjames.sheetmusic.score.Grace
 import com.ryanjames.sheetmusic.score.NoteEvent
+import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.NoteRole
 import com.ryanjames.sheetmusic.score.NoteValue
 import com.ryanjames.sheetmusic.score.Rational
@@ -208,11 +209,13 @@ class GraceImportTest {
                 note("E"),
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S18", "S18", "S18", "S16"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S18", "S18", "S18"), result.diagnostics.map { it.unsupported?.featureId })
         val events = result.value.parts.single().measures.single().events.filterIsInstance<NoteEvent>()
-        assertEquals(listOf(NoteRole.GRACE, NoteRole.GRACE, NoteRole.NORMAL), events.map { it.role })
+        // An unpitched grace note is imported with its (absent) display position since MX-16.
+        assertEquals(listOf(NoteRole.GRACE, NoteRole.GRACE, NoteRole.GRACE, NoteRole.NORMAL), events.map { it.role })
+        assertEquals(NotePitch.Unpitched(), events[2].pitch)
         assertTrue(events.all { it.onset == Rational.ZERO })
-        assertEquals(listOf(events[2].id, events[2].id), result.value.relationships.map { it.endEventId })
+        assertEquals(List(3) { events[3].id }, result.value.relationships.map { it.endEventId })
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
     }
 
