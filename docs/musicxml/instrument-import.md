@@ -88,7 +88,7 @@ XSD-validated:
 - A concert-score subset of F21: a clarinet whose part transposition appears only in `for-part`,
   and a piccolo with an octave transposition.
 
-The remaining F21 cases (`listening`, `assess`, packaging) stay with MX-20.
+The remaining F21 cases (`listening`, `assess`, packaging) are covered by MX-20; see [version-40-changes.md](version-40-changes.md).
 
 `InstrumentImportTest` adds 10 common tests:
 
