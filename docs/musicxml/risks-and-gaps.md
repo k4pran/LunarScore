@@ -118,6 +118,28 @@ JVM/Android host tests and iOS cross-compilation are recorded in [xml-reader.md]
 Native runtime still requires macOS/Xcode. Opaque capture must bound fragments before allocation;
 MXL safety remains MX-19 and JS/Wasm targets remain undeclared for this module.
 
+## MX-18 layout and visual hint decisions and remaining gaps
+
+MX-18 supersedes the MX-06 S17 discard of `defaults` layout and measure `print`, and the S04/S13/S12
+discard of position and colour attributes on notes, rests, words, dynamics, metronome marks and
+wedges. Hints are optional: they never change musical meaning and the renderer ignores them.
+All lengths are tenths (one tenth of a staff space). See [layout-import.md](layout-import.md).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Scaling, page/system/staff layout defaults (F18) | `Score.layout` with exact tenths; scaling kept only when given | Renderer adapter that converts tenths to output units |
+| Omitted `defaults`, or `defaults` with only `concert-score` | `Score.layout` null; no scaling or page size is assumed | None |
+| System/page breaks, blank pages, page number, layout overrides, measure distance (F18) | `Measure.print` per part and measure | Renderer system/page breaking |
+| Negative `default-x/y`, `relative-x/y` | Kept exactly, sign included (F18 note, words) | None |
+| `color` with or without alpha, either case | Upper-case `#RRGGBB` / `#AARRGGBB`; other forms fatal `INVALID_VALUE` | None |
+| Second or later `print` in one measure | S17 `DISCARDED`; the first is kept | Merge policy if real files need it |
+| `appearance`, music/word/lyric fonts, `lyric-language`, `system-dividers`, `measure-numbering`, part-name/abbreviation displays, `staff-spacing` | S17 `DISCARDED` per element or attribute; the rest of the layout is kept | Appearance and typography model |
+| Position/colour on stems, beams, accidentals, tuplets, articulations, ornaments, barlines, endings, other direction types; font, justification, enclosure and `print-object` attributes | Feature-specific `DISCARDED` as before (S04/S10/S11/S12/S13/S15/S17) | Extend `VisualHints` to those elements when a renderer needs them |
+| Invalid decimals, colours, margin types, yes/no values, `blank-page`, staff-layout `number`, non-positive scaling or page size | Fatal `INVALID_VALUE` | None |
+| Scaling missing a value, page height without width, duplicate or conflicting page margins, incomplete margins, duplicate singleton children | Fatal `INVALID_STRUCTURE` | None |
+
+F18 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+
 ## MX-17 barline, repeat and ending decisions and remaining gaps
 
 MX-17 supersedes the MX-06 S15 discard of whole barlines and the MX-08 S24 discard of
@@ -197,7 +219,7 @@ MX-06 S13 discard of a measure's `direction` element, MX-11's S12 discard of `ar
 | `offset` | Exact rational quarter notes, negative allowed; display only unless `sound="yes"`, which also sets `DirectionSound.offset`; offset before divisions fatal `INVALID_STRUCTURE` | None |
 | Other direction types: `rehearsal`, `segno`, `coda`, `pedal`, `octave-shift`, `dashes`, `bracket`, `damp`, `eyeglasses`, `image`, `principal-voice`, `percussion`, `accordion-registration`, `harp-pedals`, `scordatura`, `string-mute`, `staff-divide`, `symbol`, `other-direction` | S13 `DISCARDED` per element; the rest of the direction is kept, and a direction with nothing interpretable has no event | Model and import each type; `PEDAL` relationship is reserved |
 | Metric modulation, `beat-unit-tied`, `metronome-note` metronome forms | S13 `DISCARDED`; metronome dropped | Complex metronome model |
-| Display attributes (fonts, enclosure, position, color, `parentheses`, wedge `spread`/`niente`/line style, `strong-accent type`, trill-sound and mordent attributes) | S13 or S12 `DISCARDED` per attribute; mark kept | Layout hints (MX-18); ornament realization |
+| Display attributes (fonts, enclosure, position, color, `parentheses`, wedge `spread`/`niente`/line style, `strong-accent type`, trill-sound and mordent attributes) | S13 or S12 `DISCARDED` per attribute; mark kept. Position and color of words, dynamics, metronome marks and wedges superseded by MX-18 above | Ornament realization |
 | Other notations: `fermata`, `technical`, `arpeggiate`, `glissando`, `slide`, `accidental-mark`, `non-arpeggiate`, `other-notation`; other articulations/ornaments (`breath-mark`, `caesura`, `scoop`, `plop`, `doit`, `falloff`, `wavy-line`, `tremolo`, `other-ornament`, …) | S12 `DISCARDED` per element | Fermata, tremolo and wavy-line models |
 | Other `sound` attributes and children; `listening` in a direction | S26 `DISCARDED`; tempo/dynamics kept (instrument change superseded by MX-16 below) | MX-20/21 listening and playback |
 | Unmatched wedge endpoints or `continue` without an open wedge | `UNMATCHED_SPAN`; relationship kept with a null partner | None |
@@ -317,7 +339,7 @@ part/measure structures. This supersedes earlier statements that no semantic imp
 | Invalid measure implicit flag or nonpositive/out-of-Int credit page | Fatal `INVALID_VALUE` | General schema value validation remains separate work |
 | Timewise root through public score API | Superseded by MX-10: normalized to the partwise projection | None |
 | Credit images/symbols, text typography/language, encoding supports and unknown header content | S03 `UNSUPPORTED_FEATURE` / `DISCARDED`; plain supported text still retained; strict rejects, tolerant warns | Rich credit/layout and encoding capability semantics remain unimplemented |
-| Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations | Layout MX-18; source IDs/display text/multimetric measure semantics need explicit model mappings |
+| Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations (defaults layout and print superseded by MX-18) | Part-name displays; source IDs/display text/multimetric measure semantics need explicit model mappings |
 | Part groups, part links, grouping, links/bookmarks | S25 discarded-content findings; actual grouping/link importer tests; no targets fetched | Group/editorial/link semantics and full F27 remain pending |
 | Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree (score-instrument and `midi-instrument` superseded by MX-16, barline by MX-17) | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
 | Foreign subtrees or namespaced attributes resemble supported names | Expanded-name lookup prevents aliasing; `foreign-extension` subtree or owner-group attribute finding | No namespace rewriting or extension semantics |

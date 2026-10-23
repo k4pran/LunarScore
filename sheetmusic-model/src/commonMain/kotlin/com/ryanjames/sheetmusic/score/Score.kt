@@ -1,11 +1,15 @@
 package com.ryanjames.sheetmusic.score
 
-/** Ordered format-neutral score. Event and relationship IDs are unique across the score. */
+/**
+ * Ordered format-neutral score. Event and relationship IDs are unique across the score. [layout]
+ * holds optional engraving defaults, null when the source gives none.
+ */
 public data class Score(
     val parts: List<Part> = emptyList(),
     val relationships: List<Relationship> = emptyList(),
     val title: String? = null,
     val metadata: List<MetadataEntry> = emptyList(),
+    val layout: LayoutDefaults? = null,
 )
 
 /**
@@ -47,7 +51,8 @@ public data class Instrument(val id: String, val name: String? = null, val percu
  * [extent] is the observed time extent in quarter notes, not an inferred meter length. Empty and
  * pickup measures are legal. Event order is retained; it need not be sorted by onset or voice.
  * [barlines] are the notated barlines in source order. [measureRepeat] marks a measure displayed
- * as a measure-repeat sign; its events are still the music it sounds.
+ * as a measure-repeat sign; its events are still the music it sounds. [print] holds optional
+ * breaks and layout requested at the measure.
  */
 public data class Measure(
     val id: String,
@@ -57,6 +62,7 @@ public data class Measure(
     val implicit: Boolean = false,
     val barlines: List<Barline> = emptyList(),
     val measureRepeat: MeasureRepeat? = null,
+    val print: PrintHints? = null,
 ) {
     init {
         require(id.isNotBlank())

@@ -22,6 +22,8 @@ import com.ryanjames.sheetmusic.score.Event
 import com.ryanjames.sheetmusic.score.Grace
 import com.ryanjames.sheetmusic.score.Instrument
 import com.ryanjames.sheetmusic.score.KeyMode
+import com.ryanjames.sheetmusic.score.LayoutDefaults
+import com.ryanjames.sheetmusic.score.MarginType
 import com.ryanjames.sheetmusic.score.Measure
 import com.ryanjames.sheetmusic.score.MeasureRepeat
 import com.ryanjames.sheetmusic.score.MetadataEntry
@@ -33,8 +35,11 @@ import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.NoteRole
 import com.ryanjames.sheetmusic.score.NoteValue
 import com.ryanjames.sheetmusic.score.OrnamentType
+import com.ryanjames.sheetmusic.score.PageLayout
+import com.ryanjames.sheetmusic.score.PageMargins
 import com.ryanjames.sheetmusic.score.Part
 import com.ryanjames.sheetmusic.score.Placement
+import com.ryanjames.sheetmusic.score.PrintHints
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.RationalError
 import com.ryanjames.sheetmusic.score.RationalException
@@ -42,13 +47,17 @@ import com.ryanjames.sheetmusic.score.RelationshipKind
 import com.ryanjames.sheetmusic.score.Repeat
 import com.ryanjames.sheetmusic.score.RepeatDirection
 import com.ryanjames.sheetmusic.score.RestEvent
+import com.ryanjames.sheetmusic.score.Scaling
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.SoundingPitch
 import com.ryanjames.sheetmusic.score.Staff
+import com.ryanjames.sheetmusic.score.StaffLayout
 import com.ryanjames.sheetmusic.score.StemDirection
 import com.ryanjames.sheetmusic.score.Step
+import com.ryanjames.sheetmusic.score.SystemLayout
 import com.ryanjames.sheetmusic.score.TimeModification
 import com.ryanjames.sheetmusic.score.Transposition
+import com.ryanjames.sheetmusic.score.VisualHints
 import com.ryanjames.sheetmusic.score.WedgeType
 import com.ryanjames.sheetmusic.score.WrittenPitch
 
@@ -71,7 +80,9 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * notes keep only their display position. Barline styles, repeat signs and ending marks are kept
  * on their measures, ending start/stop marks are paired into part endings (orphans are
  * `UNMATCHED_SPAN`), and staff-1 measure-repeat signs mark their measures; playback order is
- * derived separately by `playbackOrder`. Other musical content is not implemented yet: meaningful unmapped
+ * derived separately by `playbackOrder`. Scaling, page/system/staff layout defaults, measure
+ * `print` breaks and layout, and position/colour of notes, rests and direction marks are kept as
+ * optional engraving hints in tenths. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. Parts with
  * events or a valid staves declaration define staff 1; measure extent is the observed end of timed content. This is not an XSD validator.
  * Structural identity/reference errors are fatal under both policies. Input security, resource
@@ -98,6 +109,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     /** Whether `defaults` declares a concert score, in which written pitches are concert pitches. */
     private var concertScore = false
+
+    /** Layout defaults read from `defaults`, if any. */
+    private var layoutDefaults: LayoutDefaults? = null
 
     /** The part whose measure content is being read; timewise input switches it per measure. */
     private lateinit var body: PartBody
@@ -185,6 +199,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             relationships = spans.map { it.relationship },
             title = title,
             metadata = metadata.toList(),
+            layout = layoutDefaults,
         )
     }
 
@@ -291,19 +306,226 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     /**
      * Reads `concert-score`, which declares that written pitches are concert pitches apart from
-     * octave transpositions; other layout defaults are reported as S17 discarded.
+     * octave transpositions, and scaling plus page, system and staff layout as [LayoutDefaults].
+     * Appearance, fonts and lyric languages are reported as S17 discarded.
      */
     private fun defaults(start: ScoreXmlEvent) {
         attributes(start, feature = "S17")
+        val seen = mutableSetOf<String>()
+        var scaling: Scaling? = null
+        var page: PageLayout? = null
+        var system: SystemLayout? = null
+        val staves = mutableListOf<StaffLayout>()
         children { event ->
-            if (event.localName() == "concert-score") {
-                attributes(event, feature = "S16")
-                children { child -> unsupportedTree(child, "S16") }
-                concertScore = true
+            when (val name = event.localName()) {
+                "concert-score" -> {
+                    attributes(event, feature = "S16")
+                    children { child -> unsupportedTree(child, "S16") }
+                    concertScore = true
+                }
+                "scaling" -> if (once(seen, name, event)) scaling = scaling(event)
+                "page-layout" -> if (once(seen, name, event)) page = pageLayout(event)
+                "system-layout" -> if (once(seen, name, event)) system = systemLayout(event)
+                "staff-layout" -> staffLayout(event)?.let { staves += it }
+                else -> unsupportedTree(event, "S17")
+            }
+        }
+        if (!context.canContinue || (scaling == null && page == null && system == null && staves.isEmpty())) return
+        layoutDefaults = LayoutDefaults(scaling, page, system, staves.toList())
+        provenance("layout", start)
+    }
+
+    /** Reads the millimetres that correspond to a number of tenths; both are required and positive. */
+    private fun scaling(start: ScoreXmlEvent): Scaling? {
+        attributes(start, feature = "S17")
+        val values = layoutValues(start, setOf("millimeters", "tenths"), positive = true)
+        val millimeters = values["millimeters"]
+        val tenths = values["tenths"]
+        if (!context.canContinue) return null
+        if (millimeters == null || tenths == null) {
+            invalid(start, "A scaling requires millimeters and tenths")
+            return null
+        }
+        return Scaling(millimeters, tenths)
+    }
+
+    /**
+     * Reads page height and width (positive, given together) and up to two page-margins: one for
+     * both page sides, or one each for odd and even pages.
+     */
+    private fun pageLayout(start: ScoreXmlEvent): PageLayout? {
+        attributes(start, feature = "S17")
+        val seen = mutableSetOf<String>()
+        var height: Rational? = null
+        var width: Rational? = null
+        val margins = mutableListOf<PageMargins>()
+        children { event ->
+            when (val name = event.localName()) {
+                "page-height", "page-width" -> if (once(seen, name, event)) {
+                    val value = tenths(event, name, positive = true)
+                    if (name == "page-height") height = value else width = value
+                }
+                "page-margins" -> pageMargins(event)?.let { added ->
+                    if (margins.any { it.type == added.type || it.type == MarginType.BOTH || added.type == MarginType.BOTH }) {
+                        invalid(event, "Page margins must be given once for both pages or once each for odd and even pages")
+                    } else {
+                        margins += added
+                    }
+                }
+                else -> unsupportedTree(event, "S17")
+            }
+        }
+        if (!context.canContinue) return null
+        if ((height == null) != (width == null)) {
+            invalid(start, "Page height and width must be given together")
+            return null
+        }
+        return PageLayout(height, width, margins.toList())
+    }
+
+    private fun pageMargins(start: ScoreXmlEvent): PageMargins? {
+        attributes(start, setOf("type"), "S17")
+        val type = when (val text = start.attribute("type")) {
+            null, "both" -> MarginType.BOTH
+            "odd" -> MarginType.ODD
+            "even" -> MarginType.EVEN
+            else -> {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("type"), "Unknown margin type: $text")
+                return null
+            }
+        }
+        val values = layoutValues(start, setOf("left-margin", "right-margin", "top-margin", "bottom-margin"))
+        if (!context.canContinue) return null
+        val left = values["left-margin"]
+        val right = values["right-margin"]
+        val top = values["top-margin"]
+        val bottom = values["bottom-margin"]
+        if (left == null || right == null || top == null || bottom == null) {
+            invalid(start, "Page margins require left, right, top and bottom margins")
+            return null
+        }
+        return PageMargins(type, left, right, top, bottom)
+    }
+
+    /** Reads system margins (left and right together) and distances; system dividers are S17 discarded. */
+    private fun systemLayout(start: ScoreXmlEvent): SystemLayout? {
+        attributes(start, feature = "S17")
+        val seen = mutableSetOf<String>()
+        var margins: Map<String, Rational> = emptyMap()
+        var distance: Rational? = null
+        var topDistance: Rational? = null
+        children { event ->
+            when (val name = event.localName()) {
+                "system-margins" -> if (once(seen, name, event)) {
+                    attributes(event, feature = "S17")
+                    margins = layoutValues(event, setOf("left-margin", "right-margin"))
+                    if (context.canContinue && margins.size != 2) invalid(event, "System margins require left and right margins")
+                }
+                "system-distance" -> if (once(seen, name, event)) distance = tenths(event, name)
+                "top-system-distance" -> if (once(seen, name, event)) topDistance = tenths(event, name)
+                else -> unsupportedTree(event, "S17")
+            }
+        }
+        if (!context.canContinue) return null
+        return SystemLayout(margins["left-margin"], margins["right-margin"], distance, topDistance)
+    }
+
+    /** Reads a staff-layout's optional positive staff `number` and staff distance. */
+    private fun staffLayout(start: ScoreXmlEvent): StaffLayout? {
+        attributes(start, setOf("number"), "S17")
+        val numberText = start.attribute("number")
+        val staff = numberText?.let { positiveInt(it) }
+        if (numberText != null && staff == null) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "Staff-layout number must be a positive Int")
+            return null
+        }
+        val distance = layoutValues(start, setOf("staff-distance"))["staff-distance"]
+        if (!context.canContinue) return null
+        return StaffLayout(staff, distance)
+    }
+
+    /**
+     * Reads the children of a layout element named in [names] once each as decimals; other children
+     * are S17 discarded. Missing children are absent from the result.
+     */
+    private fun layoutValues(start: ScoreXmlEvent, names: Set<String>, positive: Boolean = false): Map<String, Rational> {
+        val values = mutableMapOf<String, Rational>()
+        val seen = mutableSetOf<String>()
+        children { event ->
+            val name = event.localName()
+            if (name != null && name in names) {
+                if (once(seen, name, event)) tenths(event, name, positive)?.let { values[name] = it }
             } else {
                 unsupportedTree(event, "S17")
             }
         }
+        return values
+    }
+
+    /** A decimal element value in tenths (millimetres for scaling); null after `INVALID_VALUE`. */
+    private fun tenths(start: ScoreXmlEvent, label: String, positive: Boolean = false): Rational? {
+        val text = text(start, feature = "S17")
+        if (!context.canContinue) return null
+        return if (positive) positiveDecimal(text, start.location, label) else decimal(text, start.location, label)
+    }
+
+    /**
+     * Reads a measure's `print`: system/page breaks, blank pages, page number and layout overrides.
+     * Measure numbering, part name displays, `id` and the deprecated `staff-spacing` are S17 discarded.
+     */
+    private fun print(start: ScoreXmlEvent): PrintHints? {
+        attributes(start, setOf("new-system", "new-page", "blank-page", "page-number"), "S17")
+        val newSystem = yesNo(start, "new-system") ?: return null
+        val newPage = yesNo(start, "new-page") ?: return null
+        val blankPageText = start.attribute("blank-page")
+        val blankPages = blankPageText?.let { positiveInt(it) } ?: 0
+        if (blankPageText != null && blankPages == 0) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("blank-page"), "Blank-page must be a positive Int")
+            return null
+        }
+        val seen = mutableSetOf<String>()
+        var page: PageLayout? = null
+        var system: SystemLayout? = null
+        val staves = mutableListOf<StaffLayout>()
+        var measureDistance: Rational? = null
+        children { event ->
+            when (val name = event.localName()) {
+                "page-layout" -> if (once(seen, name, event)) page = pageLayout(event)
+                "system-layout" -> if (once(seen, name, event)) system = systemLayout(event)
+                "staff-layout" -> staffLayout(event)?.let { staves += it }
+                "measure-layout" -> if (once(seen, name, event)) {
+                    attributes(event, feature = "S17")
+                    measureDistance = layoutValues(event, setOf("measure-distance"))["measure-distance"]
+                }
+                else -> unsupportedTree(event, "S17")
+            }
+        }
+        if (!context.canContinue) return null
+        return PrintHints(newSystem, newPage, blankPages, start.attribute("page-number"), page, system, staves.toList(), measureDistance)
+    }
+
+    /**
+     * Reads the position (`default-x/y`, `relative-x/y` in tenths, possibly negative) and `color`
+     * attributes of a printed element; null when it has none. Callers allow [VISUAL_ATTRIBUTES].
+     */
+    private fun visualHints(start: ScoreXmlEvent): VisualHints? {
+        fun position(name: String): Rational? {
+            val text = start.attribute(name) ?: return null
+            return decimal(text, start.attributeLocation(name), name)
+        }
+        val defaultX = position("default-x")
+        val defaultY = position("default-y")
+        val relativeX = position("relative-x")
+        val relativeY = position("relative-y")
+        val color = start.attribute("color")?.let { text ->
+            text.trim { it in WHITESPACE }.uppercase().takeIf { COLOR.matches(it) } ?: run {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("color"), "Color must be #RRGGBB or #AARRGGBB")
+                null
+            }
+        }
+        if (!context.canContinue) return null
+        return VisualHints(defaultX, defaultY, relativeX, relativeY, color)
+            .takeUnless { defaultX == null && defaultY == null && relativeX == null && relativeY == null && color == null }
     }
 
     /**
@@ -508,6 +730,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val wedges = mutableListOf<WedgeEndpoint>()
         val graces = GraceLinker(body.spans)
         val barlines = mutableListOf<Barline>()
+        var print: PrintHints? = null
+        var printRead = false
         fun eventId() = "$partId:measure-$number:event-${events.size + 1}"
         fun add(event: Event, source: ScoreXmlEvent) {
             provenance("$path.events[${events.size}]", source)
@@ -548,12 +772,20 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     barlines += read.barline
                     read.barline.ending?.let { resolveEnding(it, "measure-$number", checkNotNull(read.endingSource)) }
                 }
+                "print" -> if (printRead) {
+                    unsupportedTree(event, "S17", "Only the first print in a measure is kept")
+                } else {
+                    printRead = true
+                    print = print(event)?.also { provenance("$path.print", event) }
+                }
                 else -> unsupportedTree(event)
             }
         }
         registerWedges(wedges)
         graces.finish()
-        return Measure("measure-$number", displayNumber, extent, events.toList(), implicit, barlines.toList(), body.measureRepeat)
+        return Measure(
+            "measure-$number", displayNumber, extent, events.toList(), implicit, barlines.toList(), body.measureRepeat, print,
+        )
     }
 
     /**
@@ -1015,7 +1247,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * placed at [onset] and leaves the cursor there; a `duration` on it is reported and ignored.
      */
     private fun note(start: ScoreXmlEvent, onset: Rational, id: String): TimedNote? {
-        attributes(start, feature = "S04")
+        attributes(start, VISUAL_ATTRIBUTES, "S04")
+        val visual = visualHints(start)
+        if (!context.canContinue) return null
         val seen = mutableSetOf<String>()
         var content: NoteContent? = null
         var durationText = ""
@@ -1127,7 +1361,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList())
             val event = NoteEvent(
                 id, onset, null, withSounding(pitch, start.location), voice = voice, notation = notation,
-                role = NoteRole.GRACE, instrumentId = noteInstrumentId, grace = grace,
+                role = NoteRole.GRACE, instrumentId = noteInstrumentId, grace = grace, visual = visual,
             )
             return if (context.canContinue) TimedNote(event, onset, marks.toList()) else null
         }
@@ -1147,11 +1381,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val event = when (val noteContent = content ?: return null) {
             is NoteContent.Rest -> {
                 instrumentLocation?.let { unsupported(it, "S16", "An instrument on a rest is not represented; it is discarded") }
-                RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure)
+                RestEvent(id, onset, quarters, voice = voice, notation = notation, wholeMeasure = noteContent.wholeMeasure, visual = visual)
             }
             is NoteContent.Pitch -> NoteEvent(
                 id, onset, quarters, withSounding(noteContent.pitch, start.location), voice = voice, notation = notation,
-                role = role, instrumentId = noteInstrumentId,
+                role = role, instrumentId = noteInstrumentId, visual = visual,
             )
         }
         if (!context.canContinue) return null
@@ -1385,8 +1619,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * In a direction its own placement is validated but ignored, as MusicXML specifies; the direction's governs.
      */
     private fun dynamics(start: ScoreXmlEvent, feature: String, inDirection: Boolean = false): Dynamics? {
-        attributes(start, setOf("placement"), feature)
+        attributes(start, setOf("placement") + VISUAL_ATTRIBUTES, feature)
         val placement = placement(start).takeUnless { inDirection }
+        val visual = visualHints(start)
         val markings = mutableListOf<String>()
         children { event ->
             val name = event.localName()
@@ -1405,7 +1640,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             unsupported(start.location, feature, "Dynamics without a marking are discarded")
             return null
         }
-        return Dynamics(markings.toList(), placement)
+        return Dynamics(markings.toList(), placement, visual)
     }
 
     /**
@@ -1507,7 +1742,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         children { event ->
             empty = false
             when (event.localName()) {
-                "words" -> marks += DirectionMark.Words(text(event, feature = "S13"))
+                "words" -> {
+                    val visual = visualHints(event)
+                    marks += DirectionMark.Words(text(event, VISUAL_ATTRIBUTES, "S13"), visual)
+                }
                 "dynamics" -> dynamics(event, "S13", inDirection = true)?.let { marks += it }
                 "metronome" -> metronome(event)?.let { marks += it }
                 "wedge" -> wedge(event)?.let { (mark, span) ->
@@ -1525,7 +1763,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * `metronome-note` forms are reported as discarded, as are `parentheses` and display attributes.
      */
     private fun metronome(start: ScoreXmlEvent): DirectionMark.Metronome? {
-        attributes(start, feature = "S13")
+        attributes(start, VISUAL_ATTRIBUTES, "S13")
+        val visual = visualHints(start)
         var beatUnits = 0
         var beatUnit: NoteValue? = null
         var dots = 0
@@ -1569,12 +1808,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             invalid(start, "A metronome mark requires a beat-unit and per-minute")
             return null
         }
-        return DirectionMark.Metronome(unit, rate, dots)
+        return DirectionMark.Metronome(unit, rate, dots, visual)
     }
 
     /** A hairpin endpoint paired by `number` (1 to 16) like a slur; display attributes are S13 discarded. */
     private fun wedge(start: ScoreXmlEvent): Pair<DirectionMark.Wedge, SpanMark>? {
-        attributes(start, setOf("type", "number"), "S13")
+        attributes(start, setOf("type", "number") + VISUAL_ATTRIBUTES, "S13")
+        val visual = visualHints(start)
         val text = start.attribute("type") ?: run {
             invalid(start, "A wedge requires a type")
             return null
@@ -1589,7 +1829,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             WedgeType.CONTINUE -> SpanType.CONTINUE
             WedgeType.STOP -> SpanType.STOP
         }
-        return DirectionMark.Wedge(type) to SpanMark(RelationshipKind.WEDGE, spanType, number, start.location)
+        return DirectionMark.Wedge(type, visual) to SpanMark(RelationshipKind.WEDGE, spanType, number, start.location)
     }
 
     /**
@@ -2111,6 +2351,12 @@ private val NOTE_TYPES: Map<String, NoteValue> = mapOf(
     "64th" to NoteValue.N64, "128th" to NoteValue.N128, "256th" to NoteValue.N256,
     "512th" to NoteValue.N512, "1024th" to NoteValue.N1024,
 )
+
+/** Position and colour attributes kept as [VisualHints]. */
+private val VISUAL_ATTRIBUTES: Set<String> = setOf("default-x", "default-y", "relative-x", "relative-y", "color")
+
+/** MusicXML 4.0 `color`, accepted case-insensitively and stored in upper case. */
+private val COLOR = Regex("#[0-9A-F]{6}([0-9A-F]{2})?")
 
 private val NOTE_CHILD_FEATURES: Map<String, String> = mapOf(
     "footnote" to "S25", "level" to "S25",

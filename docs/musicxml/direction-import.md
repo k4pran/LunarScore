@@ -65,7 +65,7 @@ realization (trill speed, beats, accidentals) is not modeled.
 |---|---|
 | Other direction types (`rehearsal`, `segno`, `coda`, `pedal`, `octave-shift`, `dashes`, `bracket`, `image`, …) | S13 `DISCARDED` per element; the rest of the direction is kept |
 | Metric modulation (two beat units), `beat-unit-tied`, `metronome-note` forms | S13 `DISCARDED`; the metronome mark is dropped |
-| Display attributes on `direction`, `direction-type`, `words`, `dynamics`, `metronome` (for example `parentheses`), `wedge` (`spread`, `niente`, line style, position, color) | S13 `DISCARDED` per attribute; the mark is kept |
+| Display attributes on `direction`, `direction-type`, `words`, `dynamics`, `metronome` (for example `parentheses`), `wedge` (`spread`, `niente`, line style) | S13 `DISCARDED` per attribute; the mark is kept. Position and `color` on `words`, `dynamics`, `metronome` and `wedge` are kept as `VisualHints` since MX-18 ([layout-import.md](layout-import.md)) |
 | Other `sound` attributes and children (`damper-pedal`, `swing`, `midi-instrument`, `instrument-change`, `play`, …); `listening` | S26 `DISCARDED`; tempo and dynamics are kept |
 | `footnote`, `level` in a direction | S25 `DISCARDED` |
 | Other articulations (`breath-mark`, `caesura`, `scoop`, `plop`, `doit`, `falloff`, `other-articulation`) and ornaments (`wavy-line`, `tremolo`, `accidental-mark`, `other-ornament`); other notations (`fermata`, `technical`, `arpeggiate`, `glissando`, …) | S12 `DISCARDED` per element |
