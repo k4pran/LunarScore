@@ -102,6 +102,41 @@ class GraceImportTest {
     }
 
     @Test
+    fun testInvalidGraceDurationIsIgnoredWithoutValidation() {
+        listOf("0", "-1", "abc", "99999999999999999999999").forEach { duration ->
+            val xml = document(
+                "<note><grace/><pitch><step>C</step><octave>4</octave></pitch><duration>$duration</duration></note>" + note("D"),
+            )
+            val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+            assertEquals(listOf("S18"), result.diagnostics.map { it.unsupported?.featureId }, duration)
+            val (grace, principal) = result.value.parts.single().measures.single().events.filterIsInstance<NoteEvent>()
+            assertNull(grace.duration)
+            assertEquals(Relationship("P1:grace-note-1", RelationshipKind.GRACE_NOTE, grace.id, principal.id), result.value.relationships.single())
+        }
+        failure(document("<note><pitch><step>C</step><octave>4</octave></pitch><duration>0</duration></note>"), DiagnosticCode.INVALID_VALUE)
+    }
+
+    @Test
+    fun testGraceRelationshipPrecedesSpansStartingOnTheGraceNote() {
+        val xml = document(
+            "<note><grace/><pitch><step>C</step><octave>4</octave></pitch><voice>1</voice>" +
+                "<notations><slur type='start'/></notations></note>" +
+                "<note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice>" +
+                "<notations><slur type='stop'/></notations></note>",
+        )
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val id = { event: Int -> "P1:measure-1:event-$event" }
+        assertEquals(
+            listOf(
+                Relationship("P1:grace-note-1", RelationshipKind.GRACE_NOTE, id(1), id(2)),
+                Relationship("P1:slur-1", RelationshipKind.SLUR, id(1), id(2)),
+            ),
+            result.value.relationships,
+        )
+    }
+
+    @Test
     fun testGraceChordKeepsTheFirstGraceNoteAndDiscardsChordTones() {
         val xml = document(
             grace("C") + "<note><grace/><chord/><pitch><step>E</step><octave>4</octave></pitch></note>" + note("D"),
