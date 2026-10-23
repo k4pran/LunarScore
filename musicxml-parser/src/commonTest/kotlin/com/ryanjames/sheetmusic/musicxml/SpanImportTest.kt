@@ -113,14 +113,14 @@ class SpanImportTest {
     }
 
     @Test
-    fun testDiscardedNoteLeavesItsPartnerUnmatched() {
+    fun testTieAcrossStavesPairsByPitch() {
         val xml = document(
-            note("C", "<tie type='start'/>") +
+            "<attributes><staves>2</staves></attributes>" + note("C", "<tie type='start'/>") +
                 "<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><tie type='stop'/><staff>2</staff></note>",
         )
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf(DiagnosticCode.UNSUPPORTED_FEATURE, DiagnosticCode.UNMATCHED_SPAN), result.diagnostics.map { it.code })
-        assertEquals(listOf(Relationship("P1:sound-tie-1", RelationshipKind.SOUND_TIE, event(1), null)), result.value.relationships)
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(listOf(Relationship("P1:sound-tie-1", RelationshipKind.SOUND_TIE, event(1), event(2))), result.value.relationships)
     }
 
     @Test

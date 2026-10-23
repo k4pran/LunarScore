@@ -13,7 +13,7 @@ can always be told apart.
 | `repeat direction`, `times` | `Repeat(RepeatDirection, times)`; `times` is the total number of plays, null when unspecified |
 | `ending number`, `type`, text | `EndingMark(EndingType, numbers, text)` on the barline; blank text becomes null |
 | Paired ending marks | `Part.endings`: `Ending(id, numbers, startMeasureId, stopMeasureId, text, discontinued)` spanning whole measures |
-| `measure-style/measure-repeat` (staff 1) | `Measure.measureRepeat = MeasureRepeat(measures, slashes)` |
+| `measure-style/measure-repeat` (whole measure; a style numbered for one staff of several is S24 discarded since [MX-09](polyphony.md)) | `Measure.measureRepeat = MeasureRepeat(measures, slashes)` |
 
 Barlines take no time and never move the cursor. `ending number` follows the 4.0
 `ending-number` pattern, `([ ]*)|([1-9][0-9]*(, ?[1-9][0-9]*)*)`, so `"1, 2"` gives `[1, 2]` and
@@ -68,7 +68,7 @@ Navigation findings are returned as `PlaybackDiagnostic`s, separate from parser 
 | Barline `segno`, `coda`, `divisions` and `id` attributes; `segno`, `coda`, `fermata`, `wavy-line` children; `bar-style color` | S15 `DISCARDED` |
 | `repeat after-jump`, `winged`; ending `print-object`, `end-length`, `system`, position and font attributes | S15 `DISCARDED`; the repeat or ending is kept |
 | Barline `footnote`, `level` | S25 `DISCARDED` |
-| Middle barline after an uninterpreted `backup`/`forward` | S06 `DISCARDED`, like notes, so it is never mistimed |
+| Middle barline after `backup`/`forward` | At the cursor after the move since [MX-09](polyphony.md) |
 | `measure-style` for staff ≠ 1 | S08 `DISCARDED` |
 | `multiple-rest`, `beat-repeat`, `slash`; `measure-style` display attributes | S24 `DISCARDED` (MX-21) |
 | Unknown location, bar-style, repeat direction, ending type or measure-repeat type; negative `times`; invalid ending number; non-positive measure count or slashes | Fatal `INVALID_VALUE` |

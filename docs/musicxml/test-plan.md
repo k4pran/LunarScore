@@ -58,6 +58,13 @@ printed accidentals untouched, invalid values and staff-scoped/unsupported attri
 `AttributeStateTest` checks the model resolver directly. These are implementation-authored and
 not XSD-validated. See [attribute state](attribute-state.md).
 
+MX-09 adds original F05, F06 and F08 XML in `PolyphonyFixtures.kt` and 11 `PolyphonyImportTest`
+assertions for backup/forward onsets and voice gaps, chord tones with shorter, equal, longer and
+cross-staff durations, two parts with a two-staff piano, backup before zero under both policies,
+invalid cursor moves, staff numbers beyond the declared staves and the declared staff limit. Tests
+that asserted earlier discards after a cursor move or on staff ≠ 1 now assert the interpreted
+result. These are implementation-authored and not XSD-validated. See [polyphony](polyphony.md).
+
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.
 3. Compare exact musical semantics using reduced rational values; compare presentation fields only where the fixture calls for them.
@@ -73,21 +80,21 @@ Each `F` fixture is a small hand-verifiable file unless noted. Create F01–F08 
 | F02 | Header and two score-parts; preserve part IDs/names/order, work and movement titles. |
 | F03 | F4 with `<alter>1</alter>` and printed natural accidental; preserve pitch alteration and printed accidental independently. |
 | F04 | Divisions change 4→8 midway; following duration=4 starts at the exact preceding end and lasts 1/2 quarter. |
-| F05 | Two voices with backup; voice 2 event starts at 0 while voice 1 advances; forward creates a gap. |
-| F06 | Two notes in a chord at the same onset plus a cross-staff note; chord children retain individual durations. Include a shorter child and equal child, assert following onset uses the reference note; a longer child must receive a semantic diagnostic. |
+| F05 | Two voices with backup; voice 2 event starts at 0 while voice 1 advances; forward creates a gap. Implemented in `PolyphonyFixtures.kt` (MX-09). |
+| F06 | Two notes in a chord at the same onset plus a cross-staff note; chord children retain individual durations. Include a shorter child and equal child, assert following onset uses the reference note; a longer child must receive a semantic diagnostic. Implemented in `PolyphonyFixtures.kt` (MX-09); the longer child is an inline variant in `PolyphonyImportTest`. |
 | F07 | Mid-measure clef/key/time change; each event sees state active at its offset. |
-| F08 | Two parts with different measure content and a two-staff piano part; IDs and offsets stay separate. |
+| F08 | Two parts with different measure content and a two-staff piano part; IDs and offsets stay separate. Implemented in `PolyphonyFixtures.kt` (MX-09). |
 | F09 | Eighth notes with beams and triplet; exact 1/3 or 2/3 rational duration as specified by fixture. Implemented in `TupletFixtures.kt` (MX-12). |
 | F10 | Tie and slur crossing a measure; endpoints resolve by ID and notation/playback types stay distinct. Add notation-only tied, orphan endpoints and a slur stop preceding its musical start in document order. Executable XML in `SpanFixtures.kt` (MX-11); stop-before-start is a resolver test until backup/forward is interpreted. |
 | F11 | Nested tuplet/time-modification, dotted note and pickup measure; no floating-point drift. Include valid tuplet numbers 7,8,16 and invalid 17 independently of nesting depth. Implemented in `TupletFixtures.kt`; 17 is an inline variant (MX-12). |
 | F12 | Partwise/timewise equivalent pair; canonical semantic projections are equal. The schema-validated [MX-00 example](reference-analysis.md#concrete-specification--importer-disagreement) is a seed; the executable pair is `TimewiseFixtures.kt` (MX-10), which also has a measure missing one part. |
 | F13 | Staccato, trill and dynamic on a note; annotations retained and scoped correctly. Implemented in `DirectionFixtures.kt` (MX-13). |
-| F14 | Tempo/metronome, text direction, wedge and offset; event order and span retained. Implemented in `DirectionFixtures.kt` (MX-13); a direction after backup is an inline discard test until MX-09 interprets backup. |
+| F14 | Tempo/metronome, text direction, wedge and offset; event order and span retained. Implemented in `DirectionFixtures.kt` (MX-13); a direction after backup is an inline test of its cursor offset (MX-09). |
 | F15 | Two lyric verses, elision/syllabic text and melisma; ordered text and note association. |
 | F16 | Repeat start/end, two endings and a nonstandard barline; structural and playback fields distinct. Implemented in `BarlineFixtures.kt` (MX-17) with a pickup; nested, orphan and mismatched endings are inline variants in `BarlineImportTest`, and navigation rules are model tests in `PlaybackOrderTest`. |
 | F17 | Transposing instrument plus unpitched percussion; written and sounding fields must not be conflated. Model-only (MX-02) and XML with a mid-measure instrument change (MX-16, `InstrumentFixtures.kt`). |
 | F18 | Page/system/staff layout, print break and explicit positioning; retain supported hints. Implemented in `LayoutFixtures.kt` (MX-18) with negative offsets and colours; omitted defaults, discarded and invalid layout content are inline variants in `LayoutImportTest`. |
-| F19 | Grace before a duration-bearing note and cue note; grace does not advance main cursor. Implemented in `GraceFixtures.kt` (MX-15); grace chord and cue after backup are inline discard tests until MX-09. |
+| F19 | Grace before a duration-bearing note and cue note; grace does not advance main cursor. Implemented in `GraceFixtures.kt` (MX-15); grace chord and cue after backup are inline tests (MX-09). |
 | F20 | `.mxl` with container and two renditions; select first MusicXML rootfile and reject unsafe paths. |
 | F21 | At least `concert-score`, `for-part`, `listening`, `assess` and packaging cases from 4.0 history; supported mapping or explicit unsupported diagnostic. The `concert-score`/`for-part` subset is implemented in `InstrumentFixtures.kt` (MX-16). The rest is `VersionFourFixtures.kt` (MX-20): one measure carrying every score-document addition, with ordered diagnostics asserted in `VersionFourImportTest`. Packaging cases wait for the MX-19 `.mxl` adapter. See the [checklist](version-40-changes.md). |
 | F22 | XSD-invalid: wrong root, missing required part-list, illegal duration and malformed XML; expected rejection category. |

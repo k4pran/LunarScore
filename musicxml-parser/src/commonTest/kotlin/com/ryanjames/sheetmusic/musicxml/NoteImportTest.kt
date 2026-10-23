@@ -166,33 +166,34 @@ class NoteImportTest {
             "<note print-object='no'><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><stem default-y='5'>up</stem></note>" +
                 "<note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>" +
                 "<note><unpitched/><duration>1</duration></note>" +
-                "<note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><staff>2</staff></note>" +
                 "<note><rest><display-step>B</display-step></rest><duration>1</duration><notations><fermata/></notations></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S04", "S10", "S06", "S06", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S04", "S10", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.severity == DiagnosticSeverity.WARNING && it.unsupported?.retention == ContentRetention.DISCARDED })
         val events = events(result)
-        assertEquals(listOf(Rational.ZERO, Rational.ONE, Rational.of(3)), events.map { it.onset })
-        assertEquals(NotePitch.Unpitched(), assertIs<NoteEvent>(events[1]).pitch)
-        assertIs<RestEvent>(events[2])
-        assertEquals(Rational.of(4), result.value.parts.single().measures.single().extent)
+        // The chord tone shares the C's onset and does not advance the cursor.
+        assertEquals(listOf(Rational.ZERO, Rational.ZERO, Rational.ONE, Rational.of(2)), events.map { it.onset })
+        assertEquals(NotePitch.Unpitched(), assertIs<NoteEvent>(events[2]).pitch)
+        assertIs<RestEvent>(events[3])
+        assertEquals(Rational.of(3), result.value.parts.single().measures.single().extent)
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
     }
 
     @Test
-    fun testUninterpretedCursorMoveDiscardsLaterTimedContent() {
+    fun testBackupRewindsTheCursorForLaterContent() {
         val xml = document(
             "<note><rest/><duration>1</duration></note><backup><duration>1</duration></backup>" +
-                "<note><rest/><duration>1</duration></note><attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>",
+                "<note><rest/><duration>1</duration><voice>2</voice></note>" +
+                "<attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>",
         )
-        val result = success(xml.replace("</part>", "<measure number='2'><note><rest/><duration>2</duration></note></measure></part>"),
-            ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S06", "S06", "S06"), result.diagnostics.map { it.unsupported?.featureId })
+        val result = success(xml.replace("</part>", "<measure number='2'><note><rest/><duration>2</duration></note></measure></part>"))
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
         val measures = result.value.parts.single().measures
-        assertEquals(1, measures[0].events.size)
+        assertEquals(listOf(Rational.ZERO, Rational.ZERO, Rational.ONE), measures[0].events.map { it.onset })
         assertEquals(Rational.ONE, measures[0].extent)
-        assertEquals(Rational.of(2), assertIs<RestEvent>(measures[1].events.single()).duration)
+        // The cursor is measure-local, so the next measure starts at zero.
+        assertEquals(Rational.ZERO, assertIs<RestEvent>(measures[1].events.single()).onset)
     }
 
     @Test
@@ -226,17 +227,22 @@ class NoteImportTest {
     @Test
     fun testTimeNumberScopesMeterToStaff() {
         val xml = document(
-            "<attributes><time number='2'><beats>3</beats><beat-type>4</beat-type></time>" +
+            "<attributes><staves>2</staves><time number='2'><beats>3</beats><beat-type>4</beat-type></time>" +
                 "<time number='1'><beats>2</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>1</duration></note>",
         )
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S08"), result.diagnostics.map { it.unsupported?.featureId })
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
         val events = events(result)
-        assertEquals(2, events.size)
-        assertEquals(Attribute.TimeSignature(2, 4), assertIs<AttributeEvent>(events[0]).attribute)
-        assertIs<RestEvent>(events[1])
-        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
-        failure(xml.replace("number='2'", "number='0'"), DiagnosticCode.INVALID_VALUE, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(3, events.size)
+        assertEquals(
+            listOf(Attribute.TimeSignature(3, 4) to 2, Attribute.TimeSignature(2, 4) to 1),
+            events.take(2).map { assertIs<AttributeEvent>(it).let { event -> event.attribute to event.staff } },
+        )
+        assertIs<RestEvent>(events[2])
+        for (policy in ParsePolicy.entries) {
+            failure(xml.replace("<staves>2</staves>", ""), DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
+            failure(xml.replace("number='2'", "number='0'"), DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
+        }
     }
 
     @Test

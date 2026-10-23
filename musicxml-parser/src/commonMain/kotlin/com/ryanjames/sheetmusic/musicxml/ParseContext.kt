@@ -1,7 +1,7 @@
 package com.ryanjames.sheetmusic.musicxml
 
 /** Shared policy/limit enforcement for future reader and semantic adapters. One context per parse. */
-internal class ParseContext(private val options: ParseOptions = ParseOptions()) {
+internal class ParseContext(val options: ParseOptions = ParseOptions()) {
     private val diagnostics = mutableListOf<ParseDiagnostic>()
     private val provenance = mutableListOf<SourceProvenance>()
     private var retainedBytes = 0
@@ -77,8 +77,8 @@ internal class ParseContext(private val options: ParseOptions = ParseOptions()) 
         }
         val recoverable = when (code) {
             DiagnosticCode.UNMATCHED_SPAN, DiagnosticCode.INVALID_CURSOR_MOVE,
-            DiagnosticCode.INCONSISTENT_MEASURE_DURATION, DiagnosticCode.UNSUPPORTED_FEATURE,
-            DiagnosticCode.RECOVERED_VALUE -> true
+            DiagnosticCode.INCONSISTENT_MEASURE_DURATION, DiagnosticCode.INCONSISTENT_CHORD_DURATION,
+            DiagnosticCode.UNSUPPORTED_FEATURE, DiagnosticCode.RECOVERED_VALUE -> true
             else -> false
         }
         val severity = if (recoverable && options.policy == ParsePolicy.TOLERANT) {

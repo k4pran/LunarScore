@@ -108,34 +108,32 @@ class DirectionImportTest {
     }
 
     @Test
-    fun testDirectionAfterBackupIsDiscardedRatherThanMistimed() {
+    fun testDirectionAfterBackupIsPlacedAtTheCursor() {
         val xml = document(
-            note("C") + direction("<wedge type='crescendo'/>") + "<backup><duration>1</duration></backup>" +
-                direction("<wedge type='stop'/>") + note("D"),
+            direction("<wedge type='crescendo'/>") + note("C") + note("D") + "<backup><duration>1</duration></backup>" +
+                direction("<wedge type='stop'/>", "<voice>2</voice>") + note("E"),
         )
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S06", "S06", "S06"), result.diagnostics.mapNotNull { it.unsupported?.featureId })
-        assertEquals(
-            "/score-partwise[1]/part[1]/measure[1]/direction[2]",
-            result.diagnostics.mapNotNull { it.location.path }[1],
-        )
-        val direction = assertIs<DirectionEvent>(result.value.parts.single().measures.single().events[1])
-        assertEquals(Rational.ONE, direction.onset)
-        // The stop after the backup is discarded, so the crescendo stays unmatched with a null end.
-        assertEquals(DiagnosticCode.UNMATCHED_SPAN, result.diagnostics.last().code)
-        assertEquals(listOf(event(1, 2) to null), result.value.relationships.map { it.startEventId to it.endEventId })
-        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val directions = result.value.parts.single().measures.single().events.filterIsInstance<DirectionEvent>()
+        assertEquals(listOf(Rational.ZERO, Rational.ONE), directions.map { it.onset })
+        assertEquals("2", directions[1].voice)
+        // The stop after the backup is at offset 1, after the crescendo starts, so they pair.
+        assertEquals(listOf(event(1, 1) to event(1, 4)), result.value.relationships.map { it.startEventId to it.endEventId })
     }
 
     @Test
-    fun testDirectionForAnotherStaffIsDiscarded() {
-        val xml = document(direction("<words>arco</words>", "<staff>2</staff>") + direction("<words>dolce</words>", "<staff>1</staff>") + note("C"))
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S06"), result.diagnostics.map { it.unsupported?.featureId })
-        val events = result.value.parts.single().measures.single().events
-        assertEquals(listOf(DirectionMark.Words("dolce")), assertIs<DirectionEvent>(events.first()).marks)
-        assertEquals(2, events.size)
-        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
+    fun testDirectionKeepsItsDeclaredStaff() {
+        val directions = direction("<words>arco</words>", "<staff>2</staff>") + direction("<words>dolce</words>", "<staff>1</staff>") + note("C")
+        val result = success(document("<attributes><staves>2</staves></attributes>$directions"))
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val events = result.value.parts.single().measures.single().events.filterIsInstance<DirectionEvent>()
+        assertEquals(
+            listOf(listOf(DirectionMark.Words("arco")) to 2, listOf(DirectionMark.Words("dolce")) to 1),
+            events.map { it.marks to it.staff },
+        )
+        // Staff 2 does not exist without a staves declaration.
+        for (policy in ParsePolicy.entries) failure(document(directions), DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
     }
 
     @Test

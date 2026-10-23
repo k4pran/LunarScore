@@ -23,7 +23,7 @@ measure extent.
 | `direction/@placement`, `direction/@directive` | `DirectionDisplay.placement`, `DirectionDisplay.directive` | Display |
 | `offset` (divisions) | `DirectionDisplay.offset` in quarter notes; also `DirectionSound.offset` when `sound="yes"` | Display; playback when stated |
 | `voice` | `DirectionEvent.voice`; null means the direction applies to every voice | Scope |
-| `staff` | Staff 1 kept; another staff discards the direction (S06), as for notes | Scope |
+| `staff` | `DirectionEvent.staff`; a staff beyond the declared staves is `INVALID_VALUE` ([MX-09](polyphony.md)) | Scope |
 
 A metronome mark and a `sound` tempo are independent: F14's quarter = 120 mark is printed, while
 `sound tempo="120"` is the playback tempo. Neither is derived from the other, and dynamics markings
@@ -41,10 +41,8 @@ endpoints are `UNMATCHED_SPAN` and keep a null partner.
 The `offset` element moves a direction's display (and, with `sound="yes"`, its playback) without
 changing the onset where it sits in the measure. Negative offsets are kept exactly as rationals.
 
-Backup and forward are not interpreted yet (MX-09 is not on this branch). As with notes and
-attribute changes, a direction after an uninterpreted backup/forward is reported as S06
-`DISCARDED` instead of being placed at a wrong offset; a wedge endpoint inside it is dropped, so its
-partner becomes `UNMATCHED_SPAN`. Exact direction offsets after backup become testable with MX-09.
+A direction after `backup`/`forward` sits at the cursor after the move, and its wedge endpoints
+pair by display position like any other ([MX-09](polyphony.md)).
 
 ## Note expression mapping
 
@@ -71,7 +69,7 @@ realization (trill speed, beats, accidentals) is not modeled.
 | Other articulations (`breath-mark`, `caesura`, `scoop`, `plop`, `doit`, `falloff`, `other-articulation`) and ornaments (`wavy-line`, `tremolo`, `accidental-mark`, `other-ornament`); other notations (`fermata`, `technical`, `arpeggiate`, `glissando`, …) | S12 `DISCARDED` per element |
 | Articulation/ornament attributes other than `placement` (for example `strong-accent type`, trill-sound or mordent `long`) | S12 `DISCARDED` per attribute; the expression is kept |
 | Dynamics without a marking | Discarded under the containing feature (S12 or S13) |
-| Direction on staff ≠ 1, or after an uninterpreted backup/forward | S06 `DISCARDED`; no event |
+| Direction on staff ≠ 1, or after backup/forward | Superseded by [MX-09](polyphony.md): kept on its staff at the cursor |
 | Unknown `placement`, wedge `type` or beat unit; wedge `number` outside 1–16; non-`yes`/`no` `directive` or offset `sound`; malformed offset; negative or malformed sound tempo/dynamics; blank `per-minute` or voice; nonpositive staff | Fatal `INVALID_VALUE` |
 | Direction without `direction-type`; wedge without `type`; metronome without `beat-unit` or `per-minute`; duplicate `offset`, `voice`, `staff`, `sound` or `per-minute` | Fatal `INVALID_STRUCTURE` |
 | An offset before any divisions | Divisions 1 assumed with `RECOVERED_VALUE`, as for note durations (MX-21) |
@@ -91,7 +89,7 @@ Neither has been XSD-validated.
 
 `DirectionImportTest` adds 8 common tests: F13 and F14 values, IDs, relationships and provenance
 with no diagnostics; a direction after backup discarded with S06 and its wedge partner unmatched;
-a direction for staff 2 discarded; wedge pairing by number with unmatched start and continue; S12,
+a direction for staff 2 discarded (both now assert the MX-09 cursor offset and staff); wedge pairing by number with unmatched start and continue; S12,
 S13 and S26 discard of unsupported variants under tolerant and strict policies; fatal value and
 structure errors under both policies; and defaults for minimal directions and plain notes.
 `ScoreProjectionTest` checks direction invariants and `WEDGE` validation.

@@ -22,7 +22,7 @@ and the [4.0 version history](https://www.w3.org/2021/06/musicxml40/version-hist
 | Note `instrument` | `NoteEvent.instrumentId`; it must name a score-instrument of the same part |
 | Note without `instrument` in a part with exactly one score-instrument | That instrument, as MusicXML implies |
 | Note without `instrument` in a part with several score-instruments | Null: the instrument is unknown, not guessed |
-| `direction/sound/instrument-change` | `AttributeEvent(InstrumentChange(id))` on staff 1 at the direction's onset plus any `offset sound="yes"`, after the direction event |
+| `direction/sound/instrument-change` | `AttributeEvent(InstrumentChange(id))` on every staff of the part ([MX-09](polyphony.md)) at the direction's onset plus any `offset sound="yes"`, after the direction event |
 
 `effectiveStates()` gives every event the instrument change and transposition in effect, so a
 mid-score instrument change forms a timeline per part. A sound `instrument-change` changes the
@@ -38,7 +38,7 @@ Written pitch (`step`, exact `alter`, `octave`) is never rewritten. Every pitche
 sounding = 12 × (octave + 1) + step semitones + alter + chromatic + 12 × octave-change
 ```
 
-`chromatic` and `octave-change` come from the staff-1 `transpose` in effect at the note. A
+`chromatic` and `octave-change` come from the `transpose` in effect on the note's staff ([MX-09](polyphony.md)). A
 transpose applies at its exact offset and persists across measures. A part with no `transpose`
 sounds as written. `diatonic` is kept on `Transposition` for spelling, but sounding semitones use
 only `chromatic`, so microtonal alters and chromatic values stay exact.
@@ -72,7 +72,7 @@ instrument, and unpitched grace notes are imported like pitched ones.
 | Second and later `instrument` on one note (a note shared by several instruments) | S16 `DISCARDED`; the first instrument is kept |
 | `instrument` on a rest | S16 `DISCARDED` (rests have no instrument) |
 | `transpose/double` | S16 `DISCARDED`; the primary transposition is kept |
-| `transpose` for staff ≠ 1 | S08 `DISCARDED` until MX-09 |
+| `transpose` for staff ≠ 1 | Applies to that staff since [MX-09](polyphony.md); without a `number`, to every staff |
 | `for-part` (concert-score part transposition); `attributes/instruments` count | S16 `DISCARDED` |
 | Other `defaults` children | S17 `DISCARDED` per child (previously one record for the whole `defaults`) |
 | Missing `instrument-name` or score-instrument `id`; duplicate score-instrument; unknown `instrument`, `midi-instrument` or `instrument-change` ID; `transpose` without `chromatic`; only one of `display-step`/`display-octave` | Fatal `INVALID_STRUCTURE` |

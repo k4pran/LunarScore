@@ -65,3 +65,17 @@ blank.
 
 **Fix**: Check with `isBlank()`/`isWhitespace()` so the parser reports `INVALID_VALUE` /
 `INVALID_STRUCTURE` first. The adversarial mutants in `ComplianceAuditTest` found this.
+
+## Stacked pull requests merged into a stale parent never reach master (issues #10, #15, #20)
+
+**Symptom**: PRs for MX-09, MX-14 and MX-19 showed as merged and their issues looked done, but
+`master` had none of their code, and later features were built around its absence.
+
+**Cause**: Each PR targeted its parent feature branch (`agent/issue-9`, `-14`, `-19`). The parent was
+rebase-merged into `master` first, which rewrote its commits, and the child was then merged into
+the old parent branch, which nothing merges any more.
+
+**Fix**: Base every PR on `master` (see `AGENTS.md`), or retarget a stacked PR to `master` before
+its parent merges. Check with `git merge-base --is-ancestor origin/<branch> origin/master` before
+closing an issue. The three branches were ported onto MX-21 as `lunar-score-10-…`, `-15-…` and
+`-20-…`.

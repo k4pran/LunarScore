@@ -98,7 +98,7 @@ support than those rows record.
 
 | Clarification | Status |
 |---|---|
-| `chord`/`duration`: chord notes with different durations | Chord notes are S06 discarded until MX-09 |
+| `chord`/`duration`: chord notes with different durations | Implemented (MX-09): each tone keeps its duration; a tone longer than its reference is `INCONSISTENT_CHORD_DURATION` |
 | `measure-repeat`: the music is repeated in each measure; `type` behaviour | Implemented (MX-17), `Measure.measureRepeat` |
 | `beat-repeat` `type` behaviour | `beat-repeat` is S24 discarded |
 | `diatonic`/`octave-change` for transpositions of an octave or more | Implemented (MX-16): sounding pitch = `chromatic` + 12 × `octave-change` |

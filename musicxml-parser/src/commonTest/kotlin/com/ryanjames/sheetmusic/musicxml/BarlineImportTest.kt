@@ -206,16 +206,19 @@ class BarlineImportTest {
     }
 
     @Test
-    fun testMiddleBarlineAfterCursorMoveIsDiscarded() {
+    fun testMiddleBarlineAfterBackupSitsAtTheCursor() {
         val xml = document(
             measure(
                 right = "<backup><duration>1</duration></backup><barline location='middle'><bar-style>dashed</bar-style></barline>" +
                     "<barline><bar-style>light-heavy</bar-style></barline>",
             ),
         )
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S06", "S06"), result.diagnostics.map { it.unsupported?.featureId })
-        assertEquals(listOf(Barline(style = BarStyle.LIGHT_HEAVY)), result.value.parts.single().measures.single().barlines)
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(
+            listOf(Barline(BarlineLocation.MIDDLE, Rational.of(3), BarStyle.DASHED), Barline(style = BarStyle.LIGHT_HEAVY)),
+            result.value.parts.single().measures.single().barlines,
+        )
     }
 
     @Test
@@ -241,15 +244,22 @@ class BarlineImportTest {
         assertEquals(listOf(DiagnosticCode.UNMATCHED_SPAN), success(orphan, ParseOptions(ParsePolicy.TOLERANT)).diagnostics.map { it.code })
         failure(orphan, DiagnosticCode.UNMATCHED_SPAN)
 
+        // A measure-repeat sign marks whole measures, so one for a single staff of several is discarded.
         val other = document(
             measure(
-                left = "<attributes><measure-style number='2'><measure-repeat type='start'>1</measure-repeat></measure-style>" +
-                    "<measure-style><multiple-rest>4</multiple-rest></measure-style></attributes>",
+                left = "<attributes><staves>2</staves><measure-style number='2'><measure-repeat type='start'>1</measure-repeat>" +
+                    "</measure-style><measure-style><multiple-rest>4</multiple-rest></measure-style></attributes>",
             ),
         )
         val result = success(other, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S08", "S24"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S24", "S24"), result.diagnostics.map { it.unsupported?.featureId })
         assertNull(result.value.parts.single().measures.single().measureRepeat)
+        failure(other.replace("<staves>2</staves>", ""), DiagnosticCode.INVALID_VALUE, ParseOptions(ParsePolicy.TOLERANT))
+        // On a single staff, staff 1 is the whole measure.
+        val single = document(
+            measure(left = "<attributes><measure-style number='1'><measure-repeat type='start'>1</measure-repeat></measure-style></attributes>"),
+        )
+        assertEquals(MeasureRepeat(1, 1), success(single).value.parts.single().measures.single().measureRepeat)
 
         for (invalid in listOf("<measure-repeat type='start'>0</measure-repeat>", "<measure-repeat type='start' slashes='0'>1</measure-repeat>", "<measure-repeat type='begin'>1</measure-repeat>")) {
             failure(document(measure(left = "<attributes><measure-style>$invalid</measure-style></attributes>")), DiagnosticCode.INVALID_VALUE)

@@ -138,34 +138,47 @@ class GraceImportTest {
     }
 
     @Test
-    fun testGraceChordKeepsTheFirstGraceNoteAndDiscardsChordTones() {
-        val xml = document(
-            grace("C") + "<note><grace/><chord/><pitch><step>E</step><octave>4</octave></pitch></note>" + note("D"),
-        )
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S06"), result.diagnostics.map { it.unsupported?.featureId })
+    fun testGraceChordTonesShareTheirChordAndPrincipal() {
+        val graceChordTone = "<note><grace/><chord/><pitch><step>E</step><octave>4</octave></pitch></note>"
+        val result = success(document(grace("C") + graceChordTone + note("D")))
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
         val events = result.value.parts.single().measures.single().events.filterIsInstance<NoteEvent>()
-        assertEquals(listOf(NoteRole.GRACE, NoteRole.NORMAL), events.map { it.role })
-        assertEquals(listOf(Rational.ZERO, Rational.ZERO), events.map { it.onset })
-        assertEquals(Relationship("P1:grace-note-1", RelationshipKind.GRACE_NOTE, events[0].id, events[1].id), result.value.relationships.single())
-        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
+        assertEquals(listOf(NoteRole.GRACE, NoteRole.GRACE, NoteRole.NORMAL), events.map { it.role })
+        assertEquals(listOf(Rational.ZERO, Rational.ZERO, Rational.ZERO), events.map { it.onset })
+        assertEquals(listOf("P1:measure-1:chord-1", "P1:measure-1:chord-1", null), events.map { it.chordId })
+        assertEquals(
+            listOf(
+                Relationship("P1:grace-note-1", RelationshipKind.GRACE_NOTE, events[0].id, events[2].id),
+                Relationship("P1:grace-note-2", RelationshipKind.GRACE_NOTE, events[1].id, events[2].id),
+            ),
+            result.value.relationships,
+        )
+        // A grace chord tone needs a grace reference note, and a timed chord tone a timed one.
+        for (policy in ParsePolicy.entries) {
+            failure(document(note("C") + graceChordTone), DiagnosticCode.INVALID_STRUCTURE, ParseOptions(policy))
+            failure(
+                document(grace("C") + "<note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>"),
+                DiagnosticCode.INVALID_STRUCTURE,
+                ParseOptions(policy),
+            )
+        }
     }
 
     @Test
-    fun testCueAfterBackupIsDiscardedUntilCursorMovesAreInterpreted() {
+    fun testCueAfterBackupIsPlacedAtTheCursor() {
         val xml = document(
             note("C", voice = "1") + grace("E", voice = "1") +
                 "<backup><duration>1</duration></backup>" +
                 "<note><cue/><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration><voice>2</voice></note>",
         )
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S06", "S06"), result.diagnostics.map { it.unsupported?.featureId })
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
         val events = result.value.parts.single().measures.single().events.filterIsInstance<NoteEvent>()
-        assertEquals(listOf(NoteRole.NORMAL, NoteRole.GRACE), events.map { it.role })
-        assertEquals(Rational.ONE, events[1].onset)
-        // The grace note before the cursor move is an after-grace of the C.
+        assertEquals(listOf(NoteRole.NORMAL, NoteRole.GRACE, NoteRole.CUE), events.map { it.role })
+        assertEquals(listOf(Rational.ZERO, Rational.ONE, Rational.ZERO), events.map { it.onset })
+        assertEquals("2", events[2].voice)
+        // The cue in voice 2 is not a principal for voice 1, so the grace note is an after-grace of the C.
         assertEquals(events[0].id, result.value.relationships.single().endEventId)
-        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
     }
 
     @Test
@@ -188,15 +201,18 @@ class GraceImportTest {
     }
 
     @Test
-    fun testGraceBeforeDiscardedNoteHasNoPrincipal() {
+    fun testGraceLinksToItsPrincipalOnAnotherStaff() {
         val xml = document(
-            grace("C") + "<note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><staff>2</staff></note>" + note("E"),
+            "<attributes><staves>2</staves></attributes>" + grace("C") +
+                "<note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><staff>2</staff></note>" + note("E"),
         )
-        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf(DiagnosticCode.UNSUPPORTED_FEATURE, DiagnosticCode.UNMATCHED_SPAN), result.diagnostics.map { it.code })
-        val events = result.value.parts.single().measures.single().events
-        assertEquals(listOf(Rational.ZERO, Rational.ONE), events.map { it.onset })
-        assertNull(result.value.relationships.single().endEventId)
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val events = result.value.parts.single().measures.single().events.filterIsInstance<NoteEvent>()
+        assertEquals(listOf(1, 2, 1), events.map { it.staff })
+        assertEquals(listOf(Rational.ZERO, Rational.ZERO, Rational.ONE), events.map { it.onset })
+        // The principal is the next note in the grace note's voice, whatever its staff.
+        assertEquals(events[0].id to events[1].id, result.value.relationships.single().let { it.startEventId to it.endEventId })
     }
 
     @Test

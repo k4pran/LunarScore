@@ -27,10 +27,10 @@ truncated score. Failure codes and their meaning are stable; message prose is no
 |---|---|---|---|
 | `MALFORMED_XML`, `UNSAFE_XML`, `UNSUPPORTED_ENCODING`, `UNSUPPORTED_XML_VERSION`, `UNSUPPORTED_ROOT`, `UNSUPPORTED_NAMESPACE` | Error/failure, stop | Error/failure, stop | Supply available coordinates; do not invent line/column before reader creation |
 | `INVALID_STRUCTURE`, `INVALID_VALUE`, `NUMERIC_OVERFLOW` | Error/failure, stop | Error/failure, stop | Missing required structure/references or uninterpretable required values cannot yield an accepted score |
-| `UNMATCHED_SPAN`, `INVALID_CURSOR_MOVE`, `INCONSISTENT_MEASURE_DURATION` | Error/failure | Warning/accepted candidate | Preserve unresolved facts where representable; describe any repair/discard explicitly; do not silently clamp a cursor |
+| `UNMATCHED_SPAN`, `INVALID_CURSOR_MOVE`, `INCONSISTENT_MEASURE_DURATION`, `INCONSISTENT_CHORD_DURATION` | Error/failure | Warning/accepted candidate | Preserve unresolved facts where representable; describe any repair/discard explicitly; do not silently clamp a cursor. MX-09 adds the chord code for a tone longer than its reference note |
 | `UNSUPPORTED_FEATURE` | Error/failure | Warning/accepted candidate | Include coverage feature ID, location and explicit retention outcome for each meaningful unmapped subtree/attribute |
 | `RECOVERED_VALUE` | Error/failure | Warning/accepted candidate | Message describes the actual repair; use unsupported-content records as well when meaningful source material is lost |
-| `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `PATH_LIMIT`, `ATTRIBUTE_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |
+| `INPUT_LIMIT`, `DEPTH_LIMIT`, `ELEMENT_LIMIT`, `PATH_LIMIT`, `ATTRIBUTE_LIMIT`, `DIAGNOSTIC_LIMIT`, `RETENTION_LIMIT`, `PROVENANCE_LIMIT`, `STAFF_LIMIT` | Error/failure, stop | Error/failure, stop | Stop consumption; never hide a limit behind success |
 | `CANCELLED`, `ARCHIVE_READ_FAILED`, `ARCHIVE_ENTRY_LIMIT` | Error/failure, stop | Error/failure, stop | Cancellation and detailed archive detection remain reader/archive adapter work |
 
 Semantic findings may be collected after strict rejection to provide useful ordered diagnostics;
@@ -78,6 +78,7 @@ but schema-valid `grouping` (S25) is the contract test example; there is no grou
 | Cumulative source path UTF-16 code units | 8,388,608 | MX-05 cursor before full-path concatenation; `PATH_LIMIT` reuses an existing parent location |
 | Diagnostics | 1,000 | Internal shared `ParseContext` |
 | Opaque retained source UTF-8 bytes | 65,536 total | Internal shared `ParseContext`; zero disables opaque retention |
+| Declared staves, summed across parts | 1,024 | MX-09 before a `staves` count is applied, since staves and unnumbered attributes expand per staff; fatal `STAFF_LIMIT` |
 | Provenance entries | 100,000 | Internal shared `ParseContext`; zero prohibits mappings |
 
 All limits are finite; XML and diagnostic limits must be positive. Retention/provenance may be

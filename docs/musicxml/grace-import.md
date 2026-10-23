@@ -25,10 +25,9 @@ grace note, end = principal), numbered `<partId>:grace-note-<n>` in the grace no
 
 - The principal is the next imported normal or cue note in the same voice in the same measure.
   Consecutive grace notes share that principal.
-- Grace notes followed in their voice by a rest, or by the end of the measure (including an
-  uninterpreted backup/forward), are after-graces of the previous note in that voice.
-- Grace notes whose next timed note in the voice is discarded (on another staff), or that
-  have no note in their voice to attach to, keep a null end and produce `UNMATCHED_SPAN`
+- Grace notes followed in their voice by a rest, or by the end of the measure, are after-graces
+  of the previous note in that voice. Notes in other voices after a backup do not count.
+- Grace notes that have no note in their voice to attach to keep a null end and produce `UNMATCHED_SPAN`
   (strict rejects, tolerant warns; the model reports `MISSING_ENDPOINT`).
 
 Playback time stealing is not applied: performed onsets and durations of principal and neighbouring
@@ -42,9 +41,9 @@ notes are unchanged, and the steal-time percentages are retained for consumers.
 | `make-time` and other `grace` attributes; `grace` children | S18 `DISCARDED`; the grace note is kept |
 | `cue` on a grace note | S18 `DISCARDED` (cue size); imported as a grace note |
 | Grace rest | S18 `DISCARDED`; the note is dropped without moving the cursor |
-| Grace chord tone (`grace` plus `chord`) | S06 `DISCARDED` until MX-09 imports chords; the first grace note of the chord is kept |
-| Grace note on staff other than 1 | S06 `DISCARDED`; no cursor movement (unpitched grace notes are imported since [MX-16](instrument-import.md)) |
-| Grace or cue note after `backup`/`forward` | S06 `DISCARDED` with other content after the uninterpreted cursor move, until MX-09 |
+| Grace chord tone (`grace` plus `chord`) | Imported since [MX-09](polyphony.md): a `GRACE` note sharing its grace reference's onset, chord ID and principal |
+| Grace note on staff other than 1 | Kept on its declared staff since [MX-09](polyphony.md) |
+| Grace or cue note after `backup`/`forward` | Placed at the cursor after the move since [MX-09](polyphony.md) |
 | Invalid `slash`; steal-time outside 0–100 or not a decimal | Fatal `INVALID_VALUE` |
 | Duplicate `grace` | Fatal `INVALID_STRUCTURE` |
 
