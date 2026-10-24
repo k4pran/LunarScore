@@ -38,7 +38,7 @@ Written pitch (`step`, exact `alter`, `octave`) is never rewritten. Every pitche
 sounding = 12 × (octave + 1) + step semitones + alter + chromatic + 12 × octave-change
 ```
 
-`chromatic` and `octave-change` come from the `transpose` in effect on the note's staff ([MX-09](polyphony.md)). A
+`chromatic` and `octave-change` come from the `transpose` in effect on the note's staff at the note's onset ([MX-09](polyphony.md)), so a transpose reached after a `backup` does not affect earlier-onset notes. A
 transpose applies at its exact offset and persists across measures. A part with no `transpose`
 sounds as written. `diatonic` is kept on `Transposition` for spelling, but sounding semitones use
 only `chromatic`, so microtonal alters and chromatic values stay exact.
