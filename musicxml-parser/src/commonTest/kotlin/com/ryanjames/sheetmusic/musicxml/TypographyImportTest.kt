@@ -145,6 +145,25 @@ class TypographyImportTest {
     }
 
     @Test
+    fun testLaterLyricTextRunWithoutTypographyLosesTheDistinction() {
+        // A later run with default formatting differs from an explicitly formatted first run.
+        val lyric = "<lyric><text font-weight='bold'>la</text><text>a</text></lyric>"
+        val xml = document("<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration>$lyric</note>")
+        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf(UnsupportedContent("S14", ContentRetention.DISCARDED)), result.diagnostics.map { it.unsupported })
+        assertTrue(result.diagnostics.single().location.path.orEmpty().endsWith("/lyric[1]/text[2]"))
+        val syllable = notes(result.value).single().notation.lyrics.single().syllables.single()
+        assertEquals("laa", syllable.text)
+        assertEquals(VisualHints(font = FontHints(weight = FontWeight.BOLD)), syllable.visual)
+        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
+
+        val plain = document(
+            "<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><lyric><text>la</text><text>a</text></lyric></note>",
+        )
+        assertTrue(success(plain).diagnostics.isEmpty())
+    }
+
+    @Test
     fun testFormattingWithoutAModelElementIsStillDiscarded() {
         val xml = document(
             direction("<words letter-spacing='2' xml:lang='it' underline='1'>dolce</words>") +

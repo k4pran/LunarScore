@@ -2174,7 +2174,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                         elisionVisual = null
                     } else {
                         texts.last().append(text)
-                        if (runVisual != null && runVisual != syllables.last().visual) {
+                        if (runVisual != syllables.last().visual) {
                             unsupported(event.location, "S14", "A later text run's typography differs from the syllable's first run; it is discarded")
                         }
                     }
