@@ -1100,7 +1100,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     nonTraditional = true
                     if (!accidentalAllowed) invalid(event, "A key-accidental must follow a key-alter")
                     val text = text(event, feature = "S07").trim { it in WHITESPACE }
-                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Key accidental must be nonblank")
+                    if (text.isBlank()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Key accidental must be nonblank")
                     else if (alterations.isNotEmpty()) alterations[alterations.lastIndex] = alterations.last().copy(accidental = text)
                 }
                 "key-octave" -> keyOctave(event)?.let { octaves += it }

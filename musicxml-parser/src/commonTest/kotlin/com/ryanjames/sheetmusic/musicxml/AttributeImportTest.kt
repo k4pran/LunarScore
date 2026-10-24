@@ -146,6 +146,12 @@ class AttributeImportTest {
         failure(key("<key-step>H</key-step><key-alter>1</key-alter>"), DiagnosticCode.INVALID_VALUE)
         failure(key("<key-step>F</key-step><key-alter>sharp</key-alter>"), DiagnosticCode.INVALID_VALUE)
         failure(key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental> </key-accidental>"), DiagnosticCode.INVALID_VALUE)
+        failure(key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental>&#xA0;</key-accidental>"), DiagnosticCode.INVALID_VALUE)
+        failure(
+            key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental>&#xA0;</key-accidental>"),
+            DiagnosticCode.INVALID_VALUE,
+            ParseOptions(ParsePolicy.TOLERANT),
+        )
         val smufl = success(
             key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental smufl='accSagittal5v7KleismaUp'>other</key-accidental>"),
             ParseOptions(ParsePolicy.TOLERANT),
