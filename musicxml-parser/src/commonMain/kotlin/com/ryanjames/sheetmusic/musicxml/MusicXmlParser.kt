@@ -1793,6 +1793,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         val placement = placement(start)
         val syllables = mutableListOf<LyricSyllable>()
+        // Each syllable's text runs, joined once at the end so many runs do not recopy the text so far.
+        val texts = mutableListOf<StringBuilder>()
         var syllabic: Syllabic? = null
         var syllabicPending = false
         var elision: String? = null
@@ -1830,12 +1832,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 "text" -> {
                     val text = text(event, feature = "S14")
                     if (syllables.isEmpty() || elision != null) {
-                        syllables += LyricSyllable(text, syllabic, elision)
+                        syllables += LyricSyllable("", syllabic, elision)
+                        texts += StringBuilder(text)
                         syllabic = null
                         syllabicPending = false
                         elision = null
                     } else {
-                        syllables[syllables.lastIndex] = syllables.last().let { it.copy(text = it.text + text) }
+                        texts.last().append(text)
                     }
                 }
                 "extend" -> {
@@ -1876,7 +1879,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             return null
         }
         if (discarded) return null
-        return Lyric(syllables.toList(), verse, start.attribute("name"), extend, placement)
+        val joined = syllables.mapIndexed { index, syllable -> syllable.copy(text = texts[index].toString()) }
+        return Lyric(joined, verse, start.attribute("name"), extend, placement)
     }
 
     /** A lyric `extend` with its optional start/continue/stop type; display attributes are S14 discarded. */
