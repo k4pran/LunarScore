@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F10 source, authored for this repository from the MusicXML 4.0 tie, tied and slur
- * references. Expected XSD result: valid (not validated by these tests). In 4/4 with
+ * references. Expected XSD result: valid (checked by `XsdValidationTest`). In 4/4 with
  * divisions=1: slur 1 runs from E4 in measure 1 to G4 in measure 2 with a continue point on the
  * first G4; nested slur 2 and a sound tie plus its printed tie join the two G4s across the
  * barline; the two A4s carry a notation-only tied mark without a sound tie.

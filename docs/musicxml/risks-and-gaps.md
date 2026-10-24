@@ -157,7 +157,7 @@ outcome was structured: no exception escaped and no failure lacked an error.
 | Non-score XML with a DOCTYPE (`catalog.xml`) | Fatal `UNSAFE_XML` | None |
 | Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07; now kept as `TimeSymbol`), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary); counts predate MX-09 and MX-14, which now import voices, chords, staves and lyrics, and have not been re-run | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
 | F05, F06, F08, F15 fixtures | Implemented by MX-09 (`PolyphonyFixtures.kt`) and MX-14 (`LyricFixtures.kt`) | None |
-| XSD validation, real exporter corpus, iOS runtime | Not run: fixtures are not schema-validated, only public test suites were used, iOS is compile-only on Windows | Run with an XSD validator, a rights-cleared exporter corpus and on macOS |
+| Real exporter corpus, iOS runtime | Fixture files are schema-validated (MX-04, `XsdValidationTest`) except F21; only public test suites were used; iOS is compile-only on Windows | A rights-cleared exporter corpus, F21 reordered to schema order, and runs on macOS |
 
 ## MX-20 MusicXML 4.0 change-list decisions and remaining gaps
 
@@ -182,7 +182,7 @@ additions were already reported by their domain owners; MX-20 pins each of them 
 | `concert-score`, `instrument-change`, `part name` credit-type, number-level 16, deprecated `none` clef | Supported; asserted in F21 and the MX-16/MX-11/MX-12 tests | None |
 | DTD versions deprecated | The standard header is ignored unresolved (MX-21); any other DOCTYPE is fatal `UNSAFE_XML` | None |
 
-F21 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F21 is implementation-authored and knowingly schema-invalid in element order ([manifest](fixture-manifest.md)); iOS runtime still requires macOS.
 
 ## MX-18 layout and visual hint decisions and remaining gaps
 
@@ -204,7 +204,7 @@ All lengths are tenths (one tenth of a staff space). See [layout-import.md](layo
 | Invalid decimals, colours, margin types, yes/no values, `blank-page`, staff-layout `number`, non-positive scaling or page size | Fatal `INVALID_VALUE` | None |
 | Scaling missing a value, page height without width, duplicate or conflicting page margins, incomplete margins, duplicate singleton children | Fatal `INVALID_STRUCTURE` | None |
 
-F18 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F18 is implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-17 barline, repeat and ending decisions and remaining gaps
 
@@ -228,7 +228,7 @@ See [barline-import.md](barline-import.md).
 | Measure-repeat sign | `MeasureRepeat` on each measure showing it, music retained, playback unchanged; orphan stop `UNMATCHED_SPAN` | None |
 | `multiple-rest`, `beat-repeat`, `slash`; measure style for one staff of a multi-staff part | S24 `DISCARDED`; a staff number beyond the declared staves is `INVALID_VALUE` (MX-09) | MX-21; staff-scoped measure styles need model support |
 
-F16 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F16 is implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-16 instrument and pitch interpretation decisions and remaining gaps
 
@@ -252,7 +252,7 @@ note `instrument` and unpitched notes. It also supersedes the S26 discard of a d
 | Transpose for staff ≠ 1 | Per-staff transposition since MX-09; an unnumbered transpose applies to every staff | None |
 | Unknown or missing instrument references; missing instrument name; half a display position; `midi-unpitched` outside 1–128 | Fatal `INVALID_STRUCTURE` / `INVALID_VALUE` | None |
 
-F17 and the F21 subset are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F17 and the F21 subset are implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-15 grace and cue note decisions and remaining gaps
 
@@ -311,7 +311,7 @@ MX-06 S13 discard of a measure's `direction` element, MX-11's S12 discard of `ar
 | Unknown placement, wedge type or beat unit; wedge number outside 1–16; malformed offset or sound values; blank per-minute | Fatal `INVALID_VALUE` | None |
 | Direction without `direction-type`; wedge without type; metronome without beat-unit/per-minute; duplicate offset/voice/staff/sound | Fatal `INVALID_STRUCTURE` | None |
 
-F13 and F14 are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F13 and F14 are implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-12 beam, stem and tuplet decisions and remaining gaps
 
@@ -331,7 +331,7 @@ imported notes and rests. This supersedes MX-07's S10/S11 discard of `stem`, `be
 | Beam continuity (begin without end), tuplet/duration agreement | Not checked; duration stays authoritative | Optional semantic check |
 | Mixed chord values: chord tones with different type, time modification, stems or beams | Each tone keeps its own notation (MX-09); consistency is not checked | A mixed-value chord fixture |
 
-F09 and F11 are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F09 and F11 are implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-11 tie and slur decisions and remaining gaps
 
@@ -351,7 +351,7 @@ supersedes MX-07's S09 discard of `tie` and its S12 discard of the whole `notati
 | Display attributes on `tie`/`tied`/`slur` | S09 `DISCARDED` per attribute; span kept | MX-18 layout |
 | Other `notations` children and `notations` attributes | S12 (S25 `footnote`/`level`) `DISCARDED` per child; `tuplet` superseded by MX-12 and articulations, ornaments and dynamics by MX-13 above | Remaining notations (fermata, technical, …) |
 
-F10 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F10 is implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-10 timewise normalization decisions and remaining gaps
 
@@ -366,7 +366,7 @@ supersedes the MX-06 fatal `UNSUPPORTED_ROOT` for timewise roots.
 | Non-part children of a timewise measure, `part` directly under the root, unmapped timewise `part`/`measure` attributes | Feature-group `UNSUPPORTED_FEATURE` / `DISCARDED` (for example S13, S03, S01); strict rejects, tolerant warns | Measure-level semantics belong to their feature tasks |
 | Measure attributes that differ per part (partwise allows a different `implicit` or `number` per part) | Timewise has one set per measure, so the projection is identical; partwise differences are kept as written | None |
 
-F12 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F12 is implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-09 polyphony, chord and staff decisions and remaining gaps
 
@@ -387,7 +387,7 @@ barlines) and of staff ≠ 1 transposes (MX-16). See [polyphony.md](polyphony.md
 | Huge `staves` | Fatal `STAFF_LIMIT` at `ParseLimits.maxStaves` (1,024) summed across parts | None |
 | Measure fullness | Not checked | `INCONSISTENT_MEASURE_DURATION` |
 
-F05, F06 and F08 are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F05, F06 and F08 are implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-08 attribute state decisions and remaining gaps
 
@@ -408,7 +408,7 @@ MX-07's S07 discard of key, clef, staves and staff details.
 | `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` (`transpose` superseded by MX-16 and `measure-repeat` by MX-17 above) | MX-17, MX-13 |
 | State change after backup/forward | At the cursor after the move (superseded by MX-09) | None |
 
-F07 is implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F07 is implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-07 note/rest decisions and remaining gaps
 
@@ -429,7 +429,7 @@ obligation is met for durations and divisions.
 | Voice labels without backup | Labels retained; voices share the cursor unless backup/forward move it (MX-09) | None |
 | Measure fullness versus time signature | Not checked; extent is the observed end of timed content | `INCONSISTENT_MEASURE_DURATION` policy remains later work |
 
-F01/F03 basic/F04 are implementation-authored and not XSD-validated; iOS runtime still requires macOS.
+F01/F03 basic/F04 are implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
 
 ## MX-06 partwise skeleton decisions and remaining gaps
 
@@ -450,7 +450,7 @@ part/measure structures. This supersedes earlier statements that no semantic imp
 | Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree (score-instrument and `midi-instrument` superseded by MX-16, barline by MX-17) | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
 | Foreign subtrees or namespaced attributes resemble supported names | Expanded-name lookup prevents aliasing; `foreign-extension` subtree or owner-group attribute finding | No namespace rewriting or extension semantics |
 | Work/identification/encoding source containers | Flattened ordered semantic text metadata; credits remain grouped; source sidecar retains original leaf locations | No source-container round-trip, empty-container preservation or formatting promise |
-| F02 and implementation-authored variants | 18 common semantic tests on JVM/Android host; iOS cross-compiles | Independent MX-04 fixtures/XSD validation and macOS runtime evidence still required |
+| F02 and implementation-authored variants | 18 common semantic tests on JVM/Android host; iOS cross-compiles | macOS runtime evidence still required (independent fixtures and XSD validation: MX-04) |
 
 All new unsupported paths use the shared policy, diagnostics cap and source/provenance limits.
 No opaque capture is introduced. See [target results and exact scope](partwise-import.md).

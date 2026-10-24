@@ -3,7 +3,7 @@ package com.ryanjames.sheetmusic.musicxml
 /**
  * Original F21, authored from the MusicXML 4.0
  * [version history](https://www.w3.org/2021/06/musicxml40/version-history/40/) and the element
- * references it links. Expected XSD result: valid (not validated by these tests). One measure holds
+ * references it links. XSD result: invalid in element order, by design (`XsdValidationTest`). One measure holds
  * every 4.0 addition that a score document can carry, so each must be mapped or reported; the
  * expected outcome of each is asserted in `VersionFourImportTest` and listed in
  * `docs/musicxml/version-40-changes.md`. The `concert-score`/`for-part` pitch subset is

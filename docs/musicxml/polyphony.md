@@ -87,7 +87,7 @@ consistency between a chord tone and its reference, are not checked.
 [backup](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/backup/),
 [forward](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/forward/) and
 [chord](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/chord/) references.
-They are intended to be schema-valid but have not been XSD-validated. All three join the MX-21
+They are validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)). All three join the MX-21
 audit corpus, so their adversarial mutants run under both policies.
 
 - F05 has two voices with backup and a forward gap, plus a voice that starts after a forward.

@@ -49,7 +49,7 @@ notes are unchanged, and the steal-time percentages are retained for consumers.
 
 ## Fixtures and verification
 
-`GraceFixtures.kt` adds original F19, authored from the references above and not XSD-validated: a
+`GraceFixtures.kt` adds original F19, authored from the references above and validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)): a
 slashed grace note slurred to its principal with `steal-time-following`, two beamed grace notes
 before one principal, a half-note cue note and a trailing after-grace with `steal-time-previous`,
 then a whole-measure rest.

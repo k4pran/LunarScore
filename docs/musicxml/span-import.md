@@ -52,8 +52,8 @@ the tied note ends. Enharmonic ties (for example C#4 to Db4) are not paired.
 
 `SpanFixtures.kt` adds original F10, authored from the MusicXML 4.0 tie, tied and slur references:
 slur 1 crosses the barline with a `continue` point, nested slur 2 and a sound tie plus printed tie
-join two G4s across the barline, and two A4s carry a notation-only tied mark. It is intended to be
-schema-valid but has not been XSD-validated.
+join two G4s across the barline, and two A4s carry a notation-only tied mark. It is
+validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)).
 
 `SpanImportTest` adds 8 common tests: F10 relationships, IDs and provenance with no diagnostics;
 orphan and duplicate endpoints under both policies; pitch and voice pairing; discarded S09/S12/S25

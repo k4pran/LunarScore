@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F09 source, authored for this repository from the MusicXML 4.0 beam, stem and
- * time-modification references. Expected XSD result: valid (not validated by these tests). In 2/4
+ * time-modification references. Expected XSD result: valid (checked by `XsdValidationTest`). In 2/4
  * with divisions=6, measure 1 has two beamed eighths with up stems, then a beamed 3:2 eighth triplet
  * with down stems whose notes last exactly 1/3 quarter. Measure 2 beams a dotted eighth (decimal
  * duration 4.5) to a sixteenth with a backward hook, followed by a quarter rest.
@@ -59,7 +59,7 @@ internal val f09BeamsAndTriplet: String = """
 
 /**
  * Original F11 source, authored for this repository from the MusicXML 4.0 tuplet and
- * time-modification references. Expected XSD result: valid (not validated by these tests). With
+ * time-modification references. Expected XSD result: valid (checked by `XsdValidationTest`). With
  * divisions=9, the implicit pickup measure 0 holds a 3:2 quarter triplet (tuplet 7) whose middle
  * quarter is a nested 3:2 eighth triplet (tuplet 8), so its eighths carry the cumulative 9:4 ratio
  * and last 2/9 quarter each. Measure 1 in 4/4 has a dotted half, then a beamed eighth triplet

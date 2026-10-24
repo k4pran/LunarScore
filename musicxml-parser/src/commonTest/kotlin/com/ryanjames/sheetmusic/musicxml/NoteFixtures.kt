@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F01 source, authored for this repository from the MusicXML 4.0 note/duration reference.
- * Expected XSD result: valid (not validated by these tests). One part in 4/4 with divisions=4:
+ * Expected XSD result: valid (checked by `XsdValidationTest`). One part in 4/4 with divisions=4:
  * a C4 quarter at 0, then a quarter rest at 1.
  */
 internal val f01QuarterNoteAndRest: String = """
@@ -22,7 +22,7 @@ internal val f01QuarterNoteAndRest: String = """
 """.trimIndent()
 
 /**
- * Original F03 basic source. Expected XSD result: valid (not validated by these tests).
+ * Original F03 basic source. Expected XSD result: valid (checked by `XsdValidationTest`).
  * F4 is sounded sharp by alter while a natural is printed; both facts are kept independently.
  */
 internal val f03AlterWithPrintedNatural: String = """
@@ -41,7 +41,7 @@ internal val f03AlterWithPrintedNatural: String = """
 """.trimIndent()
 
 /**
- * Original F04 source. Expected XSD result: valid (not validated by these tests). Divisions
+ * Original F04 source. Expected XSD result: valid (checked by `XsdValidationTest`). Divisions
  * change 4→8 mid-measure: the following duration=4 starts at 1 and lasts 1/2 quarter. The new
  * divisions persist into the next measure.
  */

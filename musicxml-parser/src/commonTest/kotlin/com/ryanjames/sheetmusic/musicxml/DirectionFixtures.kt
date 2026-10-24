@@ -2,8 +2,8 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F13 source, authored for this repository from the MusicXML 4.0 notations,
- * articulations, ornaments and dynamics references. Expected XSD result: valid (not validated by
- * these tests). In 4/4 with divisions=2: a C5 quarter with a staccato above and an f below, a D5
+ * articulations, ornaments and dynamics references. Expected XSD result: valid (checked by
+ * `XsdValidationTest`). In 4/4 with divisions=2: a C5 quarter with a staccato above and an f below, a D5
  * quarter with a trill mark, accent and tenuto, and an E5 half with an inverted mordent, an sfp
  * written as sf then p, and a nonstandard "pocof" dynamic.
  */
@@ -45,8 +45,7 @@ internal val f13NoteExpressions: String = """
 
 /**
  * Original F14 source, authored for this repository from the MusicXML 4.0 direction, metronome,
- * words, wedge, offset and sound references. Expected XSD result: valid (not validated by these
- * tests). In 4/4 with divisions=2, measure 1 opens with a directive "Allegro" heading and a
+ * words, wedge, offset and sound references. Expected XSD result: valid (checked by `XsdValidationTest`). In 4/4 with divisions=2, measure 1 opens with a directive "Allegro" heading and a
  * quarter = 120 metronome mark whose sound tempo is 120, then a p. A crescendo starts at the second
  * note, displayed half a quarter later through a visual-only offset of 1 division. In measure 2 the
  * hairpin stops with an f whose sound dynamics apply half a quarter early (offset -1 with

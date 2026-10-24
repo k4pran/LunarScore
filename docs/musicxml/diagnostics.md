@@ -6,7 +6,7 @@ an API dependency, without adding source/XML concerns to the neutral model. `Par
 is now returned by MX-06's public [partwise skeleton importer](partwise-import.md).
 MX-05 connects the internal [secure ordered reader](xml-reader.md) to this contract; MX-06 adds
 actual structural/reference and unsupported-content emission without changing the policy.
-MX-01's dependency probes keep their original API/tests. No XSD validation is claimed.
+MX-01's dependency probes keep their original API/tests. The importer does not validate against the XSD; fixtures are schema-checked separately in tests (MX-04).
 The [4.0 XSD](https://www.w3.org/2021/06/musicxml40/listings/musicxml.xsd/) defines valid source
 structure; schema validity and supported musical interpretation remain separate questions.
 

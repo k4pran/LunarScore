@@ -42,7 +42,7 @@ brackets and durations are not checked.
 ## Fixtures and verification
 
 `TupletFixtures.kt` adds original F09 and F11, authored from the MusicXML 4.0 beam, stem, tuplet
-and time-modification references. Neither has been XSD-validated.
+and time-modification references. Both are validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)).
 
 - F09: 2/4, divisions 6. Two beamed eighths with up stems, then a beamed 3:2 eighth triplet with
   down stems lasting exactly 1/3 quarter each, then a dotted eighth (decimal duration 4.5) beamed

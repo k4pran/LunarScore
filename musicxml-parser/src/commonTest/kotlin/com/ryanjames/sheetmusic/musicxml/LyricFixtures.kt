@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F15 source, authored for this repository from the MusicXML 4.0 lyric, syllabic,
- * elision, text and extend references. Expected XSD result: valid (not validated by these tests).
+ * elision, text and extend references. Expected XSD result: valid (checked by `XsdValidationTest`).
  * In 4/4 with divisions=1, verse 1 sings "A-ve" with a melisma on "ve" extended over two more
  * notes (start, an extend-only continuation and an extend-only stop). Verse 2, named "refrain"
  * and placed below, sings "fa‿un" (two syllables elided with an undertie on one note) and then

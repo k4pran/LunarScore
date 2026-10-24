@@ -67,8 +67,8 @@ G major, 2/4 and bass clef; a following F3 with `alter` 1 and no accidental, and
 with a printed natural; a clef at the end of measure 2 that measure 3 inherits. It is authored
 from the MusicXML 4.0 [attributes](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/attributes/),
 [key](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/key/) and
-[clef](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/clef/) references, intended
-schema-valid but not XSD-validated. F03 and F04 remain covered by `NoteImportTest`.
+[clef](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/clef/) references, and
+validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)). F03 and F04 remain covered by `NoteImportTest`.
 
 `AttributeImportTest` adds 9 common tests: F07 effective state and exact offsets, missing state,
 key forms and unsupported key content, clef forms and standard lines, staves/staff details,

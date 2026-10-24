@@ -70,7 +70,7 @@ Measure fullness against the time signature is not checked. Key, clef and staff-
 into the next measure). They are authored from the MusicXML 4.0
 [note](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/note/) and
 [duration](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/duration/) references,
-intended schema-valid but not XSD-validated. `NoteImportTest` adds 12 common tests: exact F01/F03/F04
+validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)). `NoteImportTest` adds 12 common tests: exact F01/F03/F04
 semantics and provenance, fractional divisions, cue/voice, zero/negative/malformed durations under
 both policies, overflow (huge duration, tiny divisions, overflowing quotient and cursor sum), missing
 structure, invalid values, unsupported note/attribute content with exact later onsets, and cursor-move

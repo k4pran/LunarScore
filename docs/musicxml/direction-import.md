@@ -79,7 +79,7 @@ realization (trill speed, beats, accidentals) is not modeled.
 
 `DirectionFixtures.kt` adds original F13 and F14, authored from the MusicXML 4.0 direction,
 notations, articulations, ornaments, dynamics, metronome, wedge, offset and sound references.
-Neither has been XSD-validated.
+Both are validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)).
 
 - F13: a staccato above and an f below on C5, a trill mark, accent and tenuto on D5, and an inverted
   mordent, an `sf`+`p` and an `other-dynamics` "pocof" on E5, with unchanged exact timing.

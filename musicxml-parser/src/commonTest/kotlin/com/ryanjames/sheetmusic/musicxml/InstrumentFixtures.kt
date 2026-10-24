@@ -3,7 +3,7 @@ package com.ryanjames.sheetmusic.musicxml
 /**
  * Original F17 source, authored for this repository from the MusicXML 4.0 score-instrument,
  * instrument, transpose, unpitched, midi-instrument and instrument-change references. Expected XSD
- * result: valid (not validated by these tests). In 4/4 with divisions=1, part P1 is a B-flat
+ * result: valid (checked by `XsdValidationTest`). In 4/4 with divisions=1, part P1 is a B-flat
  * clarinet doubling alto saxophone: measure 1 has written D5 and E4 halves for the clarinet
  * (transposing down a major second, so sounding C5 and D4); measure 2 has a written B4 half for the
  * clarinet, then at beat 3 a transpose to the alto saxophone (down a major sixth), a "To Alto Sax."
@@ -79,7 +79,7 @@ internal val f17InstrumentsAndTransposition: String = """
 
 /**
  * Original concert-score subset of F21, authored from the MusicXML 4.0 concert-score, for-part and
- * transpose references. Expected XSD result: valid (not validated by these tests). The score is in
+ * transpose references. Expected XSD result: valid (checked by `XsdValidationTest`). The score is in
  * concert pitch: the B-flat clarinet part P1 keeps its part transposition only in `for-part` (for
  * generating a transposed part), so its written C5 sounds as written. The piccolo part P2 keeps
  * its octave transposition, which concert scores allow, so its written C5 sounds as C6.

@@ -93,4 +93,4 @@ provenance and playback, and inline variants:
 - timewise ending pairing.
 
 `PlaybackOrderTest` covers navigation rules, diagnostics, ending validation and model invariants.
-All fixtures are implementation-authored and not XSD-validated.
+All fixtures are implementation-authored; F16 is validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)).

@@ -6,8 +6,8 @@ import okio.DeflaterSink
 import okio.use
 
 /**
- * Original F20 score, authored for this repository. Expected XSD result: valid (not validated by
- * these tests). It is the exact UTF-8 content of `scores/f20.musicxml` in [f20MxlHex].
+ * Original F20 score, authored for this repository. Expected XSD result: valid (checked by
+ * `XsdValidationTest`). It is the exact UTF-8 content of `scores/f20.musicxml` in [f20MxlHex].
  */
 internal const val f20Score: String = "<score-partwise version=\"4.0\"><work><work-title>Packed</work-title></work>" +
     "<part-list><score-part id=\"P1\"><part-name>Flute</part-name></score-part></part-list><part id=\"P1\">" +

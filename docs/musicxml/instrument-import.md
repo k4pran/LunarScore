@@ -80,8 +80,8 @@ instrument, and unpitched grace notes are imported like pitched ones.
 
 ## Fixtures and verification
 
-`InstrumentFixtures.kt` adds two original fixtures, authored from the references above and not
-XSD-validated:
+`InstrumentFixtures.kt` adds two original fixtures, authored from the references above and
+validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)):
 
 - F17: a B-flat clarinet doubling alto saxophone, with a transpose and instrument change at beat 3
   of measure 2, plus unpitched bass drum and tied snare with MIDI percussion keys.

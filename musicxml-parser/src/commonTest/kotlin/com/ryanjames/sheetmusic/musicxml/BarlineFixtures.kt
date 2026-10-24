@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F16 source, authored for this repository from the MusicXML 4.0 barline, repeat and
- * ending references. Expected XSD result: valid (not validated by these tests). In 4/4 with
+ * ending references. Expected XSD result: valid (checked by `XsdValidationTest`). In 4/4 with
  * divisions=1, implicit measure 0 is a one-quarter pickup. Measure 1 opens a repeat with a
  * heavy-light forward-repeat barline. Measure 2 is the first ending ("1."), closed by a light-heavy
  * backward repeat. Measure 3 is the second ending, discontinued (open) at its end. Measure 4 has a
