@@ -116,8 +116,11 @@ public data class DirectionEvent(
 
 /** Initial neutral state vocabulary; additional domains can be added without XML/UI types. */
 public sealed interface Attribute {
-    /** A simple meter; additive/interchangeable meters remain future model work. */
-    public data class TimeSignature(val beats: Int, val beatUnit: Int) : Attribute {
+    /**
+     * A simple meter; additive/interchangeable meters remain future model work. [symbol] is how the
+     * signature is displayed and never changes the meter; null means none was given (numbers).
+     */
+    public data class TimeSignature(val beats: Int, val beatUnit: Int, val symbol: TimeSymbol? = null) : Attribute {
         init {
             require(beats > 0 && beatUnit > 0)
         }
@@ -148,6 +151,12 @@ public sealed interface Attribute {
     /** Instrument reference resolved within the containing part. */
     public data class InstrumentChange(val instrumentId: String) : Attribute
 }
+
+/**
+ * Time signature display: common (C) and cut (alla breve) symbols, numerator only, a note in place
+ * of the denominator (plain or dotted), or the usual pair of numbers.
+ */
+public enum class TimeSymbol { COMMON, CUT, SINGLE_NUMBER, NOTE, DOTTED_NOTE, NORMAL }
 
 /** Conventional and non-pitched clef signs. */
 public enum class ClefSign { G, F, C, PERCUSSION, TAB, JIANPU, NONE }

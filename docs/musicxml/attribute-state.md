@@ -18,7 +18,7 @@ val clefAtNote = states[noteEvent.id]?.clef   // null means no clef has been see
 |---|---|
 | `divisions` | Part state for duration conversion (MX-07); persists across measures, not an event |
 | `key` with `fifths` and optional `mode` | `Attribute.KeySignature(fifths, KeyMode?)`; absent mode stays null |
-| `time` with one positive `beats`/`beat-type` pair | `Attribute.TimeSignature` (MX-07) |
+| `time` with one positive `beats`/`beat-type` pair | `Attribute.TimeSignature` (MX-07); its `symbol` (`common`, `cut`, `single-number`, `note`, `dotted-note`, `normal`) is kept as display-only `TimeSymbol`, null when absent |
 | `clef` `sign`/`line`/`clef-octave-change` | `Attribute.Clef`; signs G, F, C, percussion, TAB, jianpu, none. A missing line uses the MusicXML standard line for G (2), F (4) and C (3); otherwise it stays null |
 | `staves` | No event; sets the part's staff count for later content ([MX-09](polyphony.md)) |
 | `staff-details` `staff-lines` | `Attribute.StaffLines(count)`, zero allowed |
@@ -48,7 +48,7 @@ Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from
 
 | Content | Outcome |
 |---|---|
-| Non-integer `fifths`, `line`, `clef-octave-change`; unknown clef sign; non-positive `staves` or attribute `number`, or a `number` beyond the declared staves; negative `staff-lines` | Fatal `INVALID_VALUE` |
+| Non-integer `fifths`, `line`, `clef-octave-change`; unknown clef sign or time `symbol`; non-positive `staves` or attribute `number`, or a `number` beyond the declared staves; negative `staff-lines` | Fatal `INVALID_VALUE` |
 | Key without `fifths` (traditional form), clef without `sign`, duplicate `fifths`/`mode`/`sign`/`line`/`staff-lines` | Fatal `INVALID_STRUCTURE` |
 | `part-symbol` | S08 `DISCARDED` (staff-scoped attributes and `staves` > 1 are interpreted since [MX-09](polyphony.md)) |
 | Non-traditional keys (`key-step`/`key-alter`/`key-accidental`) | S07 `DISCARDED`, whole key dropped |

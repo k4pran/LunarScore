@@ -16,6 +16,7 @@ import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.SoundingPitch
 import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.Step
+import com.ryanjames.sheetmusic.score.TimeSymbol
 import com.ryanjames.sheetmusic.score.WrittenPitch
 import com.ryanjames.sheetmusic.score.validate
 import kotlin.test.Test
@@ -204,9 +205,10 @@ class NoteImportTest {
                 "<clef><sign>G</sign><line>2</line></clef></attributes><note><rest/><duration>1</duration></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S07", "S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
+        // The common-time symbol is kept; the additive and senza-misura forms are discarded.
+        assertEquals(listOf("S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
         val events = events(result)
-        assertEquals(Attribute.TimeSignature(4, 4), assertIs<AttributeEvent>(events[1]).attribute)
+        assertEquals(Attribute.TimeSignature(4, 4, TimeSymbol.COMMON), assertIs<AttributeEvent>(events[1]).attribute)
         assertEquals(4, events.size)
         assertIs<RestEvent>(events[3])
     }
