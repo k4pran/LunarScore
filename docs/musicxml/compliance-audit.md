@@ -61,21 +61,22 @@ It needs `curl`, `tar` and a POSIX shell (Git Bash on Windows). The report goes 
 contains `.invalid.` (41g, 74b, 75b) and 11b, whose `backup` moves before the start of its measure,
 are expected to be diagnosed: the run fails if either policy accepts one without a diagnostic.
 
-Results on 2026-10-24 after MX-24 (#53), 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
+Results on 2026-10-24 after MX-25 (#54), 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
 
 | Policy | Outcome |
 |---|---|
-| Strict | 79 accepted; 101 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` |
-| Tolerant | 79 accepted; 104 accepted with warnings |
+| Strict | 89 accepted; 91 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` |
+| Tolerant | 89 accepted; 94 accepted with warnings |
 
 No file threw, no failure lacked an error and every expected-diagnosed file was diagnosed. The
 tolerant policy accepts every file: since MX-24, 41h's two parts missing from the part list are
 discarded (S01) and 41g's part without an `id` is bound to the only score-part (`RECOVERED_VALUE`).
 Missing `divisions` (03e, 51b, 51c) default to 1 under both policies, so those files are accepted
-cleanly. 74b and 75b are diagnosed only because their `figured-bass` and `accordion-registration`
+cleanly. Since MX-25 the time-signature files 11c–11i import without discarded content. 74b and
+75b are diagnosed only because their `figured-bass` and `accordion-registration`
 content is discarded; the invalidity itself is not detected without XSD validation (#5).
 
-Tolerant files discarding content, per group: S01 4, S03 21, S04 8, S07 17, S08 2, S09 9, S10 1,
+Tolerant files discarding content, per group: S01 4, S03 21, S04 8, S07 7, S08 2, S09 9, S10 1,
 S11 7, S12 17, S13 17, S14 6, S15 3, S16 1, S17 17, S22 10, S23 1, S24 7, S25 9, S26 1.
 
 Each file that is not accepted cleanly under both policies is listed below with the open MX issues
@@ -96,16 +97,6 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | `03d-Rhythm-DottedDurations-Factors.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/multiple-rest` | warnings | S24 8 | #64 |
 | `03e-Rhythm-SecondaryBeamBreaks.musicxml` | UNSUPPORTED_FEATURE `part/measure/@width` | warnings | S01 1 | #57 |
 | `11b-TimeSignatures-NoTime.musicxml` | INVALID_CURSOR_MOVE `part/measure/backup` | warnings | S07 2 | #56; intended: backup before measure start |
-| `11c-TimeSignatures-Complex.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 2 | #54 |
-| `11c-TimeSignatures-CompoundSimple.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 2 | #54 |
-| `11d-TimeSignatures-ComplexMultiple.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 2 | #54 |
-| `11d-TimeSignatures-CompoundMultiple.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 2 | #54 |
-| `11e-TimeSignatures-ComplexMixed.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 1 | #54 |
-| `11e-TimeSignatures-CompoundMixed.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 1 | #54 |
-| `11f-TimeSignatures-SymbolMeaning.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 1 | #54 |
-| `11g-TimeSignatures-SingleNumber.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 1 | #54 |
-| `11h-TimeSignatures-SenzaMisura.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 2 | #54 |
-| `11i-TimeSignatures-Alternate.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 6 | #54 |
 | `13c-KeySignatures-NonTraditional.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key` | warnings | S07 7 | #55 |
 | `13d-KeySignatures-Microtones.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key` | warnings | S07 1 | #55 |
 | `13e-KeySignatures-Cancel.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key/cancel` | warnings | S07 4 | #55 |

@@ -22,6 +22,7 @@ import com.ryanjames.sheetmusic.score.Event
 import com.ryanjames.sheetmusic.score.ExtendType
 import com.ryanjames.sheetmusic.score.Grace
 import com.ryanjames.sheetmusic.score.Instrument
+import com.ryanjames.sheetmusic.score.InterchangeableTime
 import com.ryanjames.sheetmusic.score.KeyMode
 import com.ryanjames.sheetmusic.score.LayoutDefaults
 import com.ryanjames.sheetmusic.score.Lyric
@@ -52,6 +53,7 @@ import com.ryanjames.sheetmusic.score.Repeat
 import com.ryanjames.sheetmusic.score.RepeatDirection
 import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Scaling
+import com.ryanjames.sheetmusic.score.SenzaMisura
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.SoundingPitch
 import com.ryanjames.sheetmusic.score.Staff
@@ -60,7 +62,10 @@ import com.ryanjames.sheetmusic.score.StemDirection
 import com.ryanjames.sheetmusic.score.Syllabic
 import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.SystemLayout
+import com.ryanjames.sheetmusic.score.TimeFraction
 import com.ryanjames.sheetmusic.score.TimeModification
+import com.ryanjames.sheetmusic.score.TimeRelation
+import com.ryanjames.sheetmusic.score.TimeSeparator
 import com.ryanjames.sheetmusic.score.TimeSymbol
 import com.ryanjames.sheetmusic.score.Transposition
 import com.ryanjames.sheetmusic.score.VisualHints
@@ -937,39 +942,105 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Interprets one simple beats/beat-type pair with its display `symbol`; other time forms are
-     * reported as discarded. An unknown symbol is `INVALID_VALUE`.
+     * Interprets a time signature: one or more beats/beat-type fractions, each with an additive
+     * numerator such as `3+2`, an optional `interchangeable` alternate, or `senza-misura`, with the
+     * display `symbol` and `separator`. A main form that is not positive integer fractions is
+     * reported as discarded with the whole time; an unreadable alternate is discarded alone. An
+     * unknown symbol, separator or time relation is `INVALID_VALUE`; an overflowing length is
+     * `NUMERIC_OVERFLOW`.
      */
     private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
-        attributes(start, setOf("number", "symbol"), "S07")
-        val symbolText = start.attribute("symbol")
-        val symbol = symbolText?.let { TIME_SYMBOLS[it.trim { char -> char in WHITESPACE }] }
-        if (symbolText != null && symbol == null) {
-            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("symbol"), "Unknown time symbol: $symbolText")
-        }
-        val beats = mutableListOf<String>()
-        val beatTypes = mutableListOf<String>()
-        var simple = true
+        attributes(start, setOf("number", "symbol", "separator"), "S07")
+        val symbol = timeSymbol(start)
+        val separator = timeSeparator(start)
+        val parts = mutableListOf<Pair<String, String>>()
+        var interchangeable: InterchangeableTime? = null
+        var interchangeables = 0
+        var senzaMisura: SenzaMisura? = null
+        var senzaMisuras = 0
+        var readable = true
         children { event ->
-            when (event.localName()) {
-                "beats" -> beats += text(event, feature = "S07")
-                "beat-type" -> beatTypes += text(event, feature = "S07")
+            when (val name = event.localName()) {
+                "beats", "beat-type" -> parts += name to text(event, feature = "S07")
+                "interchangeable" -> {
+                    interchangeables++
+                    interchangeable = interchangeable(event)
+                }
+                "senza-misura" -> {
+                    senzaMisuras++
+                    senzaMisura = SenzaMisura(text(event, feature = "S07").trim { it in WHITESPACE }.ifEmpty { null })
+                }
                 // Foreign extensions are reported on their own and keep the understood meter.
                 null -> unsupportedTree(event)
                 else -> {
-                    simple = false
+                    readable = false
                     skipTree()
                 }
             }
         }
         if (!context.canContinue) return null
-        val beatCount = beats.singleOrNull()?.let(::positiveInt)
-        val beatUnit = beatTypes.singleOrNull()?.let(::positiveInt)
-        if (!simple || beatCount == null || beatUnit == null) {
-            unsupported(start.location, "S07", "Only one positive integer beats/beat-type pair is interpreted; time discarded")
+        val fractions = timeFractions(parts)
+        val understood = readable && interchangeables <= 1 && when (senzaMisuras) {
+            0 -> !fractions.isNullOrEmpty()
+            1 -> parts.isEmpty() && interchangeables == 0
+            else -> false
+        }
+        if (!understood) {
+            unsupported(start.location, "S07", "Only positive integer beats/beat-type fractions or senza-misura are interpreted; time discarded")
             return null
         }
-        return Attribute.TimeSignature(beatCount, beatUnit, symbol)
+        var signature: Attribute.TimeSignature? = null
+        exact(start.location) {
+            Attribute.TimeSignature(fractions.orEmpty(), symbol, separator, interchangeable, senzaMisura).also { signature = it }.length
+        }
+        return signature
+    }
+
+    /**
+     * Interprets an interchangeable alternate meter with its `time-relation`, `symbol` and
+     * `separator`. Fractions that are not positive integers are reported and the alternate
+     * discarded; the main meter is kept.
+     */
+    private fun interchangeable(start: ScoreXmlEvent): InterchangeableTime? {
+        attributes(start, setOf("symbol", "separator"), "S07")
+        val symbol = timeSymbol(start)
+        val separator = timeSeparator(start)
+        val parts = mutableListOf<Pair<String, String>>()
+        val seen = mutableSetOf<String>()
+        var relation: TimeRelation? = null
+        children { event ->
+            when (val name = event.localName()) {
+                "time-relation" -> if (once(seen, name, event)) {
+                    val text = text(event, feature = "S07")
+                    relation = TIME_RELATIONS[text.trim { it in WHITESPACE }]
+                    if (relation == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown time relation: $text")
+                }
+                "beats", "beat-type" -> parts += name to text(event, feature = "S07")
+                else -> unsupportedTree(event, "S07")
+            }
+        }
+        if (!context.canContinue) return null
+        val fractions = timeFractions(parts)?.takeIf { it.isNotEmpty() } ?: run {
+            unsupported(start.location, "S07", "Only positive integer beats/beat-type fractions are interpreted; alternate discarded")
+            return null
+        }
+        return InterchangeableTime(fractions, relation, symbol, separator)
+    }
+
+    private fun timeSymbol(start: ScoreXmlEvent): TimeSymbol? {
+        val text = start.attribute("symbol") ?: return null
+        return TIME_SYMBOLS[text.trim { it in WHITESPACE }] ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("symbol"), "Unknown time symbol: $text")
+            null
+        }
+    }
+
+    private fun timeSeparator(start: ScoreXmlEvent): TimeSeparator? {
+        val text = start.attribute("separator") ?: return null
+        return TIME_SEPARATORS[text.trim { it in WHITESPACE }] ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("separator"), "Unknown time separator: $text")
+            null
+        }
     }
 
     /**
@@ -2775,6 +2846,36 @@ private val TIME_SYMBOLS: Map<String, TimeSymbol> = mapOf(
     "dotted-note" to TimeSymbol.DOTTED_NOTE,
     "normal" to TimeSymbol.NORMAL,
 )
+
+private val TIME_SEPARATORS: Map<String, TimeSeparator> = mapOf(
+    "none" to TimeSeparator.NONE,
+    "horizontal" to TimeSeparator.HORIZONTAL,
+    "diagonal" to TimeSeparator.DIAGONAL,
+    "vertical" to TimeSeparator.VERTICAL,
+    "adjacent" to TimeSeparator.ADJACENT,
+)
+
+private val TIME_RELATIONS: Map<String, TimeRelation> = mapOf(
+    "parentheses" to TimeRelation.PARENTHESES,
+    "bracket" to TimeRelation.BRACKET,
+    "equals" to TimeRelation.EQUALS,
+    "slash" to TimeRelation.SLASH,
+    "space" to TimeRelation.SPACE,
+    "hyphen" to TimeRelation.HYPHEN,
+)
+
+/**
+ * Pairs beats/beat-type texts in source order into fractions, splitting additive numerators such
+ * as `3+2`; null unless they alternate beats then beat-type and every number is a positive Int.
+ */
+private fun timeFractions(parts: List<Pair<String, String>>): List<TimeFraction>? {
+    if (parts.size % 2 != 0) return null
+    return parts.chunked(2).map { (beats, beatType) ->
+        if (beats.first != "beats" || beatType.first != "beat-type") return null
+        val numerators = beats.second.split('+').map { positiveInt(it) ?: return null }
+        TimeFraction(numerators, positiveInt(beatType.second) ?: return null)
+    }
+}
 
 private val CLEF_SIGNS: Map<String, ClefSign> = mapOf(
     "G" to ClefSign.G, "F" to ClefSign.F, "C" to ClefSign.C, "percussion" to ClefSign.PERCUSSION,

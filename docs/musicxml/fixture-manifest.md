@@ -23,7 +23,8 @@ Unmodified files (apart from line endings) from
 MIT License, © 2010–2016 Reinhold Kainhofer and the GNU LilyPond project and © 2016–2026 Michael
 Scott Asato Cuthbert. Embedded in `W3cSuiteFixtures.kt` and asserted by `W3cSuiteImportTest`. They
 stand in for the test-plan fixtures F01–F08: their authors are independent of the importer, and each
-file states what a reader should produce.
+file states what a reader should produce. The 11c–11i time-signature files (MX-25) are embedded in
+`W3cTimeSignatureFixtures.kt`.
 
 | Suite file | Covers | Schema | Strict / tolerant | Musical facts asserted (from the suite description) |
 |---|---|---|---|---|
@@ -39,6 +40,16 @@ file states what a reader should produce.
 | `46c-Midmeasure-Clef` | F07 | Valid | Accepted / accepted | Clef change via an implicit measure and mid-measure; each note sees its clef |
 | `13e-KeySignatures-MidMeasure-Change` | F07 | Valid | Accepted / accepted | Keys 2, −2, 0 and 7 fifths take effect note by note |
 | `43b-MultiStaff-DifferentKeys` | F08 | Valid | Accepted / accepted | Two staves with their own key and clef |
+| `11c-TimeSignatures-Complex` | F07 | Valid | Accepted / accepted | (3+2)/8 and (5+3+1)/4 as additive fractions, lengths 5/2 and 9 quarters |
+| `11c-TimeSignatures-CompoundSimple` | F07 | Valid | Accepted / accepted | Same facts as 11c-Complex (older spelling) |
+| `11d-TimeSignatures-ComplexMultiple` | F07 | Valid | Accepted / accepted | 3/8+2/8+3/4 and 5/2+1/8 as separate fractions, lengths 11/2 and 21/2 |
+| `11d-TimeSignatures-CompoundMultiple` | F07 | Valid | Accepted / accepted | Same facts as 11d-ComplexMultiple (older spelling) |
+| `11e-TimeSignatures-ComplexMixed` | F07 | Valid | Accepted / accepted | (3+2)/8+3/4, length 11/2 |
+| `11e-TimeSignatures-CompoundMixed` | F07 | Valid | Accepted / accepted | Same facts as 11e-ComplexMixed (older spelling) |
+| `11f-TimeSignatures-SymbolMeaning` | F07 | Valid | Accepted / accepted | 3/8 with `cut` and 1/8+2/4 with `single-number`; symbols are display only |
+| `11g-TimeSignatures-SingleNumber` | F07 | Valid | Accepted / accepted | 3/8 and (3+2)/8 with `single-number` |
+| `11h-TimeSignatures-SenzaMisura` | F07 | Valid | Accepted / accepted | Empty senza-misura, then one with `X`; no meter length |
+| `11i-TimeSignatures-Alternate` | F07 | Valid | Accepted / accepted | Six interchangeable alternates with their relations (parentheses, bracket, equals, hyphen, slash, space) |
 
 Two structure-recovery files (MX-24) are kept apart in `w3cStructureRecoveryFixtures` because they
 are not schema-valid:

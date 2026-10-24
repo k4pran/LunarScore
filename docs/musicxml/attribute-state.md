@@ -18,7 +18,7 @@ val clefAtNote = states[noteEvent.id]?.clef   // null means no clef has been see
 |---|---|
 | `divisions` | Part state for duration conversion (MX-07); persists across measures, not an event |
 | `key` with `fifths` and optional `mode` | `Attribute.KeySignature(fifths, KeyMode?)`; absent mode stays null |
-| `time` with one positive `beats`/`beat-type` pair | `Attribute.TimeSignature` (MX-07); its `symbol` (`common`, `cut`, `single-number`, `note`, `dotted-note`, `normal`) is kept as display-only `TimeSymbol`, null when absent |
+| `time` with `beats`/`beat-type` fractions, `interchangeable` or `senza-misura` | `Attribute.TimeSignature` ([MX-25](#complex-time-signatures-mx-25)); its `symbol` (`common`, `cut`, `single-number`, `note`, `dotted-note`, `normal`) is kept as display-only `TimeSymbol`, null when absent |
 | `clef` `sign`/`line`/`clef-octave-change` | `Attribute.Clef`; signs G, F, C, percussion, TAB, jianpu, none. A missing line uses the MusicXML standard line for G (2), F (4) and C (3); otherwise it stays null |
 | `staves` | No event; sets the part's staff count for later content ([MX-09](polyphony.md)) |
 | `staff-details` `staff-lines` | `Attribute.StaffLines(count)`, zero allowed |
@@ -48,10 +48,13 @@ Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from
 
 | Content | Outcome |
 |---|---|
-| Non-integer `fifths`, `line`, `clef-octave-change`; unknown clef sign or time `symbol`; non-positive `staves` or attribute `number`, or a `number` beyond the declared staves; negative `staff-lines` | Fatal `INVALID_VALUE` |
+| Non-integer `fifths`, `line`, `clef-octave-change`; unknown clef sign, time `symbol` or `separator`, or `time-relation`; non-positive `staves` or attribute `number`, or a `number` beyond the declared staves; negative `staff-lines` | Fatal `INVALID_VALUE` |
 | Key without `fifths` (traditional form), clef without `sign`, duplicate `fifths`/`mode`/`sign`/`line`/`staff-lines` | Fatal `INVALID_STRUCTURE` |
 | `part-symbol` | S08 `DISCARDED` (staff-scoped attributes and `staves` > 1 are interpreted since [MX-09](polyphony.md)) |
 | Non-traditional keys (`key-step`/`key-alter`/`key-accidental`) | S07 `DISCARDED`, whole key dropped |
+| A `time` whose fractions are not positive integers (`3.5`, `3+`, a `4+8` beat type), unpaired `beats`/`beat-type`, or `senza-misura` mixed with fractions or repeated ([MX-25](#complex-time-signatures-mx-25)) | S07 `DISCARDED`, whole time dropped |
+| An `interchangeable` whose fractions are not positive integers | S07 `DISCARDED`, the alternate alone; the main meter is kept |
+| A time length beyond the `Rational` bounds | Fatal `NUMERIC_OVERFLOW` |
 | Key `cancel`, `key-octave`, an unknown `mode` value; key/clef display attributes (`print-object`, `after-barline`, `size`, …) | S07 `DISCARDED`; the key or clef itself is kept (unknown mode becomes null) |
 | `staff-tuning`, `capo` | S23 `DISCARDED` |
 | `staff-type`, `line-detail`, `staff-size`, staff-details attributes | S17 `DISCARDED` |
@@ -59,6 +62,29 @@ Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from
 | `measure-style` | S24 `DISCARDED` |
 | `directive` and other unknown children | S07 `DISCARDED` |
 | Any state change after `backup`/`forward` | At the cursor after the move since [MX-09](polyphony.md) |
+
+## Complex time signatures (MX-25)
+
+Issue [#54](https://github.com/k4pran/LunarScore/issues/54) replaces the single beats/beat-type pair
+with the full MusicXML 4.0 [time](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/time/)
+forms. `Attribute.TimeSignature` holds:
+
+| Field | Source | Meaning |
+|---|---|---|
+| `fractions: List<TimeFraction>` | Each `beats`/`beat-type` pair in order; `beats` split on `+` | `TimeFraction(beats, beatType)`: (3+2)/8 is `TimeFraction([3, 2], 8)`; 3/8+2/8+3/4 is three fractions |
+| `length: Rational?` | Derived | Total measure length in quarter notes, summed over every fraction and numerator; null for senza misura |
+| `symbol`, `separator` | `@symbol`, `@separator` | Display only; never change the meter |
+| `interchangeable` | [interchangeable](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/interchangeable/) | `InterchangeableTime(fractions, relation, symbol, separator)`: a displayed alternate such as the 6/8 in 3/4 (6/8); it never changes `length` |
+| `senzaMisura` | [senza-misura](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/senza-misura/) | `SenzaMisura(symbol)`, with the trimmed text (for example `X`) or null when empty; `fractions` is then empty |
+
+`TimeSignature(beats, beatUnit, symbol)` remains as a constructor for a simple meter and equals the
+one-fraction form. `effectiveStates()` exposes the whole signature as `AttributeState.time`, so a
+measure-length check compares `Measure.extent` with `time.length` (the W3C 11c–11e and 11i tests do
+this for every measure). The importer itself does not yet diagnose over- or underfull measures.
+
+Suite 11f's `symbol="cut"` on 3/8 and 11g's `single-number` on (3+2)/8 are kept as given: the symbol
+is display only, so the meter stays 3/8 and (3+2)/8. MusicXML ignores `symbol` beside
+`senza-misura`; it is kept but has no meaning there.
 
 ## Fixtures and verification
 

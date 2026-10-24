@@ -1,7 +1,9 @@
 package com.ryanjames.sheetmusic.musicxml
 
 import com.ryanjames.sheetmusic.score.Attribute
+import com.ryanjames.sheetmusic.score.AttributeEvent
 import com.ryanjames.sheetmusic.score.ClefSign
+import com.ryanjames.sheetmusic.score.InterchangeableTime
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
 import com.ryanjames.sheetmusic.score.NoteEvent
@@ -11,7 +13,11 @@ import com.ryanjames.sheetmusic.score.Part
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
+import com.ryanjames.sheetmusic.score.SenzaMisura
 import com.ryanjames.sheetmusic.score.Step
+import com.ryanjames.sheetmusic.score.TimeFraction
+import com.ryanjames.sheetmusic.score.TimeRelation
+import com.ryanjames.sheetmusic.score.TimeSymbol
 import com.ryanjames.sheetmusic.score.effectiveStates
 import com.ryanjames.sheetmusic.score.validate
 import kotlin.test.Test
@@ -225,10 +231,130 @@ class W3cSuiteImportTest {
         assertEquals(Attribute.Clef(ClefSign.F, 4), states.getValue(byStaff.getValue(2).id).clef)
     }
 
+    // F07, 11c (both spellings): "Complex time signatures with the same denominator: (3+2)/8 and (5+3+1)/4."
+    @Test
+    fun testF07AdditiveNumeratorsKeepTheirComponents() {
+        listOf(w3c11cTimeSignaturesComplex, w3c11cTimeSignaturesCompoundSimple).forEach { xml ->
+            val meters = meters(part(xml))
+            assertEquals(listOf(time(listOf(3, 2) to 8), time(listOf(5, 3, 1) to 4)), meters)
+            assertEquals(listOf(Rational.of(5, 2), Rational.of(9)), meters.map { it.length })
+        }
+    }
+
+    // F07, 11d (both spellings): "Complex time signatures with separate fractions displayed:
+    // 3/8+2/8+3/4 and 5/2+1/8."
+    @Test
+    fun testF07MultipleFractionsSumToTheMeasureLength() {
+        listOf(w3c11dTimeSignaturesComplexMultiple, w3c11dTimeSignaturesCompoundMultiple).forEach { xml ->
+            val meters = meters(part(xml))
+            assertEquals(
+                listOf(time(listOf(3) to 8, listOf(2) to 8, listOf(3) to 4), time(listOf(5) to 2, listOf(1) to 8)),
+                meters,
+            )
+            assertEquals(listOf(Rational.of(11, 2), Rational.of(21, 2)), meters.map { it.length })
+        }
+    }
+
+    // F07, 11e (both spellings): "Complex time signatures of mixed type: (3+2)/8+3/4."
+    @Test
+    fun testF07MixedFractionsKeepAdditiveAndSimpleParts() {
+        listOf(w3c11eTimeSignaturesComplexMixed, w3c11eTimeSignaturesCompoundMixed).forEach { xml ->
+            val meter = meters(part(xml)).single()
+            assertEquals(time(listOf(3, 2) to 8, listOf(3) to 4), meter)
+            assertEquals(Rational.of(11, 2), meter.length)
+        }
+    }
+
+    // The measures of 11c-11e and 11i are filled to their meter's total length.
+    @Test
+    fun testF07MeasuresFillTheirMeterLength() {
+        listOf(
+            w3c11cTimeSignaturesComplex, w3c11cTimeSignaturesCompoundSimple, w3c11dTimeSignaturesComplexMultiple,
+            w3c11dTimeSignaturesCompoundMultiple, w3c11eTimeSignaturesComplexMixed, w3c11eTimeSignaturesCompoundMixed,
+            w3c11iTimeSignaturesAlternate,
+        ).forEach { xml ->
+            val part = part(xml)
+            val states = part.effectiveStates()
+            part.measures.forEach { measure ->
+                val meter = states.getValue(notes(part).first { it in measure.events }.id).time
+                assertEquals(meter?.length, measure.extent, measure.number)
+            }
+        }
+    }
+
+    // F07, 11f: "a 3/8 time signature with symbol="cut" and a complex 1/8+2/4 time signature with
+    // symbol="single-number"." The symbol is display only and never changes the meter.
+    @Test
+    fun testF07SymbolOnAComplexMeterIsDisplayOnly() {
+        val meters = meters(part(w3c11fTimeSignaturesSymbolMeaning))
+        assertEquals(
+            listOf(
+                Attribute.TimeSignature(3, 8, TimeSymbol.CUT),
+                time(listOf(1) to 8, listOf(2) to 4).copy(symbol = TimeSymbol.SINGLE_NUMBER),
+            ),
+            meters,
+        )
+        assertEquals(listOf(Rational.of(3, 2), Rational.of(5, 2)), meters.map { it.length })
+    }
+
+    // F07, 11g: "Two time signatures (3/8 and 3+2/8) having the attribute symbol="single-number"."
+    @Test
+    fun testF07SingleNumberSymbolOnAnAdditiveMeter() {
+        assertEquals(
+            listOf(
+                Attribute.TimeSignature(3, 8, TimeSymbol.SINGLE_NUMBER),
+                time(listOf(3, 2) to 8).copy(symbol = TimeSymbol.SINGLE_NUMBER),
+            ),
+            meters(part(w3c11gTimeSignaturesSingleNumber)),
+        )
+    }
+
+    // F07, 11h: "The first bar starts with an empty <senza-misura> element ... The third bar starts
+    // with a <senza-misura> element containing value X." Bars 2 and 4 keep the previous state.
+    @Test
+    fun testF07SenzaMisuraHasNoMeterLength() {
+        val part = part(w3c11hTimeSignaturesSenzaMisura)
+        val states = part.effectiveStates()
+        val unmarked = Attribute.TimeSignature(emptyList(), senzaMisura = SenzaMisura())
+        val marked = Attribute.TimeSignature(emptyList(), senzaMisura = SenzaMisura("X"))
+        val times = part.measures.map { measure -> states.getValue(measure.events.last().id).time }
+        assertEquals(listOf(unmarked, unmarked, marked, marked), times)
+        assertTrue(times.all { it?.length == null })
+        assertEquals(listOf(Rational.of(3, 2), Rational.of(3), Rational.of(2), Rational.of(5, 2)), part.measures.map { it.extent })
+    }
+
+    // F07, 11i: "Time signatures with alternates using <interchangeable>: 3/4 (6/8), 2/2 [4/4],
+    // 4/4 = 7/8+1/8, 3/4 - 6/8, 2/2 / 4/4, 3/4 6/8."
+    @Test
+    fun testF07InterchangeableAlternatesKeepTheirRelation() {
+        fun alternate(main: Attribute.TimeSignature, relation: TimeRelation, vararg fractions: Pair<List<Int>, Int>) =
+            main.copy(interchangeable = InterchangeableTime(fractions.map { (beats, type) -> TimeFraction(beats, type) }, relation))
+        val threeFour = Attribute.TimeSignature(3, 4)
+        val twoTwo = Attribute.TimeSignature(2, 2)
+        assertEquals(
+            listOf(
+                alternate(threeFour, TimeRelation.PARENTHESES, listOf(6) to 8),
+                alternate(twoTwo, TimeRelation.BRACKET, listOf(4) to 4),
+                alternate(Attribute.TimeSignature(4, 4), TimeRelation.EQUALS, listOf(7) to 8, listOf(1) to 8),
+                alternate(threeFour, TimeRelation.HYPHEN, listOf(6) to 8),
+                alternate(twoTwo, TimeRelation.SLASH, listOf(4) to 4),
+                alternate(threeFour, TimeRelation.SPACE, listOf(6) to 8),
+            ),
+            meters(part(w3c11iTimeSignaturesAlternate)),
+        )
+    }
+
     private fun score(xml: String): Score =
         assertIs<ParseResult.Success<Score>>(parseMusicXml(xml.encodeToByteArray(), ParseOptions(ParsePolicy.TOLERANT))).value
 
     private fun part(xml: String): Part = score(xml).parts.single()
+
+    /** The time signatures in source order, one per attribute change. */
+    private fun meters(part: Part): List<Attribute.TimeSignature> =
+        part.measures.flatMap { it.events }.filterIsInstance<AttributeEvent>().mapNotNull { it.attribute as? Attribute.TimeSignature }
+
+    private fun time(vararg fractions: Pair<List<Int>, Int>): Attribute.TimeSignature =
+        Attribute.TimeSignature(fractions.map { (beats, type) -> TimeFraction(beats, type) })
 
     private fun notes(part: Part): List<NoteEvent> = part.measures.flatMap { it.events }.filterIsInstance<NoteEvent>()
 }

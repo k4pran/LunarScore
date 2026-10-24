@@ -6,14 +6,18 @@ import com.ryanjames.sheetmusic.score.AttributeEvent
 import com.ryanjames.sheetmusic.score.AttributeState
 import com.ryanjames.sheetmusic.score.ClefSign
 import com.ryanjames.sheetmusic.score.Event
+import com.ryanjames.sheetmusic.score.InterchangeableTime
 import com.ryanjames.sheetmusic.score.KeyMode
 import com.ryanjames.sheetmusic.score.NoteEvent
 import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.Score
+import com.ryanjames.sheetmusic.score.SenzaMisura
 import com.ryanjames.sheetmusic.score.SoundingPitch
 import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.Step
+import com.ryanjames.sheetmusic.score.TimeFraction
+import com.ryanjames.sheetmusic.score.TimeSeparator
 import com.ryanjames.sheetmusic.score.TimeSymbol
 import com.ryanjames.sheetmusic.score.WrittenPitch
 import com.ryanjames.sheetmusic.score.effectiveStates
@@ -135,6 +139,55 @@ class AttributeImportTest {
         for (policy in ParsePolicy.entries) {
             failure(document("<attributes><time symbol='alla-breve'><beats>2</beats><beat-type>2</beat-type></time></attributes>"),
                 DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
+        }
+    }
+
+    @Test
+    fun testComplexTimeFormsAreKeptWithTheirDisplay() {
+        val result = success(document(
+            "<attributes><time separator='horizontal'><beats> 3 + 2 </beats><beat-type>8</beat-type><beats>3</beats>" +
+                "<beat-type>4</beat-type></time><time symbol='cut'><beats>2</beats><beat-type>2</beat-type>" +
+                "<interchangeable symbol='normal' separator='none'><beats>4</beats><beat-type>4</beat-type></interchangeable></time>" +
+                "<time><senza-misura> X </senza-misura></time></attributes>",
+        ))
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val (additive, alternate, senzaMisura) = events(result).map { assertIs<Attribute.TimeSignature>(assertIs<AttributeEvent>(it).attribute) }
+        assertEquals(
+            Attribute.TimeSignature(listOf(TimeFraction(listOf(3, 2), 8), TimeFraction(listOf(3), 4)), separator = TimeSeparator.HORIZONTAL),
+            additive,
+        )
+        assertEquals(Rational.of(11, 2), additive.length)
+        assertEquals(
+            Attribute.TimeSignature(2, 2, TimeSymbol.CUT).copy(
+                interchangeable = InterchangeableTime(listOf(TimeFraction(listOf(4), 4)), null, TimeSymbol.NORMAL, TimeSeparator.NONE),
+            ),
+            alternate,
+        )
+        assertEquals(Rational.of(4), alternate.length)
+        assertEquals(Attribute.TimeSignature(emptyList(), senzaMisura = SenzaMisura("X")), senzaMisura)
+        assertNull(senzaMisura.length)
+    }
+
+    @Test
+    fun testUnreadableInterchangeableIsDiscardedAlone() {
+        val result = success(document(
+            "<attributes><time><beats>3</beats><beat-type>4</beat-type><interchangeable><time-relation>space</time-relation>" +
+                "<beats>6</beats></interchangeable></time></attributes>",
+        ), ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf("S07"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(Attribute.TimeSignature(3, 4), assertIs<AttributeEvent>(events(result).single()).attribute)
+    }
+
+    @Test
+    fun testInvalidTimeValues() {
+        for (policy in ParsePolicy.entries) {
+            failure(document("<attributes><time separator='dotted'><beats>2</beats><beat-type>2</beat-type></time></attributes>"),
+                DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
+            failure(document("<attributes><time><beats>2</beats><beat-type>2</beat-type><interchangeable><time-relation>dash" +
+                "</time-relation><beats>4</beats><beat-type>4</beat-type></interchangeable></time></attributes>"),
+                DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
+            failure(document("<attributes><time><beats>2147483647+2147483647</beats><beat-type>1</beat-type></time></attributes>"),
+                DiagnosticCode.NUMERIC_OVERFLOW, ParseOptions(policy))
         }
     }
 
