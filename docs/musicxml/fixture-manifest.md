@@ -29,15 +29,24 @@ file states what a reader should produce.
 |---|---|---|---|---|
 | `03a-Rhythm-Durations` | F01 | Valid | Accepted / accepted | Every value from maxima to 1024th, plain, dotted and double-dotted, with exact durations |
 | `41a-MultiParts-Partorder` | F02 | Valid | Accepted / accepted | Four parts P0–P3 in order |
-| `51b-Header-Quotes` | F02 | Valid | `RECOVERED_VALUE` (no `divisions`, [MX-24](https://github.com/k4pran/LunarScore/issues/53)) / accepted with a warning | Movement title, composer, rights, software and part name keep their double quotes |
+| `51b-Header-Quotes` | F02 | Valid | Accepted / accepted (no `divisions`: default 1) | Movement title, composer, rights, software and part name keep their double quotes |
 | `01d-Pitches-Microtones` | F03 | Valid | Accepted / accepted | Alters −3/2, −1/2, 1/2, 3/2 on C, D, E, F, repeated an octave higher |
 | `03c-Rhythm-DivisionChange` | F04 | Valid | Accepted / accepted | Divisions 1 → 8 → 38 keep quarter onsets 0–3 and halves at 0 and 2 |
+| `03e-Rhythm-No-Divisions` | F04 | Valid | Accepted / accepted | No `divisions`: the agreed default 1 makes the single whole note four quarters |
 | `03b-Rhythm-Backup` | F05 | Valid | Accepted / accepted | Voice 1 on beats 1–2, voice 2 on beats 2–3 after a partial backup, no rests |
 | `03f-Rhythm-Forward` | F05 | Valid | Accepted / accepted | Quarter on beat 2, 16th on beat 4, measure filled to 4 quarters, no rests |
 | `21c-Chords-ThreeNotesDuration` | F06 | Valid | Accepted / accepted | Seven three-note chords; each shares onset and duration |
 | `46c-Midmeasure-Clef` | F07 | Valid | Accepted / accepted | Clef change via an implicit measure and mid-measure; each note sees its clef |
 | `13e-KeySignatures-MidMeasure-Change` | F07 | Valid | Accepted / accepted | Keys 2, −2, 0 and 7 fifths take effect note by note |
 | `43b-MultiStaff-DifferentKeys` | F08 | Valid | Accepted / accepted | Two staves with their own key and clef |
+
+Two structure-recovery files (MX-24) are kept apart in `w3cStructureRecoveryFixtures` because they
+are not schema-valid:
+
+| Suite file | Covers | Schema | Strict / tolerant | Musical facts asserted (from the suite description) |
+|---|---|---|---|---|
+| `41g-PartNoId.invalid` | F02 | Invalid (part without `id`) | `RECOVERED_VALUE` / accepted with warnings | The single part is bound to the only score-part, P1, with its whole rest |
+| `41h-TooManyParts` | F02 | Invalid (`part` IDs P3 and P4 are undeclared) | `UNSUPPORTED_FEATURE` / accepted with warnings | Only the listed part P1 is imported; P3 and P4 are discarded with a diagnostic each |
 
 The whole suite (183 files) runs as a broad corpus with `scripts/run-w3c-suite.sh`; see
 [compliance-audit.md](compliance-audit.md).

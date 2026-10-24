@@ -27,12 +27,13 @@ no DOM or second pass: measures are normalized as the ordered reader streams the
 
 ## Errors
 
-Under both policies these are fatal `INVALID_STRUCTURE`: a part ID that is unknown or blank, a part
+Under both policies these are fatal `INVALID_STRUCTURE`: a part ID that is missing or blank, a part
 that appears twice in one measure, a declared part that appears in no measure, a measure without a
 `number` or before the part-list, and a timewise root without a part-list. An invalid `implicit`
 value is fatal `INVALID_VALUE`. Other content under a timewise root or measure that is not a part,
 such as a `part` directly under the root, produces the usual structured `UNSUPPORTED_FEATURE` /
-`DISCARDED` finding for its feature group.
+`DISCARDED` finding for its feature group. A part whose ID the part-list does not declare is skipped in that
+measure as S01 `UNSUPPORTED_FEATURE` / `DISCARDED` (MX-24): tolerant parsing warns, strict fails.
 
 ## Provenance
 

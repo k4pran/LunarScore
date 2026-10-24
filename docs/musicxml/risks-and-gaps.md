@@ -152,13 +152,24 @@ diagnostic.
 | Case | Implemented structured outcome / evidence | Remaining work |
 |---|---|---|
 | Suite files are not committed | Downloaded per run and deleted afterwards, also on failure; the revision is overridable | Copy fixtures with the MIT notice only in MX-04 (#5) |
-| Expected-diagnosed files (`.invalid` 41g, 74b, 75b; 11b) | The run fails if either policy accepts one without a diagnostic (`CorpusRunnerTest`). 41g is `INVALID_STRUCTURE`, 11b `INVALID_CURSOR_MOVE` under strict | 74b and 75b are diagnosed only through discarded content; detecting their invalidity needs XSD validation (#5) or MX-30/MX-34 (#59, #63) |
-| 41h, parts missing from the part list | Rejected under both policies; the only valid file the tolerant policy rejects | MX-24 (#53) |
-| Missing `divisions` (03e, 51b, 51c) | `RECOVERED_VALUE`, which rejects strict parsing | Strict policy decided in MX-24 (#53) |
+| Expected-diagnosed files (`.invalid` 41g, 74b, 75b; 11b) | The run fails if either policy accepts one without a diagnostic (`CorpusRunnerTest`). Since MX-24, 41g's part without an `id` is bound to the only score-part with `RECOVERED_VALUE` (strict failure, tolerant warning); 11b is `INVALID_CURSOR_MOVE` under strict | 74b and 75b are diagnosed only through discarded content; detecting their invalidity needs XSD validation (#5) or MX-30/MX-34 (#59, #63) |
+| 41h, parts missing from the part list | Fixed in MX-24 (#53): each extra part is S01 `DISCARDED`; tolerant imports the listed part, strict rejects the loss. Every suite file is now accepted under the tolerant policy | None |
+| Missing `divisions` (03e, 51b, 51c) | Decided in MX-24 (#53): divisions 1 under both policies without a diagnostic; the three files are accepted cleanly | None |
 | 33i unended tie, 45f ending stop without start | `UNMATCHED_SPAN`; strict rejection is intended | Kept as regressions in MX-38 (#67) and MX-23 (#52) |
 | 101 strict `UNSUPPORTED_FEATURE` rejections | Each file is linked to its open MX-23–MX-39 issues in the audit table | Re-run after each issue lands until every valid file imports without discarded content |
 | Playback order of 45e, 45i | Fixed in MX-23 (#52): orders match the suite descriptions; 45a–45d, 45j and 45k unchanged | None |
 | Semantic oracle | The runner checks structured outcomes and `playbackOrder()` only, not musical correctness | Independent expectations in MX-04 (#5) and each tracked issue |
+
+## MX-24 structure recovery decisions and remaining gaps
+
+The W3C suite allows readers to handle three structural problems. Each is now decided and tested
+(`MusicXmlParserTest`, `TimewiseImportTest`, `W3cSuiteImportTest` with suite 03e, 41g and 41h).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| `part` whose `id` the part-list does not declare (41h), partwise or in a timewise measure | The part is skipped as S01 `UNSUPPORTED_FEATURE` / `DISCARDED` at the `part` element, tagged with its ID: tolerant imports the listed parts with a warning per extra part, strict fails. A declared part left without a body is still fatal `INVALID_STRUCTURE`, as is a duplicate body | Converting unlisted parts (the suite's other option) is not planned: it would invent a name and order |
+| `part` without `id` in a score declaring a single score-part (41g, `.invalid`) | Partwise only: the first part body is bound to the only score-part with `RECOVERED_VALUE` at `@id` (tolerant warning, strict failure). A blank `id`, a second part without `id`, or several score-parts stay fatal `INVALID_STRUCTURE`; timewise parts without `id` stay fatal | None |
+| Missing `divisions` before a duration, backup/forward or direction offset (03e, 51a–d) | Divisions 1, the agreed default that MusicXML 4.1 documents, under both policies without a diagnostic. Strict accepts it because the value is specified, not repaired | None |
 
 ## MX-21 compliance audit decisions and remaining gaps
 
@@ -169,9 +180,9 @@ outcome was structured: no exception escaped and no failure lacked an error.
 | Case | Implemented structured outcome / evidence | Remaining work |
 |---|---|---|
 | Standard Recordare DOCTYPE header written by exporters | Blanked before the reader and never resolved; other DOCTYPEs stay `UNSAFE_XML` (`ScoreXmlReaderTest`; whole LilyPond suite) | None |
-| Missing `divisions` before a duration or direction offset | `RECOVERED_VALUE` once per part, divisions 1; tolerant warning, strict failure (`NoteImportTest`, `DirectionImportTest`; LilyPond 03e, 51a–d) | None |
+| Missing `divisions` before a duration or direction offset | `RECOVERED_VALUE` once per part, divisions 1; tolerant warning, strict failure (`NoteImportTest`, `DirectionImportTest`; LilyPond 03e, 51a–d). Superseded by MX-24: divisions 1 under both policies without a diagnostic | None |
 | Voice or part ID made only of, or containing, a no-break space | `INVALID_VALUE` at the voice / `INVALID_STRUCTURE` at `@id`; previously the model threw (`ComplianceAuditTest`) | None |
-| Undeclared part in the part list (LilyPond 41h) | Fatal `INVALID_STRUCTURE` under both policies | Tolerant recovery is planned in MX-24 (#53); see MX-22 below |
+| Undeclared part in the part list (LilyPond 41h) | Superseded by MX-24: S01 `DISCARDED` per extra part; tolerant warns, strict rejects | None |
 | Repeated `accidental` on a note (MusicXML 4.1 drafts, W3C `accidentals.musicxml`) | Fatal `INVALID_STRUCTURE`, correct for 4.0 | Revisit once 4.1 is published |
 | Non-score XML with a DOCTYPE (`catalog.xml`) | Fatal `UNSAFE_XML` | None |
 | Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07; now kept as `TimeSymbol`), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary); counts predate MX-09 and MX-14, which now import voices, chords, staves and lyrics, and have not been re-run | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
@@ -380,7 +391,8 @@ supersedes the MX-06 fatal `UNSUPPORTED_ROOT` for timewise roots.
 | Case | Implemented structured outcome / evidence | Remaining work |
 |---|---|---|
 | Declared part missing from a timewise measure | Empty measure with that measure's number and implicit flag, no diagnostic (valid MusicXML); F12 and leading-gap variant compare equal to explicit empty partwise measures; padding is bounded by `PROVENANCE_LIMIT` | None |
-| Unknown, blank or duplicate part ID in a measure; declared part in no measure; measure before the part-list or without a number | Fatal `INVALID_STRUCTURE` in both policies | None |
+| Blank or duplicate part ID in a measure; declared part in no measure; measure before the part-list or without a number | Fatal `INVALID_STRUCTURE` in both policies | None |
+| Part ID in a measure that the part-list does not declare | Since MX-24, S01 `DISCARDED` (the part's content in that measure is skipped); strict rejects, tolerant warns | None |
 | Parts in a different order within a measure | Part-list order; divisions carry per part across interleaved measures (F12) | None |
 | Non-part children of a timewise measure, `part` directly under the root, unmapped timewise `part`/`measure` attributes | Feature-group `UNSUPPORTED_FEATURE` / `DISCARDED` (for example S13, S03, S01); strict rejects, tolerant warns | Measure-level semantics belong to their feature tasks |
 | Measure attributes that differ per part (partwise allows a different `implicit` or `number` per part) | Timewise has one set per measure, so the projection is identical; partwise differences are kept as written | None |
@@ -416,7 +428,7 @@ MX-07's S07 discard of key, clef, staves and staff details.
 
 | Case | Implemented structured outcome / evidence | Remaining work |
 |---|---|---|
-| Notes before any key/clef/time | Effective state field is null; no treble, C major or 4/4 default; missing divisions stays fatal | Renderer adapter must choose any display fallback explicitly |
+| Notes before any key/clef/time | Effective state field is null; no treble, C major or 4/4 default; missing divisions default to 1 (MX-24) | Renderer adapter must choose any display fallback explicitly |
 | Mid-measure and end-of-measure changes | Events at exact cursor offsets; resolver applies changes in onset order, same-onset in list order, persisting across measures (F07) | Same-onset changes from different voices on one staff apply in source order (MX-09) |
 | Key change versus written pitch | `alter` and printed accidental are never inferred from or rewritten by the key (F07) | Accidental display inference is not planned in the importer |
 | Clef without line | Standard line for G/F/C per MusicXML; null for percussion/TAB/jianpu/none | None |
@@ -439,7 +451,7 @@ obligation is met for durations and divisions.
 |---|---|---|
 | Zero, negative or malformed duration/divisions; invalid step/octave/alter/type/voice/staff/yes-no flags | Fatal `INVALID_VALUE` at the element/attribute location under both policies | Full XSD lexical validation remains separate |
 | Duration or divisions outside reduced Int bounds; overflowing quotient or cursor sum | Fatal `NUMERIC_OVERFLOW` at the duration/divisions location; boundary `Int.MAX_VALUE` accepted | Wider numeric support is not promised |
-| Missing divisions before a duration; missing duration/pitch-or-rest/step/octave; duplicates | Fatal `INVALID_STRUCTURE`; no default divisions or duration inferred | MX-08 state resolution across parts/staves |
+| Missing duration/pitch-or-rest/step/octave; duplicates | Fatal `INVALID_STRUCTURE`; no duration inferred. Missing divisions were fatal here; since MX-24 they default to 1 | MX-08 state resolution across parts/staves |
 | Chord and grace notes | Superseded: chords by MX-09, grace notes by MX-15 (above) | None |
 | Unpitched notes; staff other than 1 | Superseded: unpitched notes by MX-16, staves by MX-09 (above) | None |
 | Backup/forward | Superseded by MX-09 (above): measure-local cursor; `INVALID_CURSOR_MOVE` before zero | Measure fullness checks |

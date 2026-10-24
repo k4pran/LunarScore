@@ -97,8 +97,9 @@ class MusicXmlParserTest {
         val variants = listOf(
             "<score-partwise><part-list><score-part><part-name>A</part-name></score-part></part-list></score-partwise>",
             document().replace("score-part id='P1'", "score-part id='  '"),
-            document().replace("<part id='P1'", "<part"),
             document().replace("<part id='P1'", "<part id=''"),
+            document().replace("</part-list>", "<score-part id='P2'><part-name>B</part-name></score-part></part-list>")
+                .replace("<part id='P1'", "<part"),
             document().replace("<part id='P1'", "<part id='unknown'"),
             document().replace("</part-list>", "<score-part id='P1'><part-name>B</part-name></score-part></part-list>"),
             document().replace("</score-partwise>", "<part id='P1'/></score-partwise>"),
@@ -119,8 +120,46 @@ class MusicXmlParserTest {
         val location = failure(unused, DiagnosticCode.INVALID_STRUCTURE).diagnostics.single().location
         assertEquals("/score-partwise[1]/part-list[1]/score-part[2]", location.path)
         assertEquals("P2", location.partId)
-        val unknown = failure(document().replace("<part id='P1'", "<part id='P9'"), DiagnosticCode.INVALID_STRUCTURE)
-        assertEquals("P9", unknown.diagnostics.single().location.partId)
+        val unknown = failure(document().replace("<part id='P1'", "<part id='P9'"), DiagnosticCode.UNSUPPORTED_FEATURE)
+        assertEquals("P9", unknown.diagnostics.first().location.partId)
+        assertEquals("P1", unknown.diagnostics.single { it.code == DiagnosticCode.INVALID_STRUCTURE }.location.partId)
+    }
+
+    @Test
+    fun testUnlistedPartsAreDiscardedWhenTolerant() {
+        // W3C 41h: readers may ignore parts that the part-list does not declare.
+        val extra = document().replace("</score-partwise>", "<part id='P3'><measure number='1'/></part><part id='P4'/></score-partwise>")
+        val strict = failure(extra, DiagnosticCode.UNSUPPORTED_FEATURE)
+        assertTrue(strict.diagnostics.all { it.code == DiagnosticCode.UNSUPPORTED_FEATURE })
+        val tolerant = success(extra, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf("P1"), tolerant.value.parts.map { it.id })
+        assertEquals(
+            listOf("P3" to "/score-partwise[1]/part[2]", "P4" to "/score-partwise[1]/part[3]"),
+            tolerant.diagnostics.map { it.location.partId to it.location.path },
+        )
+        tolerant.diagnostics.forEach { diagnostic ->
+            assertEquals(DiagnosticSeverity.WARNING, diagnostic.severity)
+            assertEquals(UnsupportedContent("S01", ContentRetention.DISCARDED), diagnostic.unsupported)
+        }
+        // A duplicate of a listed part stays fatal.
+        failure(document().replace("</score-partwise>", "<part id='P1'/></score-partwise>"), DiagnosticCode.INVALID_STRUCTURE, ParseOptions(ParsePolicy.TOLERANT))
+    }
+
+    @Test
+    fun testPartWithoutIdBindsToTheOnlyScorePartWhenTolerant() {
+        // W3C 41g: with a single score-part, a part without an id can only describe that part.
+        val noId = document().replace("<part id='P1'", "<part")
+        val strict = failure(noId, DiagnosticCode.RECOVERED_VALUE)
+        assertEquals(listOf(DiagnosticCode.RECOVERED_VALUE), strict.diagnostics.map { it.code })
+        val tolerant = success(noId, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(success(document()).value, tolerant.value)
+        val warning = tolerant.diagnostics.single()
+        assertEquals(DiagnosticCode.RECOVERED_VALUE to DiagnosticSeverity.WARNING, warning.code to warning.severity)
+        assertEquals("/score-partwise[1]/part[1]/@id", warning.location.path)
+        assertEquals("P1", warning.location.partId)
+        // Only the first part can be bound; a second part without an id is still fatal.
+        val second = document().replace("</score-partwise>", "<part/></score-partwise>").replace("<part id='P1'", "<part")
+        failure(second, DiagnosticCode.INVALID_STRUCTURE, ParseOptions(ParsePolicy.TOLERANT))
     }
 
     @Test

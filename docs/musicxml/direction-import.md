@@ -72,7 +72,7 @@ realization (trill speed, beats, accidentals) is not modeled.
 | Direction on staff ≠ 1, or after backup/forward | Superseded by [MX-09](polyphony.md): kept on its staff at the cursor |
 | Unknown `placement`, wedge `type` or beat unit; wedge `number` outside 1–16; non-`yes`/`no` `directive` or offset `sound`; malformed offset; negative or malformed sound tempo/dynamics; blank `per-minute` or voice; nonpositive staff | Fatal `INVALID_VALUE` |
 | Direction without `direction-type`; wedge without `type`; metronome without `beat-unit` or `per-minute`; duplicate `offset`, `voice`, `staff`, `sound` or `per-minute` | Fatal `INVALID_STRUCTURE` |
-| An offset before any divisions | Divisions 1 assumed with `RECOVERED_VALUE`, as for note durations (MX-21) |
+| An offset before any divisions | Divisions 1, as for note durations, without a diagnostic (MX-24) |
 | Wedge start without stop, stop without start, `continue` without an open wedge | `UNMATCHED_SPAN`; relationship kept with a null partner |
 
 ## Fixtures and verification

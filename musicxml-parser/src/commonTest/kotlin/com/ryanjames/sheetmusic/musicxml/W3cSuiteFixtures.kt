@@ -15,12 +15,24 @@ internal val w3cSuiteFixtures: List<W3cSuiteFixture> by lazy {
         W3cSuiteFixture("51b-Header-Quotes.musicxml", "F02", w3c51bHeaderQuotes),
         W3cSuiteFixture("01d-Pitches-Microtones.musicxml", "F03", w3c01dPitchesMicrotones),
         W3cSuiteFixture("03c-Rhythm-DivisionChange.musicxml", "F04", w3c03cRhythmDivisionChange),
+        W3cSuiteFixture("03e-Rhythm-No-Divisions.musicxml", "F04", w3c03eRhythmNoDivisions),
         W3cSuiteFixture("03b-Rhythm-Backup.musicxml", "F05", w3c03bRhythmBackup),
         W3cSuiteFixture("03f-Rhythm-Forward.musicxml", "F05", w3c03fRhythmForward),
         W3cSuiteFixture("21c-Chords-ThreeNotesDuration.musicxml", "F06", w3c21cChordsThreeNotesDuration),
         W3cSuiteFixture("46c-Midmeasure-Clef.musicxml", "F07", w3c46cMidmeasureClef),
         W3cSuiteFixture("13e-KeySignatures-MidMeasure-Change.musicxml", "F07", w3c13eKeySignaturesMidMeasureChange),
         W3cSuiteFixture("43b-MultiStaff-DifferentKeys.musicxml", "F08", w3c43bMultiStaffDifferentKeys),
+    )
+}
+
+/**
+ * MX-24 structure-recovery files. They are not schema-valid (41g's part has no `id` and 41h's extra
+ * parts reference undeclared IDs), so they are kept out of [w3cSuiteFixtures].
+ */
+internal val w3cStructureRecoveryFixtures: List<W3cSuiteFixture> by lazy {
+    listOf(
+        W3cSuiteFixture("41g-PartNoId.invalid.musicxml", "F02", w3c41gPartNoId),
+        W3cSuiteFixture("41h-TooManyParts.musicxml", "F02", w3c41hTooManyParts),
     )
 }
 
@@ -1708,6 +1720,130 @@ internal val w3c43bMultiStaffDifferentKeys: String = """<?xml version="1.0" enco
         <voice>2</voice>
         <type>whole</type>
         <staff>2</staff>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+internal val w3c03eRhythmNoDivisions: String = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN"
+                                "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
+  <identification>
+    <miscellaneous>
+      <miscellaneous-field name="description">No &lt;divisions&gt;
+          element.  The generally agreed default value is 1, and MusicXML
+          version 4.1 will mention this explicitly.
+
+          This test holds a single whole note.</miscellaneous-field>
+    </miscellaneous>
+  </identification>
+  <part-list>
+    <score-part id="P1">
+      <part-name>MusicXML Part</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <key>
+          <fifths>0</fifths>
+        </key>
+        <time>
+          <beats>4</beats>
+          <beat-type>4</beat-type>
+        </time>
+        <clef>
+          <sign>G</sign>
+          <line>2</line>
+        </clef>
+      </attributes>
+      <note>
+        <pitch>
+          <step>C</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+internal val w3c41gPartNoId: String = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 2.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="2.0">
+  <identification>
+    <miscellaneous>
+      <miscellaneous-field name="description">A part with no id attribute.
+            Since this piece has only one part, it is clear which part 
+            is described by the one part element.</miscellaneous-field>
+    </miscellaneous>
+  </identification>
+  <part-list>
+    <score-part id="P1">
+      <part-name print-object="no">MusicXML Part</part-name>
+    </score-part>
+  </part-list>
+  <part>
+    <measure number="1">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
+"""
+
+internal val w3c41hTooManyParts: String = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN"
+                                "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
+  <identification>
+    <miscellaneous>
+      <miscellaneous-field name="description">This piece has two more
+          &lt;part&gt; elements than the &lt;part-list&gt; section contains.
+          One can either convert all the parts present but not listed in the
+          part list, or simply not import or ignore them.</miscellaneous-field>
+    </miscellaneous>
+  </identification>
+  <part-list>
+    <score-part id="P1">
+      <part-name print-object="no">MusicXML Part</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+  <part id="P3">
+    <measure number="1">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>whole</type>
+      </note>
+    </measure>
+  </part>
+  <part id="P4">
+    <measure number="1">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>whole</type>
       </note>
     </measure>
   </part>

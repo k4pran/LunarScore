@@ -94,8 +94,10 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. A part
  * defines staves 1 to its largest `staves` declaration (staff 1 when it only has events); measure
  * extent is the observed end of timed content. This is not an XSD validator.
- * Structural identity/reference errors are fatal under both policies. Input security, resource
- * limits and cooperative [isCancelled] checks are shared with the ordered XML reader.
+ * Structural identity/reference errors are fatal under both policies, except that a part missing
+ * from the part-list is discarded and, in a one-part score, a part without an `id` is bound to its
+ * only score-part, both rejecting strict parsing. Missing divisions default to 1. Input security,
+ * resource limits and cooperative [isCancelled] checks are shared with the ordered XML reader.
  */
 public fun parseMusicXml(
     input: ByteArray,
@@ -629,10 +631,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     private fun part(start: ScoreXmlEvent) {
-        val id = requiredId(start) ?: return
-        val definition = definitions[id]
-        if (definition == null || id in bodies) {
-            invalid(start.attributeLocation("id"), if (definition == null) "Unknown part ID: $id" else "Duplicate part body: $id")
+        val id = partBodyId(start) ?: return
+        val definition = definitions[id] ?: return unlistedPart(start, id)
+        if (id in bodies) {
+            invalid(start.attributeLocation("id"), "Duplicate part body: $id")
             return
         }
         attributes(start, setOf("id"), "S01")
@@ -668,12 +670,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 return@children
             }
             val id = requiredId(event) ?: return@children
-            val definition = definitions[id]
-            if (definition == null || !seen.add(id)) {
-                invalid(
-                    event.attributeLocation("id"),
-                    if (definition == null) "Unknown part ID: $id" else "Duplicate part $id in measure ${header.number}",
-                )
+            val definition = definitions[id] ?: return@children unlistedPart(event, id)
+            if (!seen.add(id)) {
+                invalid(event.attributeLocation("id"), "Duplicate part $id in measure ${header.number}")
                 return@children
             }
             attributes(event, setOf("id"), "S01")
@@ -686,6 +685,30 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             provenance(measurePath, start, id)
             body.measures += measure(id, measurePath, index + 1, header.number, header.implicit)
         }
+    }
+
+    /**
+     * A partwise part's ID. A part without an `id` in a score declaring a single score-part can
+     * only describe that part (W3C suite 41g), so it is bound to it with `RECOVERED_VALUE`, which
+     * fails strict parsing; any other missing or invalid ID is fatal.
+     */
+    private fun partBodyId(start: ScoreXmlEvent): String? {
+        val only = definitions.keys.singleOrNull()
+        if (start.attribute("id") != null || only == null || bodies.isNotEmpty()) return requiredId(start)
+        context.report(
+            DiagnosticCode.RECOVERED_VALUE,
+            start.attributeLocation("id").copy(partId = only),
+            "A part without an id was bound to the only score-part, $only",
+        )
+        return only
+    }
+
+    /**
+     * Discards a part whose ID the part-list does not declare. The suite allows readers to ignore
+     * such parts (41h), so the score keeps its listed parts; strict parsing rejects the loss.
+     */
+    private fun unlistedPart(start: ScoreXmlEvent, id: String) {
+        unsupportedTree(start, "S01", "Part $id is not declared in the part-list; discarded")
     }
 
     private fun partBody(id: String) = PartBody(id, SpanResolver(id) { location, message ->
@@ -909,7 +932,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             return null
         }
         val sourceDuration = duration ?: return null
-        val currentDivisions = divisionsOrDefault(body, durationSource)
+        val currentDivisions = divisionsOrDefault(body)
         return exact(durationSource.location) { sourceDuration / currentDivisions }
     }
 
@@ -1478,7 +1501,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             invalid(start, "A non-grace note requires a duration")
             return null
         }
-        val currentDivisions = divisionsOrDefault(body, durationSource)
+        val currentDivisions = divisionsOrDefault(body)
         val sourceDuration = positiveDecimal(durationText, durationSource.location, "Duration") ?: return null
         val quarters = exact(durationSource.location) { sourceDuration / currentDivisions } ?: return null
         val end = exact(durationSource.location) { onset + quarters } ?: return null
@@ -1953,7 +1976,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         val quarters = offsetSource?.let { source ->
             val value = offset ?: return null
-            val divisions = divisionsOrDefault(body, source)
+            val divisions = divisionsOrDefault(body)
             exact(source.location) { value / divisions } ?: return null
         } ?: Rational.ZERO
         val soundOffset = if (offsetAffectsSound) quarters else Rational.ZERO
@@ -2463,13 +2486,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * The part's divisions. Exporters sometimes omit `divisions`; the generally agreed default of 1
-     * is then assumed once per part with `RECOVERED_VALUE`, which fails strict parsing.
+     * The part's divisions. Exporters sometimes omit `divisions`; the generally agreed default of 1,
+     * which MusicXML 4.1 documents, then applies under both policies without a diagnostic.
      */
-    private fun divisionsOrDefault(body: PartBody, source: ScoreXmlEvent): Rational = body.divisions ?: Rational.ONE.also {
-        context.report(DiagnosticCode.RECOVERED_VALUE, source.location.withDeclaredPart(), "No preceding divisions; assumed 1")
-        body.divisions = it
-    }
+    private fun divisionsOrDefault(body: PartBody): Rational = body.divisions ?: Rational.ONE
 
     private fun invalid(event: ScoreXmlEvent, message: String) = invalid(event.location, message)
 

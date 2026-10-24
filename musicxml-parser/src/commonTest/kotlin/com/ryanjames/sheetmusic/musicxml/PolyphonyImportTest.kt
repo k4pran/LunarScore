@@ -165,12 +165,13 @@ class PolyphonyImportTest {
         ).forEach { (content, code) ->
             for (policy in ParsePolicy.entries) failure(document(content), code, ParseOptions(policy))
         }
-        // Missing divisions are recovered as 1, as for note durations.
+        // Missing divisions default to 1 under both policies, as for note durations.
         val noDivisions = document("<forward><duration>1</duration></forward>").replace("<attributes><divisions>1</divisions></attributes>", "")
-        failure(noDivisions, DiagnosticCode.RECOVERED_VALUE)
-        val recovered = success(noDivisions, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(DiagnosticCode.RECOVERED_VALUE, recovered.diagnostics.single().code)
-        assertEquals(Rational.ONE, recovered.value.parts.single().measures.single().extent)
+        for (policy in ParsePolicy.entries) {
+            val result = success(noDivisions, ParseOptions(policy))
+            assertEquals(emptyList(), result.diagnostics, "$policy")
+            assertEquals(Rational.ONE, result.value.parts.single().measures.single().extent)
+        }
     }
 
     @Test

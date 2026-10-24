@@ -39,7 +39,7 @@ staff lines, transposition and instrument) for every event ID:
   measure affects the next measure.
 - An `AttributeEvent`'s own entry includes its change.
 - Missing state is `null`, never defaulted to treble clef, C major or 4/4. Missing divisions
-  remain a fatal `INVALID_STRUCTURE` before any duration (MX-07).
+  default to 1 before any duration (MX-24; fatal in MX-07).
 
 Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from `<alter>` and
 `NotatedValue.accidental` only from `<accidental>`; neither is inferred from the key (F03, F07).

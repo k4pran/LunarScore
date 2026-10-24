@@ -26,21 +26,21 @@ class CorpusRunnerTest {
             file("c-width.musicxml", f20Score.replace("<measure number=\"1\">", "<measure number=\"1\" width=\"200\">")),
             file("a-clean.musicxml", f20Score),
             file("b-packed.mxl", f20MxlHex.decodeHex().toByteArray()),
-            file("d-unknown-part.invalid.musicxml", f20Score.replace("<part id=\"P1\">", "<part id=\"P9\">")),
+            file("d-blank-part-id.invalid.musicxml", f20Score.replace("<part id=\"P1\">", "<part id=\"\">")),
         )
         val report = runCorpus("fixture corpus", files)
 
-        assertEquals(listOf("a-clean.musicxml", "b-packed.mxl", "c-width.musicxml", "d-unknown-part.invalid.musicxml"), report.files.map { it.name })
+        assertEquals(listOf("a-clean.musicxml", "b-packed.mxl", "c-width.musicxml", "d-blank-part-id.invalid.musicxml"), report.files.map { it.name })
         assertEquals(emptyList(), report.problems)
-        val (clean, packed, width, unknownPart) = report.files
+        val (clean, packed, width, blankPartId) = report.files
         listOf(clean, packed).forEach { file ->
             assertTrue(file.outcomes.values.all { it.outcome == "accepted" && it.discarded.isEmpty() }, file.name)
         }
         assertEquals("rejected: UNSUPPORTED_FEATURE", width.outcomes.getValue(ParsePolicy.STRICT).outcome)
         assertEquals("accepted with warnings", width.outcomes.getValue(ParsePolicy.TOLERANT).outcome)
         assertEquals(mapOf("S01" to 1), width.outcomes.getValue(ParsePolicy.TOLERANT).discarded)
-        assertTrue(unknownPart.expectedDiagnosed)
-        assertTrue(unknownPart.outcomes.values.all { it.firstError?.code == DiagnosticCode.INVALID_STRUCTURE })
+        assertTrue(blankPartId.expectedDiagnosed)
+        assertTrue(blankPartId.outcomes.values.all { it.firstError?.code == DiagnosticCode.INVALID_STRUCTURE })
 
         assertEquals(mapOf("accepted" to 2, "rejected: INVALID_STRUCTURE" to 1, "rejected: UNSUPPORTED_FEATURE" to 1), report.summary(ParsePolicy.STRICT))
         assertEquals(mapOf("S01" to 1), report.filesPerDiscardedFeature())
