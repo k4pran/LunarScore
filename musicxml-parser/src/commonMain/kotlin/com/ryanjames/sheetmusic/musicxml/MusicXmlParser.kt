@@ -23,7 +23,11 @@ import com.ryanjames.sheetmusic.score.ExtendType
 import com.ryanjames.sheetmusic.score.Grace
 import com.ryanjames.sheetmusic.score.Instrument
 import com.ryanjames.sheetmusic.score.InterchangeableTime
+import com.ryanjames.sheetmusic.score.KeyAlteration
+import com.ryanjames.sheetmusic.score.KeyCancel
+import com.ryanjames.sheetmusic.score.KeyCancelLocation
 import com.ryanjames.sheetmusic.score.KeyMode
+import com.ryanjames.sheetmusic.score.KeyOctave
 import com.ryanjames.sheetmusic.score.LayoutDefaults
 import com.ryanjames.sheetmusic.score.Lyric
 import com.ryanjames.sheetmusic.score.LyricExtend
@@ -1044,17 +1048,29 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Interprets a traditional key (fifths and optional mode). Non-traditional keys are discarded;
-     * cancellation and accidental octave display are reported while the key itself is kept.
+     * Interprets a traditional key (optional `cancel` with its `location`, `fifths` and optional
+     * `mode`) or a non-traditional key (`key-step`/`key-alter` pairs in order, each with an optional
+     * `key-accidental`), either with optional `key-octave` placements. Every value is display or key
+     * data only and never changes a note's written pitch. Mixing the two forms, or a step, alter or
+     * accidental out of sequence, is `INVALID_STRUCTURE`; an unknown mode is discarded alone.
      */
     private fun key(start: ScoreXmlEvent): Attribute.KeySignature? {
         attributes(start, setOf("number"), "S07")
         val seen = mutableSetOf<String>()
         var fifths: Int? = null
         var mode: KeyMode? = null
-        var traditional = true
+        var cancel: KeyCancel? = null
+        val alterations = mutableListOf<KeyAlteration>()
+        val octaves = mutableListOf<KeyOctave>()
+        var nonTraditional = false
+        // The step awaiting its alter, and whether the last child completed an alteration.
+        var pendingStep: Step? = null
+        var stepPending = false
+        var accidentalAllowed = false
         children { event ->
-            when (val name = event.localName()) {
+            val name = event.localName()
+            val completesAlteration = name == "key-alter"
+            when (name) {
                 "fifths" -> if (once(seen, name, event)) {
                     fifths = integer(event, "Fifths")
                 }
@@ -1063,25 +1079,79 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     mode = KeyMode.entries.firstOrNull { it.name.lowercase() == text }
                     if (mode == null) unsupported(event.location, "S07", "Key mode $text is not interpreted; mode discarded")
                 }
-                "key-step", "key-alter", "key-accidental" -> {
-                    traditional = false
-                    skipTree()
+                "cancel" -> if (once(seen, name, event)) cancel = keyCancel(event)
+                "key-step" -> {
+                    nonTraditional = true
+                    if (stepPending) invalid(event, "A key-step requires a key-alter")
+                    val text = text(event, feature = "S07").trim { it in WHITESPACE }
+                    pendingStep = Step.entries.firstOrNull { it.name == text }
+                    if (pendingStep == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Key step must be A to G")
+                    stepPending = true
                 }
-                "cancel" -> unsupportedTree(event, "S07", "Key cancellation display is not interpreted")
-                "key-octave" -> unsupportedTree(event, "S07", "Key accidental octave display is not interpreted")
+                "key-alter" -> {
+                    nonTraditional = true
+                    if (!stepPending) invalid(event, "A key-alter must follow a key-step")
+                    val alter = decimal(event, "S07", "Key alter")
+                    val step = pendingStep
+                    if (step != null && alter != null) alterations += KeyAlteration(step, alter)
+                    stepPending = false
+                }
+                "key-accidental" -> {
+                    nonTraditional = true
+                    if (!accidentalAllowed) invalid(event, "A key-accidental must follow a key-alter")
+                    val text = text(event, feature = "S07").trim { it in WHITESPACE }
+                    if (text.isEmpty()) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Key accidental must be nonblank")
+                    else if (alterations.isNotEmpty()) alterations[alterations.lastIndex] = alterations.last().copy(accidental = text)
+                }
+                "key-octave" -> keyOctave(event)?.let { octaves += it }
                 else -> unsupportedTree(event, "S07")
             }
+            accidentalAllowed = completesAlteration
         }
         if (!context.canContinue) return null
-        if (!traditional) {
-            unsupported(start.location, "S07", "Non-traditional keys are not interpreted; key discarded")
-            return null
-        }
+        if (stepPending) invalid(start, "A key-step requires a key-alter")
+        if (nonTraditional && seen.isNotEmpty()) invalid(start, "A key is either traditional or non-traditional")
+        if (!context.canContinue) return null
+        if (nonTraditional) return Attribute.KeySignature.nonTraditional(alterations.toList(), octaves.toList())
         val keyFifths = fifths ?: run {
             invalid(start, "A traditional key requires fifths")
             return null
         }
-        return Attribute.KeySignature(keyFifths, mode)
+        return Attribute.KeySignature(keyFifths, mode, cancel, octaves = octaves.toList())
+    }
+
+    /** Interprets the cancelled fifths of the previous key and their display `location`. */
+    private fun keyCancel(start: ScoreXmlEvent): KeyCancel? {
+        val locationText = start.attribute("location")
+        val location = locationText?.let { text ->
+            KEY_CANCEL_LOCATIONS[text.trim { it in WHITESPACE }] ?: run {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("location"), "Unknown cancel location: $text")
+                return null
+            }
+        }
+        val text = text(start, setOf("location"), "S07")
+        if (!context.canContinue) return null
+        val fifths = text.trim { it in WHITESPACE }.toIntOrNull() ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "Cancel must be an Int")
+            return null
+        }
+        return KeyCancel(fifths, location)
+    }
+
+    /** Interprets the displayed octave (0–9) of the key or cancel accidental counted by `number`. */
+    private fun keyOctave(start: ScoreXmlEvent): KeyOctave? {
+        val number = start.attribute("number")?.let(::positiveInt) ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("number"), "Key octave number must be a positive Int")
+            return null
+        }
+        val cancel = yesNo(start, "cancel") ?: return null
+        val text = text(start, setOf("number", "cancel"), "S07")
+        if (!context.canContinue) return null
+        val octave = text.trim { it in WHITESPACE }.toIntOrNull()?.takeIf { it in 0..9 } ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.location, "Key octave must be 0 to 9")
+            return null
+        }
+        return KeyOctave(number, octave, cancel)
     }
 
     /** Interprets a clef sign, line and octave change; a missing G/F/C line uses its standard line. */
@@ -2876,6 +2946,12 @@ private fun timeFractions(parts: List<Pair<String, String>>): List<TimeFraction>
         TimeFraction(numerators, positiveInt(beatType.second) ?: return null)
     }
 }
+
+private val KEY_CANCEL_LOCATIONS: Map<String, KeyCancelLocation> = mapOf(
+    "left" to KeyCancelLocation.LEFT,
+    "right" to KeyCancelLocation.RIGHT,
+    "before-barline" to KeyCancelLocation.BEFORE_BARLINE,
+)
 
 private val CLEF_SIGNS: Map<String, ClefSign> = mapOf(
     "G" to ClefSign.G, "F" to ClefSign.F, "C" to ClefSign.C, "percussion" to ClefSign.PERCUSSION,

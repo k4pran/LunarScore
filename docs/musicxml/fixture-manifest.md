@@ -24,7 +24,7 @@ MIT License, © 2010–2016 Reinhold Kainhofer and the GNU LilyPond project and 
 Scott Asato Cuthbert. Embedded in `W3cSuiteFixtures.kt` and asserted by `W3cSuiteImportTest`. They
 stand in for the test-plan fixtures F01–F08: their authors are independent of the importer, and each
 file states what a reader should produce. The 11c–11i time-signature files (MX-25) are embedded in
-`W3cTimeSignatureFixtures.kt`.
+`W3cTimeSignatureFixtures.kt` and the 13a–13e key-signature files (MX-26) in `W3cKeySignatureFixtures.kt`.
 
 | Suite file | Covers | Schema | Strict / tolerant | Musical facts asserted (from the suite description) |
 |---|---|---|---|---|
@@ -50,6 +50,11 @@ file states what a reader should produce. The 11c–11i time-signature files (MX
 | `11g-TimeSignatures-SingleNumber` | F07 | Valid | Accepted / accepted | 3/8 and (3+2)/8 with `single-number` |
 | `11h-TimeSignatures-SenzaMisura` | F07 | Valid | Accepted / accepted | Empty senza-misura, then one with `X`; no meter length |
 | `11i-TimeSignatures-Alternate` | F07 | Valid | Accepted / accepted | Six interchangeable alternates with their relations (parentheses, bracket, equals, hyphen, slash, space) |
+| `13a-KeySignatures` | F07 | Valid | Accepted / accepted | Fifths −11 to 11, each in major then minor |
+| `13b-KeySignatures-ChurchModes` | F07 | Valid | Accepted / accepted | Two sharps in every mode, from major to locrian, then none |
+| `13c-KeySignatures-NonTraditional` | F07 | Valid | Accepted / accepted | [F♯, A♭, B♭], then [C𝄫, G𝄪, D♭, B♯, F♮] with octaves 2 to 6 |
+| `13d-KeySignatures-Microtones` | F07 | Valid | Accepted / accepted | Seven alterations from −1.5 to 1.5 semitones, exact; note pitches unchanged |
+| `13e-KeySignatures-Cancel` | F07 | Valid | Accepted / accepted | Cancel of 3, −5, −3 and 4 fifths at default, right, before-barline and left |
 
 Two structure-recovery files (MX-24) are kept apart in `w3cStructureRecoveryFixtures` because they
 are not schema-valid:

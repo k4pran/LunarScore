@@ -61,22 +61,23 @@ It needs `curl`, `tar` and a POSIX shell (Git Bash on Windows). The report goes 
 contains `.invalid.` (41g, 74b, 75b) and 11b, whose `backup` moves before the start of its measure,
 are expected to be diagnosed: the run fails if either policy accepts one without a diagnostic.
 
-Results on 2026-10-24 after MX-25 (#54), 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
+Results on 2026-10-24 after MX-26 (#55), 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
 
 | Policy | Outcome |
 |---|---|
-| Strict | 89 accepted; 91 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` |
-| Tolerant | 89 accepted; 94 accepted with warnings |
+| Strict | 92 accepted; 88 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` |
+| Tolerant | 92 accepted; 91 accepted with warnings |
 
 No file threw, no failure lacked an error and every expected-diagnosed file was diagnosed. The
 tolerant policy accepts every file: since MX-24, 41h's two parts missing from the part list are
 discarded (S01) and 41g's part without an `id` is bound to the only score-part (`RECOVERED_VALUE`).
 Missing `divisions` (03e, 51b, 51c) default to 1 under both policies, so those files are accepted
-cleanly. Since MX-25 the time-signature files 11c–11i import without discarded content. 74b and
+cleanly. Since MX-25 the time-signature files 11c–11i, and since MX-26 the key-signature files 13a–13e,
+import without discarded content. 74b and
 75b are diagnosed only because their `figured-bass` and `accordion-registration`
 content is discarded; the invalidity itself is not detected without XSD validation (#5).
 
-Tolerant files discarding content, per group: S01 4, S03 21, S04 8, S07 7, S08 2, S09 9, S10 1,
+Tolerant files discarding content, per group: S01 4, S03 21, S04 8, S07 4, S08 2, S09 9, S10 1,
 S11 7, S12 17, S13 17, S14 6, S15 3, S16 1, S17 17, S22 10, S23 1, S24 7, S25 9, S26 1.
 
 Each file that is not accepted cleanly under both policies is listed below with the open MX issues
@@ -97,9 +98,6 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | `03d-Rhythm-DottedDurations-Factors.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/multiple-rest` | warnings | S24 8 | #64 |
 | `03e-Rhythm-SecondaryBeamBreaks.musicxml` | UNSUPPORTED_FEATURE `part/measure/@width` | warnings | S01 1 | #57 |
 | `11b-TimeSignatures-NoTime.musicxml` | INVALID_CURSOR_MOVE `part/measure/backup` | warnings | S07 2 | #56; intended: backup before measure start |
-| `13c-KeySignatures-NonTraditional.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key` | warnings | S07 7 | #55 |
-| `13d-KeySignatures-Microtones.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key` | warnings | S07 1 | #55 |
-| `13e-KeySignatures-Cancel.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key/cancel` | warnings | S07 4 | #55 |
 | `13e-KeySignatures-MidMeasure-Change.musicxml` | accepted | accepted | none | #55  |
 | `13f-KeySignatures-Visible.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key/@print-object` | warnings | S07 1 | #56 |
 | `14a-StaffDetails-LineChanges.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S17 2, S25 2 | #58 |
@@ -136,8 +134,8 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | `33j-Beams-Tremolos.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/ornaments/tremolo` | warnings | S12 12 | #60 |
 | `33k-Tie-Types.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/rest/display-step` | warnings | S09 1, S17 2 | #65, #67 |
 | `34a-Print-Object-Spanners.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/@print-object` | warnings | S04 18, S09 2, S11 2, S12 24 | #56, #61, #62 |
-| `34b-Colors.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/technical` | warnings | S04 1, S07 6, S09 2, S10 4, S11 1, S12 32, S13 17, S14 1, S15 4, S17 5, S24 2 | #57, #61, #63 |
-| `34c-Font-Size.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/@font-size` | warnings | S04 4, S07 6, S11 4, S12 24, S13 12, S14 1, S17 2, S24 2 | #57, #61, #63 |
+| `34b-Colors.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/technical` | warnings | S04 1, S07 5, S09 2, S10 4, S11 1, S12 32, S13 17, S14 1, S15 4, S17 5, S24 2 | #57, #61, #63 |
+| `34c-Font-Size.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/@font-size` | warnings | S04 4, S07 5, S11 4, S12 24, S13 12, S14 1, S17 2, S24 2 | #57, #61, #63 |
 | `34d-Note-Attributes.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/@print-leger` | warnings | S04 15, S14 4 | #56 |
 | `41c-StaffGroups.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S08 1, S16 1, S17 3, S25 22 | #58, #68 |
 | `41d-StaffGroups-Nested.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 4 | #58 |

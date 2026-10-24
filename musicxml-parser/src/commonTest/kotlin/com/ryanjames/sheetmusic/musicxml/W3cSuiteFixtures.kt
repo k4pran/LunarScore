@@ -33,6 +33,12 @@ internal val w3cSuiteFixtures: List<W3cSuiteFixture> by lazy {
         W3cSuiteFixture("11g-TimeSignatures-SingleNumber.musicxml", "F07", w3c11gTimeSignaturesSingleNumber),
         W3cSuiteFixture("11h-TimeSignatures-SenzaMisura.musicxml", "F07", w3c11hTimeSignaturesSenzaMisura),
         W3cSuiteFixture("11i-TimeSignatures-Alternate.musicxml", "F07", w3c11iTimeSignaturesAlternate),
+        // MX-26 key signatures, embedded in W3cKeySignatureFixtures.kt.
+        W3cSuiteFixture("13a-KeySignatures.musicxml", "F07", w3c13aKeySignatures),
+        W3cSuiteFixture("13b-KeySignatures-ChurchModes.musicxml", "F07", w3c13bKeySignaturesChurchModes),
+        W3cSuiteFixture("13c-KeySignatures-NonTraditional.musicxml", "F07", w3c13cKeySignaturesNonTraditional),
+        W3cSuiteFixture("13d-KeySignatures-Microtones.musicxml", "F07", w3c13dKeySignaturesMicrotones),
+        W3cSuiteFixture("13e-KeySignatures-Cancel.musicxml", "F07", w3c13eKeySignaturesCancel),
     )
 }
 
