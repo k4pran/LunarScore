@@ -49,7 +49,15 @@ effect is `UNMATCHED_SPAN`.
 - An ending is skipped on passes it does not name. Inside an ending, the backward repeat is taken
   while the pass is below the highest number in its group of consecutive endings, and `times` is
   ignored, as the 4.0 reference specifies. Leaving an ending that does not repeat completes the
-  section.
+  section. An ending is checked against the pass before any forward repeat on its first measure
+  starts (suite 45e).
+- A forward repeat inside an ending, including one on its first measure, starts a nested section
+  played `times` times on each pass through the ending. When it completes, the enclosing section
+  and its pass resume, so a backward repeat closing the ending returns to the start of the repeat
+  the ending belongs to, not to the nested one (suite 45i).
+- An ending without numbers stands for the pass after the highest number of the earlier endings
+  in its group: two unnumbered endings are first and second endings (suite 45e). MusicXML does
+  not define their passes, so `UNNUMBERED_ENDING` is still reported.
 
 Navigation findings are returned as `PlaybackDiagnostic`s, separate from parser diagnostics:
 
@@ -57,7 +65,7 @@ Navigation findings are returned as `PlaybackDiagnostic`s, separate from parser 
 |---|---|
 | `MISPLACED_REPEAT` | A forward repeat that is not on a left barline, or a backward repeat that is not on a right barline; ignored |
 | `OPEN_ENDING` | An ending without a stop covers only its start measure |
-| `UNNUMBERED_ENDING` | An ending without numbers is played on every pass |
+| `UNNUMBERED_ENDING` | An ending without numbers is numbered by its position in its group |
 | `INVALID_ENDING` | An unknown or reversed measure range, or an overlap with an earlier ending; ignored |
 | `LENGTH_LIMIT` | Output truncated at `maxMeasures` |
 

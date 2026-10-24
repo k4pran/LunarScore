@@ -77,6 +77,69 @@ class PlaybackOrderTest {
     }
 
     @Test
+    fun testBackwardRepeatClosingAnEndingTargetsItsOwnRepeatNotANestedOne() {
+        // Suite 45i: A [1. B |: C :| D :| [2. |: E :| F ] G
+        val part = part(
+            measure(),
+            measure(),
+            measure(forward(), backward()),
+            measure(backward()),
+            measure(forward(), backward()),
+            measure(),
+            measure(),
+            endings = listOf(Ending("e1", listOf(1), "m2", "m4"), Ending("e2", listOf(2), "m5", "m6", discontinued = true)),
+        )
+        val playback = part.playbackOrder()
+        assertEquals(listOf(0, 1, 2, 2, 3, 0, 4, 4, 5, 6), playback.measures.map { it.measureIndex })
+        assertEquals(listOf(1, 1, 1, 2, 1, 2, 1, 2, 2, 1), playback.measures.map { it.pass })
+    }
+
+    @Test
+    fun testEndingThatStartsARepeatIsCheckedBeforeTheRepeat() {
+        // Suite 45e: |: A [1. B :| [2. |: C ] D :| E
+        val part = part(
+            measure(forward()),
+            measure(backward()),
+            measure(forward()),
+            measure(backward()),
+            measure(),
+            endings = listOf(Ending("e1", listOf(1), "m2", "m2"), Ending("e2", listOf(2), "m3", "m3", discontinued = true)),
+        )
+        assertEquals(listOf(0, 1, 0, 2, 3, 2, 3, 4), indices(part))
+    }
+
+    @Test
+    fun testUnnumberedEndingsAreNumberedByPosition() {
+        // Suite 45e: A [ B :| [ C ] D
+        val part = part(
+            measure(),
+            measure(backward()),
+            measure(),
+            measure(),
+            endings = listOf(Ending("e1", emptyList(), "m2", "m2"), Ending("e2", emptyList(), "m3", "m3", discontinued = true)),
+        )
+        val playback = part.playbackOrder()
+        assertEquals(listOf(0, 1, 0, 2, 3), playback.measures.map { it.measureIndex })
+        assertEquals(
+            listOf(PlaybackDiagnostic(PlaybackDiagnosticCode.UNNUMBERED_ENDING, 1), PlaybackDiagnostic(PlaybackDiagnosticCode.UNNUMBERED_ENDING, 2)),
+            playback.diagnostics,
+        )
+        // An unnumbered ending after numbered ones takes the next pass.
+        val mixed = part(
+            measure(),
+            measure(backward()),
+            measure(backward()),
+            measure(),
+            endings = listOf(
+                Ending("e1", listOf(1), "m2", "m2"),
+                Ending("e2", listOf(2), "m3", "m3"),
+                Ending("e3", emptyList(), "m4", "m4", discontinued = true),
+            ),
+        )
+        assertEquals(listOf(0, 1, 0, 2, 0, 3), indices(mixed))
+    }
+
+    @Test
     fun testIgnoredNotationIsDiagnosed() {
         val misplaced = part(measure(Barline(BarlineLocation.RIGHT, repeat = Repeat(RepeatDirection.FORWARD))), measure(Barline(BarlineLocation.LEFT, repeat = Repeat(RepeatDirection.BACKWARD))))
         val playback = misplaced.playbackOrder()
@@ -108,7 +171,7 @@ class PlaybackOrderTest {
             ),
             endings.playbackOrder().diagnostics,
         )
-        // The open ending covers only its first measure; the unnumbered one is always played.
+        // The open ending covers only its first measure; the lone unnumbered one stands for pass 1.
         assertEquals(listOf(0, 1, 2), indices(endings))
     }
 
