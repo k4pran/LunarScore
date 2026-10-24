@@ -155,7 +155,7 @@ outcome was structured: no exception escaped and no failure lacked an error.
 | Undeclared part in the part list (LilyPond 41h) | Fatal `INVALID_STRUCTURE` under both policies, deliberately | Optional tolerant recovery is not planned |
 | Repeated `accidental` on a note (MusicXML 4.1 drafts, W3C `accidentals.musicxml`) | Fatal `INVALID_STRUCTURE`, correct for 4.0 | Revisit once 4.1 is published |
 | Non-score XML with a DOCTYPE (`catalog.xml`) | Fatal `UNSAFE_XML` | None |
-| Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary); counts predate MX-09 and MX-14, which now import voices, chords, staves and lyrics, and have not been re-run | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
+| Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07; now kept as `TimeSymbol`), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary); counts predate MX-09 and MX-14, which now import voices, chords, staves and lyrics, and have not been re-run | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
 | F05, F06, F08, F15 fixtures | Implemented by MX-09 (`PolyphonyFixtures.kt`) and MX-14 (`LyricFixtures.kt`) | None |
 | XSD validation, real exporter corpus, iOS runtime | Not run: fixtures are not schema-validated, only public test suites were used, iOS is compile-only on Windows | Run with an XSD validator, a rights-cleared exporter corpus and on macOS |
 

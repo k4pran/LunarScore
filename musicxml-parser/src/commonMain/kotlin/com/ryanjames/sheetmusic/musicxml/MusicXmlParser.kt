@@ -61,6 +61,7 @@ import com.ryanjames.sheetmusic.score.Syllabic
 import com.ryanjames.sheetmusic.score.Step
 import com.ryanjames.sheetmusic.score.SystemLayout
 import com.ryanjames.sheetmusic.score.TimeModification
+import com.ryanjames.sheetmusic.score.TimeSymbol
 import com.ryanjames.sheetmusic.score.Transposition
 import com.ryanjames.sheetmusic.score.VisualHints
 import com.ryanjames.sheetmusic.score.WedgeType
@@ -912,9 +913,17 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return exact(durationSource.location) { sourceDuration / currentDivisions }
     }
 
-    /** Interprets one simple beats/beat-type pair; other time forms are reported as discarded. */
+    /**
+     * Interprets one simple beats/beat-type pair with its display `symbol`; other time forms are
+     * reported as discarded. An unknown symbol is `INVALID_VALUE`.
+     */
     private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
-        attributes(start, setOf("number"), "S07")
+        attributes(start, setOf("number", "symbol"), "S07")
+        val symbolText = start.attribute("symbol")
+        val symbol = symbolText?.let { TIME_SYMBOLS[it.trim { char -> char in WHITESPACE }] }
+        if (symbolText != null && symbol == null) {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("symbol"), "Unknown time symbol: $symbolText")
+        }
         val beats = mutableListOf<String>()
         val beatTypes = mutableListOf<String>()
         var simple = true
@@ -937,7 +946,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             unsupported(start.location, "S07", "Only one positive integer beats/beat-type pair is interpreted; time discarded")
             return null
         }
-        return Attribute.TimeSignature(beatCount, beatUnit)
+        return Attribute.TimeSignature(beatCount, beatUnit, symbol)
     }
 
     /**
@@ -2737,6 +2746,15 @@ private fun pitchKey(pitch: WrittenPitch): String {
     }
     return "${pitch.step}$alter${pitch.octave}"
 }
+
+private val TIME_SYMBOLS: Map<String, TimeSymbol> = mapOf(
+    "common" to TimeSymbol.COMMON,
+    "cut" to TimeSymbol.CUT,
+    "single-number" to TimeSymbol.SINGLE_NUMBER,
+    "note" to TimeSymbol.NOTE,
+    "dotted-note" to TimeSymbol.DOTTED_NOTE,
+    "normal" to TimeSymbol.NORMAL,
+)
 
 private val CLEF_SIGNS: Map<String, ClefSign> = mapOf(
     "G" to ClefSign.G, "F" to ClefSign.F, "C" to ClefSign.C, "percussion" to ClefSign.PERCUSSION,

@@ -14,6 +14,7 @@ import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.SoundingPitch
 import com.ryanjames.sheetmusic.score.Staff
 import com.ryanjames.sheetmusic.score.Step
+import com.ryanjames.sheetmusic.score.TimeSymbol
 import com.ryanjames.sheetmusic.score.WrittenPitch
 import com.ryanjames.sheetmusic.score.effectiveStates
 import com.ryanjames.sheetmusic.score.validate
@@ -113,6 +114,27 @@ class AttributeImportTest {
                 ParseOptions(policy))
             failure(document("<attributes><clef number='0'><sign>G</sign></clef></attributes>"), DiagnosticCode.INVALID_VALUE,
                 ParseOptions(policy))
+        }
+    }
+
+    @Test
+    fun testTimeSymbolIsKeptWithTheMeter() {
+        val times = listOf("common" to "4</beats><beat-type>4", "cut" to "2</beats><beat-type>2", "single-number" to "3</beats><beat-type>8")
+            .joinToString("") { (symbol, meter) -> "<time symbol='$symbol'><beats>$meter</beat-type></time>" }
+        val result = success(document("<attributes>$times<time><beats>6</beats><beat-type>8</beat-type></time></attributes>"))
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        assertEquals(
+            listOf(
+                Attribute.TimeSignature(4, 4, TimeSymbol.COMMON),
+                Attribute.TimeSignature(2, 2, TimeSymbol.CUT),
+                Attribute.TimeSignature(3, 8, TimeSymbol.SINGLE_NUMBER),
+                Attribute.TimeSignature(6, 8),
+            ),
+            events(result).map { assertIs<AttributeEvent>(it).attribute },
+        )
+        for (policy in ParsePolicy.entries) {
+            failure(document("<attributes><time symbol='alla-breve'><beats>2</beats><beat-type>2</beat-type></time></attributes>"),
+                DiagnosticCode.INVALID_VALUE, ParseOptions(policy))
         }
     }
 
