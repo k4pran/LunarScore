@@ -77,7 +77,7 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * to their principal note by a `GRACE_NOTE` relationship; cue notes are timed. Score-instruments
  * (with MIDI percussion keys) are part instruments; notes keep their instrument, and sound
  * `instrument-change`s and `transpose` become attribute events. Written pitch is kept and
- * sounding pitch is derived from its staff's current transposition (as written without one); unpitched
+ * sounding pitch is derived from its staff's transposition at the note's onset (as written without one); unpitched
  * notes keep only their display position. Barline styles, repeat signs and ending marks are kept
  * on their measures, ending start/stop marks are paired into part endings (orphans are
  * `UNMATCHED_SPAN`), and staff-1 measure-repeat signs mark their measures; playback order is
@@ -731,6 +731,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var chordCount = 0
         val wedges = mutableListOf<WedgeEndpoint>()
         val graces = GraceLinker(body.spans)
+        val noteLocations = mutableMapOf<Int, SourceLocation>()
         val barlines = mutableListOf<Barline>()
         var print: PrintHints? = null
         var printRead = false
@@ -749,7 +750,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             when (event.localName()) {
                 "note" -> {
                     val note = note(event, cursor, reference, eventId()) { chordId(it) } ?: return@children
-                    note.event?.let { add(it, event) }
+                    note.event?.let {
+                        add(it, event)
+                        noteLocations[events.lastIndex] = event.location
+                    }
                     // A grace relationship starts at its enclosing note, so it is ordered before the note's nested spans.
                     graces.add(note, SpanPosition(number, note.onset), event.location)
                     note.event?.let { registerSpans(it, note.marks, number) }
@@ -811,6 +815,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         registerWedges(wedges)
         graces.finish()
+        deriveSoundingPitches(events, noteLocations)
         return Measure(
             "measure-$number", displayNumber, extent, events.toList(), implicit, barlines.toList(), body.measureRepeat, print,
         )
@@ -864,7 +869,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             }
             val staves = staff?.let { listOf(it) } ?: (1..body.staffCount).toList()
             staves.forEach { add(change.attribute, it, change.source) }
-            (change.attribute as? Attribute.Transpose)?.let { applyTransposition(it.transposition, staves, change.source) }
+            (change.attribute as? Attribute.Transpose)?.takeIf { isAmbiguous(it.transposition) }?.let {
+                unsupported(change.source.location, "S16", "A non-octave transpose in a concert score is ambiguous; sounding pitch is not derived")
+            }
         }
     }
 
@@ -1069,19 +1076,33 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Makes [transposition] the current state of [staves] for deriving sounding pitch. A concert
-     * score may only carry octave transpositions, so a non-octave one there is ambiguous: it is
-     * kept as written and reported once, and sounding pitch on those staves stays unknown until
-     * their next transpose.
+     * Whether [transposition] is ambiguous: a concert score may only carry octave transpositions, so
+     * a non-octave one there is kept as written, and sounding pitch on its staves stays unknown
+     * until their next transpose.
      */
-    private fun applyTransposition(transposition: Transposition, staves: List<Int>, source: ScoreXmlEvent) {
-        val ambiguous = concertScore && (transposition.chromatic != Rational.ZERO || (transposition.diatonic ?: 0) != 0)
-        for (staff in staves) {
-            body.transpositions[staff] = transposition
-            if (ambiguous) body.ambiguousStaves += staff else body.ambiguousStaves -= staff
-        }
-        if (ambiguous) {
-            unsupported(source.location, "S16", "A non-octave transpose in a concert score is ambiguous; sounding pitch is not derived")
+    private fun isAmbiguous(transposition: Transposition): Boolean =
+        concertScore && (transposition.chromatic != Rational.ZERO || (transposition.diatonic ?: 0) != 0)
+
+    /**
+     * Gives each pitched note in [events] its sounding pitch under its staff's transposition at the
+     * note's onset; [locations] holds each note's source by event index. Events are visited in onset
+     * order, keeping source order at equal onsets as `effectiveStates` does, so a transpose
+     * reached after a backup applies only from its own offset. Each staff's transposition at the
+     * end of the measure carries into the next.
+     */
+    private fun deriveSoundingPitches(events: MutableList<Event>, locations: Map<Int, SourceLocation>) {
+        for (index in events.indices.sortedBy { events[it].onset }) {
+            when (val event = events[index]) {
+                is AttributeEvent -> (event.attribute as? Attribute.Transpose)?.let { transpose ->
+                    body.transpositions[event.staff] = transpose.transposition
+                    if (isAmbiguous(transpose.transposition)) body.ambiguousStaves += event.staff else body.ambiguousStaves -= event.staff
+                }
+                is NoteEvent -> (event.pitch as? NotePitch.Pitched)?.let { pitch ->
+                    val sounding = sounding(pitch.written, event.staff, locations.getValue(index))
+                    events[index] = event.copy(pitch = pitch.copy(sounding = sounding))
+                }
+                else -> Unit
+            }
         }
     }
 
@@ -1430,7 +1451,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             if (pitch == null || grace == null || !context.canContinue) return TimedNote(null, onset, onset, emptyList(), chord = chord, grace = true)
             val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList())
             val event = NoteEvent(
-                id, onset, null, withSounding(pitch, staff, start.location), staff = staff, voice = voice, notation = notation,
+                id, onset, null, pitch, staff = staff, voice = voice, notation = notation,
                 role = NoteRole.GRACE, chordId = chordReference?.let(chordId), instrumentId = noteInstrumentId, grace = grace,
                 visual = visual,
             )
@@ -1461,7 +1482,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 )
             }
             is NoteContent.Pitch -> NoteEvent(
-                id, onset, quarters, withSounding(noteContent.pitch, staff, start.location), staff = staff, voice = voice,
+                id, onset, quarters, noteContent.pitch, staff = staff, voice = voice,
                 notation = notation, role = role, chordId = chordReference?.let(chordId), instrumentId = noteInstrumentId,
                 visual = visual,
             )
@@ -1494,12 +1515,6 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             return null
         }
         return staff
-    }
-
-    /** [pitch] with its derived sounding pitch on [staff] when pitched; unpitched notes have none. */
-    private fun withSounding(pitch: NotePitch, staff: Int, location: SourceLocation): NotePitch = when (pitch) {
-        is NotePitch.Pitched -> pitch.copy(sounding = sounding(pitch.written, staff, location))
-        is NotePitch.Unpitched -> pitch
     }
 
     /** A note's `instrument` reference; it must name a score-instrument of the current part. */

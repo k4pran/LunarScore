@@ -233,6 +233,30 @@ class InstrumentImportTest {
         failure(xml.replace("<staves>2</staves>", ""), DiagnosticCode.INVALID_VALUE)
     }
 
+    @Test
+    fun testTransposeAppliesFromItsOnsetAfterBackup() {
+        val xml = "<score-partwise version='4.0'><part-list><score-part id='P1'><part-name>V</part-name></score-part></part-list>" +
+            "<part id='P1'><measure number='1'><attributes><divisions>1</divisions></attributes>" +
+            "<note><pitch><step>C</step><octave>4</octave></pitch><duration>2</duration><voice>1</voice></note>" +
+            "<attributes><transpose><chromatic>-2</chromatic></transpose></attributes>" +
+            "<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice></note>" +
+            "<backup><duration>3</duration></backup>" +
+            "<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><voice>2</voice></note></measure>" +
+            "<measure number='2'>${note("C", 4)}</measure></part></score-partwise>"
+        val result = success(xml)
+        assertTrue(result.diagnostics.isEmpty(), result.diagnostics.toString())
+        val part = result.value.parts.single()
+        val notes = part.measures.flatMap { it.events }.filterIsInstance<NoteEvent>()
+        // The voice-2 note at offset 0 precedes the transpose at offset 2, though it follows it in the source.
+        assertEquals(
+            listOf(60, 58, 60, 58).map { SoundingPitch(Rational.of(it)) },
+            notes.map { assertIs<NotePitch.Pitched>(it.pitch).sounding },
+        )
+        val states = part.effectiveStates()
+        val chromatic = listOf(null, Rational.of(-2), null, Rational.of(-2))
+        assertEquals(chromatic, notes.map { states.getValue(it.id).transpose?.transposition?.chromatic })
+    }
+
     private fun note(step: String, octave: Int) =
         "<note><pitch><step>$step</step><octave>$octave</octave></pitch><duration>1</duration></note>"
 
