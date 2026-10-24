@@ -24,7 +24,8 @@ MIT License, © 2010–2016 Reinhold Kainhofer and the GNU LilyPond project and 
 Scott Asato Cuthbert. Embedded in `W3cSuiteFixtures.kt` and asserted by `W3cSuiteImportTest`. They
 stand in for the test-plan fixtures F01–F08: their authors are independent of the importer, and each
 file states what a reader should produce. The 11c–11i time-signature files (MX-25) are embedded in
-`W3cTimeSignatureFixtures.kt` and the 13a–13e key-signature files (MX-26) in `W3cKeySignatureFixtures.kt`.
+`W3cTimeSignatureFixtures.kt`, the 13a–13e key-signature files (MX-26) in `W3cKeySignatureFixtures.kt`,
+and the MX-27 visibility files in `W3cVisibilityFixtures.kt`, asserted by `VisibilityImportTest`.
 
 | Suite file | Covers | Schema | Strict / tolerant | Musical facts asserted (from the suite description) |
 |---|---|---|---|---|
@@ -55,6 +56,9 @@ file states what a reader should produce. The 11c–11i time-signature files (MX
 | `13c-KeySignatures-NonTraditional` | F07 | Valid | Accepted / accepted | [F♯, A♭, B♭], then [C𝄫, G𝄪, D♭, B♯, F♮] with octaves 2 to 6 |
 | `13d-KeySignatures-Microtones` | F07 | Valid | Accepted / accepted | Seven alterations from −1.5 to 1.5 semitones, exact; note pitches unchanged |
 | `13e-KeySignatures-Cancel` | F07 | Valid | Accepted / accepted | Cancel of 3, −5, −3 and 4 fifths at default, right, before-barline and left |
+| `01e-Pitches-ParenthesizedAccidentals` | F03 | Valid | Accepted / accepted | Cautionary/editorial flags, then bracket and parentheses flags, each independent of the accidental name and the written alter |
+| `13f-KeySignatures-Visible` | F07 | Valid | Accepted / accepted | Hidden A♭ major key still applies to the following notes, which have no accidentals |
+| `34d-Note-Attributes` | F18 | Valid | Accepted / accepted | `print-leger`, `print-dot`, `print-lyric` and `print-object` combinations A–H; lyric `print-object` overriding the note's `print-lyric` (I–L); hidden notes keep their dotted-quarter durations |
 
 Two structure-recovery files (MX-24) are kept apart in `w3cStructureRecoveryFixtures` because they
 are not schema-valid:
@@ -63,6 +67,16 @@ are not schema-valid:
 |---|---|---|---|---|
 | `41g-PartNoId.invalid` | F02 | Invalid (part without `id`) | `RECOVERED_VALUE` / accepted with warnings | The single part is bound to the only score-part, P1, with its whole rest |
 | `41h-TooManyParts` | F02 | Invalid (`part` IDs P3 and P4 are undeclared) | `UNSUPPORTED_FEATURE` / accepted with warnings | Only the listed part P1 is imported; P3 and P4 are discarded with a diagnostic each |
+
+Four MX-27 files are kept apart in `w3cPartialVisibilityFixtures` because they also hold content
+tracked by other issues. They are schema-valid and no visibility attribute is discarded:
+
+| Suite file | Covers | Schema | Strict / tolerant | Musical facts asserted (from the suite description) |
+|---|---|---|---|---|
+| `34a-Print-Object-Spanners` | F18 | Valid | `UNSUPPORTED_FEATURE` / accepted with warnings | 18 hidden notes; beams, tuplets and slurs starting and ending on hidden notes are kept, and 3:2 durations unchanged |
+| `22b-Staff-Notestyles` | F26 | Valid | `UNSUPPORTED_FEATURE` / accepted with warnings | Hidden notes in bars 4 and 5 print their two lyric lines through `print-lyric` |
+| `11b-TimeSignatures-NoTime` | F07 | Valid | `INVALID_CURSOR_MOVE` / accepted with warnings | Hidden 2/2 on both staves, then 4/4 hidden only on staff 2; both still apply |
+| `02d-Rests-Multimeasure-TimeSignatures` | F26 | Valid | `UNSUPPORTED_FEATURE` / accepted with warnings | The part name is kept and marked not printed |
 
 The whole suite (183 files) runs as a broad corpus with `scripts/run-w3c-suite.sh`; see
 [compliance-audit.md](compliance-audit.md).

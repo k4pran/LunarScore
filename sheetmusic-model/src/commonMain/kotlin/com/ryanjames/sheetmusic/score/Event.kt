@@ -27,6 +27,36 @@ public data class Grace(
     }
 }
 
+/**
+ * Display-only visibility of a note or rest; it never changes timing, pitch or relationships.
+ * [printObject] false hides the note or rest. [printDot], [printLeger] and [printLyric] override
+ * whether its dots, leger lines and lyrics are printed, and null follows [printObject].
+ * [printSpacing] says whether space is left for an element printing nothing; null is unspecified,
+ * which leaves space.
+ */
+public data class NoteVisibility(
+    val printObject: Boolean = true,
+    val printDot: Boolean? = null,
+    val printLeger: Boolean? = null,
+    val printLyric: Boolean? = null,
+    val printSpacing: Boolean? = null,
+) {
+    /** Whether the dots are printed. */
+    public val dotsPrinted: Boolean get() = printDot ?: printObject
+
+    /** Whether leger lines are printed. */
+    public val legerLinesPrinted: Boolean get() = printLeger ?: printObject
+
+    /** Whether lyrics are printed, unless a [Lyric.printObject] overrides it for one line. */
+    public val lyricsPrinted: Boolean get() = printLyric ?: printObject
+
+    /** Whether [lyric], one of this element's lyric lines, is printed. */
+    public fun lyricPrinted(lyric: Lyric): Boolean = lyric.printObject ?: lyricsPrinted
+
+    /** Whether space is left for the element when nothing of it is printed. */
+    public val spacingKept: Boolean get() = printSpacing ?: true
+}
+
 /** Performance offsets from the nominal start/end in quarter notes; never inferred from notation. */
 public data class Performance(val attack: Rational = Rational.ZERO, val release: Rational = Rational.ZERO)
 
@@ -35,6 +65,7 @@ public data class Performance(val attack: Rational = Rational.ZERO, val release:
  * quarter notes (null only for grace), separate from [notation]. Shared [chordId] groups noteheads
  * without forcing equal durations or staves. Instrument IDs resolve within the containing part.
  * [grace] details are only allowed on a [NoteRole.GRACE] note. [visual] is optional position and colour.
+ * [visibility] is display only: a hidden note keeps its timing, ties and other relationships.
  */
 public data class NoteEvent(
     override val id: String,
@@ -50,6 +81,7 @@ public data class NoteEvent(
     val performance: Performance = Performance(),
     val grace: Grace? = null,
     val visual: VisualHints? = null,
+    val visibility: NoteVisibility = NoteVisibility(),
 ) : Event {
     init {
         validateEvent(id, onset, staff)
@@ -61,7 +93,8 @@ public data class NoteEvent(
 
 /**
  * A timed rest; a gap/forward movement is represented by the absence of events, not a fake rest.
- * [visual] is optional position and colour.
+ * [visual] is optional position and colour. [visibility] is display only: a hidden rest still
+ * occupies its time.
  */
 public data class RestEvent(
     override val id: String,
@@ -72,6 +105,7 @@ public data class RestEvent(
     val notation: NotatedValue = NotatedValue(),
     val wholeMeasure: Boolean = false,
     val visual: VisualHints? = null,
+    val visibility: NoteVisibility = NoteVisibility(),
 ) : Event {
     init {
         validateEvent(id, onset, staff)
@@ -80,12 +114,17 @@ public data class RestEvent(
     }
 }
 
-/** A staff-scoped state change, applied at its exact offset rather than just at measure start. */
+/**
+ * A staff-scoped state change, applied at its exact offset rather than just at measure start.
+ * [visible] is false when the change is not printed, such as a hidden key or time signature; the
+ * state still changes.
+ */
 public data class AttributeEvent(
     override val id: String,
     override val onset: Rational,
     val attribute: Attribute,
     override val staff: Int = 1,
+    val visible: Boolean = true,
 ) : Event {
     init {
         validateEvent(id, onset, staff)

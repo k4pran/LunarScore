@@ -55,9 +55,9 @@ Key signatures never rewrite written pitch. `WrittenPitch.alter` comes only from
 | A `time` whose fractions are not positive integers (`3.5`, `3+`, a `4+8` beat type), unpaired `beats`/`beat-type`, or `senza-misura` mixed with fractions or repeated ([MX-25](#complex-time-signatures-mx-25)) | S07 `DISCARDED`, whole time dropped |
 | An `interchangeable` whose fractions are not positive integers | S07 `DISCARDED`, the alternate alone; the main meter is kept |
 | A time length beyond the `Rational` bounds | Fatal `NUMERIC_OVERFLOW` |
-| An unknown `mode` value; key/clef display attributes (`print-object`, `after-barline`, `size`, `color`, …); the `smufl` attribute of `key-accidental` | S07 `DISCARDED`; the key or clef itself is kept (unknown mode becomes null, a `key-accidental` keeps its name) |
+| An unknown `mode` value; key/clef/time display attributes (`after-barline`, `size`, `color`, …); the `smufl` attribute of `key-accidental`. Key, time and clef `print-object` is kept as `AttributeEvent.visible` since [MX-27](note-import.md#visibility-and-print-attributes-mx-27); a hidden change still applies to state | S07 `DISCARDED`; the key or clef itself is kept (unknown mode becomes null, a `key-accidental` keeps its name) |
 | `staff-tuning`, `capo` | S23 `DISCARDED` |
-| `staff-type`, `line-detail`, `staff-size`, staff-details attributes | S17 `DISCARDED` |
+| `staff-type`, `line-detail`, `staff-size`, staff-details attributes (including `print-object`) | S17 `DISCARDED` |
 | `instruments`, `for-part` | S16 `DISCARDED` (`transpose` is interpreted since [MX-16](instrument-import.md)) |
 | `measure-style` | S24 `DISCARDED` |
 | `directive` and other unknown children | S07 `DISCARDED` |

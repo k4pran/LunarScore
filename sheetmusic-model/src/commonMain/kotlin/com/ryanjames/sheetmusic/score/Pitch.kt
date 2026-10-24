@@ -45,8 +45,18 @@ public data class TimeModification(
     }
 }
 
-/** Printed accidental name and cautionary/editorial flags, independent of [WrittenPitch.alter]. */
-public data class Accidental(val name: String, val cautionary: Boolean = false, val editorial: Boolean = false)
+/**
+ * Printed accidental name and cautionary/editorial flags, independent of [WrittenPitch.alter].
+ * [parentheses] and [bracket] say whether the accidental is printed in parentheses or brackets,
+ * independently of its name and of each other; null is unspecified.
+ */
+public data class Accidental(
+    val name: String,
+    val cautionary: Boolean = false,
+    val editorial: Boolean = false,
+    val parentheses: Boolean? = null,
+    val bracket: Boolean? = null,
+)
 
 /** Printed stem direction; [NONE] is an explicitly stemless note, unlike an unspecified (null) stem. */
 public enum class StemDirection { UP, DOWN, DOUBLE, NONE }

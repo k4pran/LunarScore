@@ -141,6 +141,28 @@ See [mxl-import.md](mxl-import.md).
 F20 was generated with .NET `ZipArchive`; other archives come from a test-only writer. iOS runtime
 still requires macOS.
 
+## MX-27 visibility and print attribute decisions and remaining gaps
+
+Visibility is display only and never removes content: a hidden note, rest, attribute or mark keeps
+its timing, chord, ties, slurs, tuplets, grace link and state change
+([scope](note-import.md#visibility-and-print-attributes-mx-27)). Suite 01e, 13f and 34d import
+cleanly; 34a, 22b, 11b and 02d discard no visibility attribute (`VisibilityImportTest`,
+`XsdValidationTest`).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Note/rest `print-object`, `print-dot`, `print-leger`, `print-lyric`, `print-spacing` | `NoteVisibility` on normal, cue and grace notes and rests; omitted overrides are null and follow `print-object` (`dotsPrinted`, `legerLinesPrinted`, `lyricsPrinted`); omitted `print-spacing` leaves space (34d) | The renderer does not consume visibility yet |
+| Spanners starting or ending on a hidden note (34a) | Kept as ordinary relationships; beams stay on hidden notes | 34a says spanners starting from a hidden note should be suppressed; that is left to the renderer. Its glissando, slide, wavy-line, tremolo and technical spanners are discarded by other features (#61, #62) |
+| Lyric `print-object` with the note's `print-lyric` (34d I–L) | `Lyric.printObject` overrides the note for that line; `NoteVisibility.lyricPrinted(lyric)` resolves both | None |
+| Key, time and clef `print-object` (13f, 11b) | `AttributeEvent.visible`; the hidden change still applies in `effectiveStates()` | None |
+| Metronome `print-object` | `DirectionMark.Metronome.visible`; its sound tempo is unchanged | Other direction types have no `print-object` in 4.0 apart from `other-direction`, which is not imported |
+| Part-name and part-abbreviation `print-object` (02d and 18 other suite files) | `Part.nameVisible` / `abbreviationVisible` with the text kept | `part-name-display` (#58) |
+| Accidental `parentheses` and `bracket` (01e) | Separate nullable flags on `Accidental`, independent of its name, `cautionary`, `editorial` and the written alter | Inferring parentheses for cautionary accidentals is left to the renderer |
+| Invalid yes/no value of any of these attributes | Fatal `INVALID_VALUE` under both policies, like other yes/no attributes | None |
+| `print-object` on `notations`, `notehead`, `staff-details`, `line-detail`, `ending`, `harmony`, `figured-bass` and `other-notation`; `print-frame` | Feature-specific `DISCARDED` (S12, S17, S15, S22) as before | Model each with its element |
+| Tuplet `bracket`, `show-number` and `show-type` | S11 `DISCARDED`; the `TUPLET` span is kept | Tuplet display model (#66) |
+| Credits | MusicXML 4.0 defines no `print-object` on `credit` content; credit display attributes stay S03 `DISCARDED` | None |
+
 ## MX-26 key signature decisions and remaining gaps
 
 `Attribute.KeySignature` now holds a traditional key (fifths, mode and an optional `cancel` with its
@@ -155,7 +177,7 @@ content (`W3cSuiteImportTest`, `XsdValidationTest`).
 | `cancel` value that does not match the previous key (13e measure 5) | Kept as given; not checked against the previous key | None planned |
 | `key-octave` `number` beyond the accidentals or cancellation naturals | Kept as given; not checked | Renderer must ignore an unmatched octave |
 | `key-step` without `key-alter`, `key-alter`/`key-accidental` out of sequence, traditional and non-traditional children mixed | Fatal `INVALID_STRUCTURE` (`AttributeImportTest`) | None |
-| `key-accidental` `smufl` (needed for `other`), key `print-object`/`color` and other display attributes | S07 `DISCARDED`; the key and accidental name are kept | Display-attribute work (#56) |
+| `key-accidental` `smufl` (needed for `other`), key `color` and other display attributes | S07 `DISCARDED`; the key and accidental name are kept. Key `print-object` superseded by MX-27 above | Display-attribute work |
 
 ## MX-25 complex time signature decisions and remaining gaps
 
@@ -171,7 +193,7 @@ content (`W3cSuiteImportTest`, `XsdValidationTest`).
 | Length beyond the `Rational` Int bounds | Fatal `NUMERIC_OVERFLOW` under both policies (`AttributeImportTest`) | None |
 | `symbol` contradicting the meter (11f `cut` on 3/8) | Kept as given; display only, never changes the meter | Renderer decides how to display it |
 | Measure length against the meter | `time.length` from `effectiveStates()`; suite measures are asserted equal to it in tests | No importer diagnostic for over/underfull measures yet (F23) |
-| `time` `print-object` and other display attributes | S07 `DISCARDED` as before | Display-attribute work (#56) |
+| `time` display attributes other than `print-object` | S07 `DISCARDED` as before; `print-object` superseded by MX-27 above | Display-attribute work |
 
 ## MX-22 W3C test-suite conformance decisions and remaining gaps
 
@@ -234,7 +256,7 @@ additions were already reported by their domain owners; MX-20 pins each of them 
 | `listening`, `listen`, `assess`, `wait`, `sync`, `other-listen(ing)`, `player`, swing, `play/ipa` | S26 `DISCARDED` at the subtree (F21) | Listening/player/swing playback model |
 | `numeral*`, `bass-separator`, `arrangement`, `inversion/@text`, `function`, figured-bass alignment and placement | S22 `DISCARDED` with `harmony`/`figured-bass` (F21) | Harmony model (F24) |
 | `for-part`, `part-clef`, `part-transpose`, `double/@above`, `instrument-sound` IDs, several note instruments | S16 `DISCARDED`; the first instrument is kept (F21) | Part-generation and shared-note model |
-| `system` on `direction`/`ending`/`harmony`/`measure-numbering`; `repeat/@after-jump`; `metronome/@print-object` | Attribute-level S13/S15/S17/S22 `DISCARDED`; the element is kept, so a hidden metronome imports as visible (F21) | System-scoped display and jump semantics |
+| `system` on `direction`/`ending`/`harmony`/`measure-numbering`; `repeat/@after-jump` | Attribute-level S13/S15/S17/S22 `DISCARDED`; the element is kept (F21). `metronome/@print-object` superseded by MX-27 above | System-scoped display and jump semantics |
 | `line-detail`, `staff-size/@scaling`, `measure-numbering` options | S17 `DISCARDED` (F21) | Staff-line and numbering display model |
 | `pedal` `discontinue`/`resume`, percussion `@smufl`, `inverted-bracket` enclosure | S13 `DISCARDED` (F21) | Pedal and percussion pictogram model |
 | `arpeggiate/@unbroken`, `wavy-line/@smufl`, `bend/@shape`, `release/@offset` | S12 `DISCARDED` (F21) | Technical and arpeggio model (F25) |
@@ -262,7 +284,7 @@ All lengths are tenths (one tenth of a staff space). See [layout-import.md](layo
 | `color` with or without alpha, either case | Upper-case `#RRGGBB` / `#AARRGGBB`; other forms fatal `INVALID_VALUE` | None |
 | Second or later `print` in one measure | S17 `DISCARDED`; the first is kept | Merge policy if real files need it |
 | `appearance`, music/word/lyric fonts, `lyric-language`, `system-dividers`, `measure-numbering`, part-name/abbreviation displays, `staff-spacing` | S17 `DISCARDED` per element or attribute; the rest of the layout is kept | Appearance and typography model |
-| Position/colour on stems, beams, accidentals, tuplets, articulations, ornaments, barlines, endings, other direction types; font, justification, enclosure and `print-object` attributes | Feature-specific `DISCARDED` as before (S04/S10/S11/S12/S13/S15/S17) | Extend `VisualHints` to those elements when a renderer needs them |
+| Position/colour on stems, beams, accidentals, tuplets, articulations, ornaments, barlines, endings, other direction types; font, justification, enclosure and `print-object` attributes | Feature-specific `DISCARDED` as before (S04/S10/S11/S12/S13/S15/S17); `print-object` on notes, rests, key, time, clef, metronome, lyric and part name superseded by MX-27 above | Extend `VisualHints` to those elements when a renderer needs them |
 | Invalid decimals, colours, margin types, yes/no values, `blank-page`, staff-layout `number`, non-positive scaling or page size | Fatal `INVALID_VALUE` | None |
 | Scaling missing a value, page height without width, duplicate or conflicting page margins, incomplete margins, duplicate singleton children | Fatal `INVALID_STRUCTURE` | None |
 
@@ -343,7 +365,7 @@ discard of a note's `lyric` child.
 | Melisma (`extend`) | Kept per note as `LyricExtend(type)`, including extend-only continuations (F15) | Resolve melisma lines into spans and check start/stop pairing |
 | Consecutive `text` runs | Joined into one syllable; their typography is S14 `DISCARDED` | Rich text runs if formatting is modeled (MX-18) |
 | `laughing`, `humming`; `lyric` with `time-only` | S14 `DISCARDED`; the lyric is dropped | Model non-text lyrics and repeat-pass lyrics |
-| `end-line`, `end-paragraph`; display/typography attributes (`justify`, positions, fonts, `color`, `xml:lang`, `print-object`, `id`) | S14 `DISCARDED`; the lyric is kept | Karaoke line breaks and layout hints (MX-18) |
+| `end-line`, `end-paragraph`; display/typography attributes (`justify`, positions, fonts, `color`, `xml:lang`, `id`) | S14 `DISCARDED`; the lyric is kept. Lyric `print-object` superseded by MX-27 above | Karaoke line breaks and layout hints (MX-18) |
 | `footnote`, `level` in a lyric | S25 `DISCARDED` | Editorial model |
 | Syllabic consistency across notes (for example `begin` without `end`) | Not checked | Semantic lyric validation |
 | Lyrics on grace and unpitched notes | Kept on the note (MX-21 grace + lyric mixed pair) | None |
@@ -466,7 +488,7 @@ MX-07's S07 discard of key, clef, staves and staff details.
 | Clef without line | Standard line for G/F/C per MusicXML; null for percussion/TAB/jianpu/none | None |
 | Invalid fifths/line/octave change/sign/staves/staff-lines/attribute `number` | Fatal `INVALID_VALUE`; missing fifths or sign `INVALID_STRUCTURE` | Full XSD lexical validation remains separate |
 | `staves` > 1, `part-symbol`, key/time/clef/staff details scoped to staff ≠ 1 | Superseded by MX-09: staves and staff-scoped attributes are interpreted; `part-symbol` stays S08 `DISCARDED` | Part-symbol display |
-| Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | Non-traditional keys, `cancel` and `key-octave` superseded by MX-26 above; unknown mode and display attributes S07 `DISCARDED`, key/clef kept (unknown mode null) | Display attributes (#56) |
+| Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | Non-traditional keys, `cancel` and `key-octave` superseded by MX-26 above; unknown mode and display attributes S07 `DISCARDED`, key/clef kept (unknown mode null); key/clef `print-object` superseded by MX-27 | Other display attributes |
 | `staff-tuning`/`capo`; other staff details | S23 / S17 `DISCARDED`; staff-line count kept | MX-13/MX-18/MX-21 |
 | `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` (`transpose` superseded by MX-16 and `measure-repeat` by MX-17 above) | MX-17, MX-13 |
 | State change after backup/forward | At the cursor after the move (superseded by MX-09) | None |

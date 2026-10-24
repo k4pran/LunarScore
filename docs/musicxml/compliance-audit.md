@@ -61,24 +61,27 @@ It needs `curl`, `tar` and a POSIX shell (Git Bash on Windows). The report goes 
 contains `.invalid.` (41g, 74b, 75b) and 11b, whose `backup` moves before the start of its measure,
 are expected to be diagnosed: the run fails if either policy accepts one without a diagnostic.
 
-Results on 2026-10-24 after MX-26 (#55), 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
+Results on 2026-10-24 after MX-27 (#56), 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
 
 | Policy | Outcome |
 |---|---|
-| Strict | 92 accepted; 88 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` |
-| Tolerant | 92 accepted; 91 accepted with warnings |
+| Strict | 99 accepted; 80 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE`; 1 `RECOVERED_VALUE` |
+| Tolerant | 99 accepted; 84 accepted with warnings |
 
 No file threw, no failure lacked an error and every expected-diagnosed file was diagnosed. The
 tolerant policy accepts every file: since MX-24, 41h's two parts missing from the part list are
 discarded (S01) and 41g's part without an `id` is bound to the only score-part (`RECOVERED_VALUE`).
 Missing `divisions` (03e, 51b, 51c) default to 1 under both policies, so those files are accepted
 cleanly. Since MX-25 the time-signature files 11c–11i, and since MX-26 the key-signature files 13a–13e,
-import without discarded content. 74b and
+import without discarded content. Since MX-27 no visibility attribute (`print-object` on notes, rests,
+key, time, clef, metronome, lyric and part name; `print-dot`, `print-leger`, `print-lyric`,
+`print-spacing`; accidental `parentheses`/`bracket`) is discarded, so 01e, 13f, 34d, 51d, 52b, 72b and
+72d are accepted cleanly and 41g's first strict error is now its `RECOVERED_VALUE`. 74b and
 75b are diagnosed only because their `figured-bass` and `accordion-registration`
 content is discarded; the invalidity itself is not detected without XSD validation (#5).
 
-Tolerant files discarding content, per group: S01 4, S03 21, S04 8, S07 4, S08 2, S09 9, S10 1,
-S11 7, S12 17, S13 17, S14 6, S15 3, S16 1, S17 17, S22 10, S23 1, S24 7, S25 9, S26 1.
+Tolerant files discarding content, per group: S01 4, S03 3, S04 3, S07 2, S08 2, S09 9, S10 1,
+S11 7, S12 17, S13 17, S14 5, S15 3, S16 1, S17 17, S22 10, S23 1, S24 7, S25 9, S26 1.
 
 Each file that is not accepted cleanly under both policies is listed below with the open MX issues
 whose fixture list or scope covers its losses; the strict column shows only the first error. 45a–45k
@@ -89,61 +92,61 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 
 | File | Strict (first error) | Tolerant | Tolerant discarded per group | Tracked by |
 |---|---|---|---|---|
-| `01e-Pitches-ParenthesizedAccidentals.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/accidental/@parentheses` | warnings | S04 10 | #56 |
+| `01e-Pitches-ParenthesizedAccidentals.musicxml` | accepted | accepted | none | #56 |
 | `02a-Rests-Durations.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/multiple-rest` | warnings | S24 1 | #64 |
 | `02b-Rests-PitchedRests.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/rest/display-step` | warnings | S17 10 | #65 |
 | `02c-Rests-MultiMeasureRests.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/multiple-rest` | warnings | S24 4 | #64 |
-| `02d-Rests-Multimeasure-TimeSignatures.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S24 4 | #56, #64 |
+| `02d-Rests-Multimeasure-TimeSignatures.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/multiple-rest` | warnings | S24 4 | #64 |
 | `02f-Rests-Placement.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/rest/display-step` | warnings | S17 24 | #65 |
 | `03d-Rhythm-DottedDurations-Factors.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/multiple-rest` | warnings | S24 8 | #64 |
 | `03e-Rhythm-SecondaryBeamBreaks.musicxml` | UNSUPPORTED_FEATURE `part/measure/@width` | warnings | S01 1 | #57 |
-| `11b-TimeSignatures-NoTime.musicxml` | INVALID_CURSOR_MOVE `part/measure/backup` | warnings | S07 2 | #56; intended: backup before measure start |
+| `11b-TimeSignatures-NoTime.musicxml` | INVALID_CURSOR_MOVE `part/measure/backup` | warnings | none | #56; intended: backup before measure start |
 | `13e-KeySignatures-MidMeasure-Change.musicxml` | accepted | accepted | none | #55  |
-| `13f-KeySignatures-Visible.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/key/@print-object` | warnings | S07 1 | #56 |
+| `13f-KeySignatures-Visible.musicxml` | accepted | accepted | none | #56 |
 | `14a-StaffDetails-LineChanges.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S17 2, S25 2 | #58 |
 | `21b-Chords-TwoNotes.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/tied/@placement` | warnings | S09 4 | #62 |
 | `21d-Chords-SchubertStabatMater.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/words/@font-weight` | warnings | S12 1, S13 1 | #60 |
 | `21f-Chord-ElementInBetween.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/segno` | warnings | S13 1 | #63 |
 | `21g-Chords-Tremolos.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/ornaments/tremolo` | warnings | S12 5 | #60 |
 | `22a-Noteheads.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notehead` | warnings | S17 114 | #65 |
-| `22b-Staff-Notestyles.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/slash` | warnings | S04 10, S24 4 | #56, #64 |
+| `22b-Staff-Notestyles.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/slash` | warnings | S24 4 | #64 |
 | `22c-Noteheads-Chords.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notehead` | warnings | S17 11 | #65 |
 | `22d-Parenthesized-Noteheads.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notehead` | warnings | S17 10 | #65 |
-| `23b-Tuplets-Styles.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S11 41 | #56, #66 |
-| `23c-Tuplet-Display-NonStandard.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S11 37 | #56, #66 |
-| `23d-Tuplets-Nested.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S11 16 | #56, #66 |
-| `23e-Tuplets-Tremolo.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S12 8 | #56, #60 |
-| `31a-Directions.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S13 30 | #56, #63 |
-| `31b-Directions-Order.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S13 2 | #56, #57 |
+| `23b-Tuplets-Styles.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/tuplet/@bracket` | warnings | S11 41 | #66 |
+| `23c-Tuplet-Display-NonStandard.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/tuplet/@bracket` | warnings | S11 37 | #66 |
+| `23d-Tuplets-Nested.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/tuplet/tuplet-actual` | warnings | S11 16 | #66 |
+| `23e-Tuplets-Tremolo.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/ornaments/tremolo` | warnings | S12 8 | #60 |
+| `31a-Directions.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/scordatura` | warnings | S13 30 | #63 |
+| `31b-Directions-Order.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/words/@font-weight` | warnings | S13 2 | #57 |
 | `31c-MetronomeMarks.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/metronome` | warnings | S13 4 | #63 |
-| `31d-Directions-Compounds.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S13 25 | #56, #57, #63 |
-| `31f-Direction-Multiline-Compounds.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S13 8 | #56, #57 |
+| `31d-Directions-Compounds.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/words/@font-family` | warnings | S13 25 | #57, #63 |
+| `31f-Direction-Multiline-Compounds.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/words/@font-family` | warnings | S13 8 | #57 |
 | `32a-Notations.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/fermata` | warnings | S12 80 | #60, #61 |
 | `32b-Articulations-Texts.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/words/@font-size` | warnings | S13 13 | #57 |
 | `32d-Arpeggio.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/arpeggiate` | warnings | S12 15 | #60 |
 | `32e-Arpeggios-Cross.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/arpeggiate` | warnings | S12 30 | #60 |
 | `32e-Fermatas.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/fermata` | warnings | S12 7 | #60 |
 | `33a-Spanners.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/tuplet/@placement` | warnings | S09 2, S11 1, S12 17, S13 25, S25 2 | #61, #62, #68 |
-| `33c-Spanners-Slurs.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S09 6 | #56, #62 |
+| `33c-Spanners-Slurs.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/slur/@placement` | warnings | S09 6 | #62 |
 | `33d-Spanners-OctaveShifts.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/octave-shift` | warnings | S13 8 | #62 |
 | `33e-Spanners-OctaveShifts-InvalidSize.musicxml` | UNSUPPORTED_FEATURE `part/measure/direction/direction-type/octave-shift` | warnings | S13 4 | #62 |
 | `33f-Trill-EndingOnGraceNote.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/slur/@placement` | warnings | S09 1, S12 3 | #62 |
-| `33g-Slur-ChordedNotes.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S09 2 | #56, #62 |
+| `33g-Slur-ChordedNotes.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/slur/@placement` | warnings | S09 2 | #62 |
 | `33h-Spanners-Glissando.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/glissando` | warnings | S12 20 | #62 |
 | `33i-Ties-NotEnded.musicxml` | UNMATCHED_SPAN `part/measure/note/tie` | warnings | none | #67; intended: tie without stop |
 | `33j-Beams-Tremolos.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/ornaments/tremolo` | warnings | S12 12 | #60 |
 | `33k-Tie-Types.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/rest/display-step` | warnings | S09 1, S17 2 | #65, #67 |
-| `34a-Print-Object-Spanners.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/@print-object` | warnings | S04 18, S09 2, S11 2, S12 24 | #56, #61, #62 |
+| `34a-Print-Object-Spanners.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/tuplet/@placement` | warnings | S09 2, S11 2, S12 24 | #61, #62 |
 | `34b-Colors.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/notations/technical` | warnings | S04 1, S07 5, S09 2, S10 4, S11 1, S12 32, S13 17, S14 1, S15 4, S17 5, S24 2 | #57, #61, #63 |
 | `34c-Font-Size.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/@font-size` | warnings | S04 4, S07 5, S11 4, S12 24, S13 12, S14 1, S17 2, S24 2 | #57, #61, #63 |
-| `34d-Note-Attributes.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/@print-leger` | warnings | S04 15, S14 4 | #56 |
+| `34d-Note-Attributes.musicxml` | accepted | accepted | none | #56 |
 | `41c-StaffGroups.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S08 1, S16 1, S17 3, S25 22 | #58, #68 |
 | `41d-StaffGroups-Nested.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 4 | #58 |
 | `41e-StaffGroups-InstrumentNames-Linebroken.musicxml` | accepted | accepted | none | #58  |
 | `41f-StaffGroups-Overlapping.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 4 | #58 |
-| `41g-PartNoId.invalid.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56; intended: `.invalid`, part without `id` bound to the only score-part with a `RECOVERED_VALUE` warning (#53) |
+| `41g-PartNoId.invalid.musicxml` | RECOVERED_VALUE `part/@id` | warnings | none | #56; intended: `.invalid`, part without `id` bound to the only score-part with a `RECOVERED_VALUE` warning (#53) |
 | `41g-StaffGroups-NestingOrder.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 14 | #58 |
-| `41h-TooManyParts.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S01 2, S03 1 | #56, #58; parts missing from the part list discarded (#53) |
+| `41h-TooManyParts.musicxml` | UNSUPPORTED_FEATURE `part` | warnings | S01 2 | #58; parts missing from the part list discarded (#53) |
 | `41i-PartNameDisplay-Override.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name-display` | warnings | S17 2 | #58 |
 | `41j-PartNameDisplay-Multiple-DisplayText-Children.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name-display` | warnings | S17 1 | #58 |
 | `41k-PartName-Print.musicxml` | UNSUPPORTED_FEATURE `part/measure/print/part-name-display` | warnings | S17 2 | #58 |
@@ -169,22 +172,22 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | `46g-PickupMeasure-Chordnames-FiguredBass.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 4 | #59 |
 | `46h-Barline-Fermata.musicxml` | UNSUPPORTED_FEATURE `part/measure/barline/fermata` | warnings | S15 3 | #60 |
 | `51a-Header-Credits.musicxml` | UNSUPPORTED_FEATURE `credit/credit-words/@default-x` | warnings | S03 40 | #57 |
-| `51d-EmptyTitle.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56 |
-| `52a-PageLayout.musicxml` | UNSUPPORTED_FEATURE `defaults/music-font` | warnings | S01 5, S03 7, S13 4, S17 2, S26 2 | #57, #68 |
-| `52b-Breaks.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56 |
+| `51d-EmptyTitle.musicxml` | accepted | accepted | none | #56 |
+| `52a-PageLayout.musicxml` | UNSUPPORTED_FEATURE `defaults/music-font` | warnings | S01 5, S03 6, S13 4, S17 2, S26 2 | #57, #68 |
+| `52b-Breaks.musicxml` | accepted | accepted | none | #56 |
 | `61h-Lyrics-BeamsMelismata.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/lyric/extend/@color` | warnings | S14 1 | #57 |
 | `61j-Lyrics-Elisions.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/lyric/@color` | warnings | S14 4 | #57 |
-| `61k-Lyrics-SpannersExtenders.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S14 3 | #56, #57 |
+| `61k-Lyrics-SpannersExtenders.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/lyric/@justify` | warnings | S14 3 | #57 |
 | `71a-Chordnames.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 8 | #59 |
 | `71b-Chordnames-Kinds.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 32 | #59 |
 | `71c-ChordsFrets.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 8 | #59 |
 | `71d-ChordsFrets-Multistaff.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 4 | #59 |
-| `71e-TabStaves.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S04 3, S12 65, S17 1, S23 43, S25 2 | #58, #61 |
+| `71e-TabStaves.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S12 65, S17 1, S23 43, S25 2 | #58, #61 |
 | `71f-AllChordTypes.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 38 | #59 |
 | `71g-MultipleChordnames.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 4 | #59 |
-| `72b-TransposingInstruments-Full.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56 |
+| `72b-TransposingInstruments-Full.musicxml` | accepted | accepted | none | #56 |
 | `72c-TransposingInstruments-Change.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name-display` | warnings | S17 4 | #58 |
-| `72d-TransposingInstruments-scorePitch.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56 |
+| `72d-TransposingInstruments-scorePitch.musicxml` | accepted | accepted | none | #56 |
 | `73a-Percussion.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 2 | #58 |
 | `74a-FiguredBass.musicxml` | UNSUPPORTED_FEATURE `part/measure/figured-bass` | warnings | S22 4 | #59 |
 | `74b-FiguredBass.invalid.musicxml` | UNSUPPORTED_FEATURE `part/measure/figured-bass` | warnings | S22 5 | #59; `.invalid` diagnosed only through discarded `figured-bass` |

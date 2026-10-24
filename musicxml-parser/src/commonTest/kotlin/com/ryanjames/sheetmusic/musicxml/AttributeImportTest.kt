@@ -171,8 +171,10 @@ class AttributeImportTest {
                 "<key><fifths>3</fifths><mode>hypodorian</mode></key>" +
                 "<key><key-step>F</key-step><key-alter>1</key-alter></key></attributes>",
         ), ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S07"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.unsupported?.retention == ContentRetention.DISCARDED })
+        // A hidden key still changes state; only its event is marked not visible.
+        assertEquals(listOf(false, true, true), events(result).map { assertIs<AttributeEvent>(it).visible })
         assertEquals(
             listOf(
                 Attribute.KeySignature(-2, KeyMode.MINOR, KeyCancel(2), octaves = listOf(KeyOctave(1, 4))),

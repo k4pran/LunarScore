@@ -57,12 +57,32 @@ All of these are `UNSUPPORTED_FEATURE` with `DISCARDED` retention: strict reject
 | `lyric` | S14 | Child discarded; note and exact duration kept. Lyrics are interpreted by [MX-14](lyric-import.md); `tie` and `notations` are interpreted by [MX-11](span-import.md); `time-modification`, `stem`, `beam` and `tuplet` by [MX-12](tuplet-import.md) |
 | `footnote`/`level`; `play`/`listen` | S25; S26 | Child discarded (`instrument` is interpreted since [MX-16](instrument-import.md)) |
 | `notehead`, rest display-step/octave, dot attributes | S17 | Child/attribute discarded |
-| Note attributes (`default-x`, `dynamics`, `print-object`, …), unknown note children | S04 | Discarded |
+| Note attributes (`dynamics`, `attack`, …), unknown note children | S04 | Discarded. Position and colour are kept since [MX-18](layout-import.md), and `print-*` attributes since [MX-27](#visibility-and-print-attributes-mx-27) |
 | `time` with `number` other than 1 | S08 (S07 before MX-08) | Superseded by [MX-09](polyphony.md): the meter applies to that staff; a non-positive number or one beyond the declared staves is `INVALID_VALUE` |
 | Time attributes (`symbol`, …); additive, multiple, interchangeable or `senza-misura` time | S07 | Discarded (a simple time with an unmapped attribute still yields its signature). Key, clef, staves and staff details are interpreted by [MX-08](attribute-state.md) |
 
 Measure fullness against the time signature is not checked. Key, clef and staff-detail state is
 [MX-08](attribute-state.md); multi-voice/cursor interpretation is [MX-09](polyphony.md).
+
+## Visibility and print attributes (MX-27)
+
+Visibility is a display-only hint. A hidden element is never dropped: it keeps its onset, duration,
+chord, ties, slurs, tuplets, grace link and lyrics, so renderers can decide what to suppress.
+
+| Source | Model |
+|---|---|
+| Note/rest `print-object`, `print-dot`, `print-leger`, `print-lyric`, `print-spacing` | `NoteEvent.visibility` / `RestEvent.visibility` (`NoteVisibility`). `print-object` defaults to yes; the other values are null when omitted. `dotsPrinted`, `legerLinesPrinted` and `lyricsPrinted` follow `print-object` unless overridden; `spacingKept` defaults to true |
+| `lyric` `print-object` | `Lyric.printObject`, which overrides the note's `print-lyric` for that line; `NoteVisibility.lyricPrinted(lyric)` resolves both |
+| `accidental` `parentheses`, `bracket` | `Accidental.parentheses` / `bracket`, null when omitted, independent of the name, `cautionary`, `editorial` and the written alter |
+| `key`, `time`, `clef` `print-object` | `AttributeEvent.visible`; the change still applies to [attribute state](attribute-state.md) |
+| `metronome` `print-object` | `DirectionMark.Metronome.visible` |
+| `part-name`, `part-abbreviation` `print-object` | `Part.nameVisible` / `abbreviationVisible` |
+
+An invalid yes/no value is fatal `INVALID_VALUE`, as for other yes/no attributes. `print-object` on
+`notations`, `notehead`, `staff-details` and other elements, and tuplet `bracket`/`show-number`, are
+still discarded by their features; see [risks and gaps](risks-and-gaps.md#mx-27-visibility-and-print-attribute-decisions-and-remaining-gaps).
+W3C suite 01e, 13f, 34d, 34a, 22b, 11b and 02d are embedded in `W3cVisibilityFixtures.kt` and
+asserted in `VisibilityImportTest`.
 
 ## Fixtures and verification
 
