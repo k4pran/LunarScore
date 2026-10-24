@@ -5,16 +5,26 @@ public enum class Placement { ABOVE, BELOW }
 
 /**
  * A printed expression mark attached to one note or rest. The mark type is its semantic component;
- * [placement] is its separate visual component and never changes the meaning.
+ * [placement] and [visual] (optional position, colour and font) are its separate visual components
+ * and never change the meaning.
  */
 public sealed interface NoteExpression {
     public val placement: Placement?
+    public val visual: VisualHints?
 
     /** An articulation such as staccato or accent. */
-    public data class Articulation(val type: ArticulationType, override val placement: Placement? = null) : NoteExpression
+    public data class Articulation(
+        val type: ArticulationType,
+        override val placement: Placement? = null,
+        override val visual: VisualHints? = null,
+    ) : NoteExpression
 
     /** An ornament such as a trill mark or mordent; its realized playback is not inferred. */
-    public data class Ornament(val type: OrnamentType, override val placement: Placement? = null) : NoteExpression
+    public data class Ornament(
+        val type: OrnamentType,
+        override val placement: Placement? = null,
+        override val visual: VisualHints? = null,
+    ) : NoteExpression
 }
 
 /** Articulations whose meaning is fully given by their type. */
@@ -31,7 +41,7 @@ public enum class OrnamentType {
 /**
  * A printed dynamic, either on a note or in a direction. [markings] are kept in source order, so
  * `sf` followed by `p` is an sfp; a nonstandard dynamic keeps its text verbatim. No playback
- * velocity is inferred from the markings. [visual] is optional position and colour.
+ * velocity is inferred from the markings. [visual] is optional position, colour and text formatting.
  */
 public data class Dynamics(
     val markings: List<String>,
@@ -43,11 +53,14 @@ public data class Dynamics(
     }
 }
 
-/** One printed component of a direction, in source order, with its optional position and colour. */
+/** One printed component of a direction, in source order, with its optional position, colour and formatting. */
 public sealed interface DirectionMark {
     public val visual: VisualHints?
 
-    /** Free text such as "dolce" or "rit."; whitespace is preserved and typography is not modeled. */
+    /**
+     * Free text such as "dolce" or "rit."; whitespace, including the line breaks of multi-line text,
+     * is preserved. Its font, alignment and enclosure are part of [visual].
+     */
     public data class Words(val text: String, override val visual: VisualHints? = null) : DirectionMark
 
     /**

@@ -16,6 +16,7 @@ import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.Repeat
 import com.ryanjames.sheetmusic.score.RepeatDirection
 import com.ryanjames.sheetmusic.score.Score
+import com.ryanjames.sheetmusic.score.VisualHints
 import com.ryanjames.sheetmusic.score.playbackOrder
 import com.ryanjames.sheetmusic.score.validate
 import kotlin.test.Test
@@ -197,11 +198,17 @@ class BarlineImportTest {
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(
-            listOf("S15", "S15", "S15", "S25", "S15", "S15", "S15", "S15", "S15", "S15", "S15"),
+            listOf("S15", "S15", "S25", "S15", "S15", "S15", "S15", "S15", "S15", "S15"),
             result.diagnostics.filter { it.code == DiagnosticCode.UNSUPPORTED_FEATURE }.map { it.unsupported?.featureId },
         )
         val barline = result.value.parts.single().measures.single().barlines.single()
-        assertEquals(Barline(style = BarStyle.LIGHT_HEAVY, repeat = Repeat(RepeatDirection.BACKWARD, 3), ending = EndingMark(EndingType.STOP, listOf(1))), barline)
+        assertEquals(
+            Barline(
+                style = BarStyle.LIGHT_HEAVY, repeat = Repeat(RepeatDirection.BACKWARD, 3), ending = EndingMark(EndingType.STOP, listOf(1)),
+                styleVisual = VisualHints(color = "#000000"),
+            ),
+            barline,
+        )
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
     }
 

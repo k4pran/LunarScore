@@ -108,14 +108,14 @@ class TimewiseImportTest {
     @Test
     fun testUnmappedTimewiseContentIsReportedWithPartContext() {
         val xml = timewise(
-            "<part id='P1'/><measure number='1' width='90'><direction/><part id='P1' extra='x'/><part id='P2'/></measure>",
+            "<part id='P1'/><measure number='1' text='1a'><direction/><part id='P1' extra='x'/><part id='P2'/></measure>",
         )
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
         val unsupported = result.diagnostics.map { assertNotNull(it.unsupported).featureId to it.location.path }
         assertEquals(listOf(
             "S03" to "/score-timewise[1]/part[1]",
-            "S01" to "/score-timewise[1]/measure[1]/@width",
+            "S01" to "/score-timewise[1]/measure[1]/@text",
             "S13" to "/score-timewise[1]/measure[1]/direction[1]",
             "S01" to "/score-timewise[1]/measure[1]/part[1]/@extra",
         ), unsupported)

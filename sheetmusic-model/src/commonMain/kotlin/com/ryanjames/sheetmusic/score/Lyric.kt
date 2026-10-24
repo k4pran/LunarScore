@@ -6,7 +6,7 @@ package com.ryanjames.sheetmusic.score
  * label such as "chorus". [syllables] are in source order; more than one means they are joined by
  * elisions. A melisma continuation has no syllables and only an [extend]. [placement] is
  * presentation only. [printObject] overrides whether this line is printed; null follows the note's
- * [NoteVisibility.lyricsPrinted].
+ * [NoteVisibility.lyricsPrinted]. [visual] is the line's optional position, colour and justification.
  */
 public data class Lyric(
     val syllables: List<LyricSyllable>,
@@ -15,6 +15,7 @@ public data class Lyric(
     val extend: LyricExtend? = null,
     val placement: Placement? = null,
     val printObject: Boolean? = null,
+    val visual: VisualHints? = null,
 ) {
     init {
         require(verse == null || verse.isNotBlank())
@@ -32,12 +33,15 @@ public data class Lyric(
  * A syllable of a [Lyric]. [text] joins the source's consecutive text runs, whose differences are
  * only typographic, with whitespace preserved. [syllabic] is its position in a word, null when
  * unspecified. [elision] is the symbol that joins it to the previous syllable on the same note, for
- * example an undertie; an empty string is an elision without a stated symbol.
+ * example an undertie; an empty string is an elision without a stated symbol. [visual] is the font
+ * and colour of the syllable's first text run and [elisionVisual] those of its elision.
  */
 public data class LyricSyllable(
     val text: String,
     val syllabic: Syllabic? = null,
     val elision: String? = null,
+    val visual: VisualHints? = null,
+    val elisionVisual: VisualHints? = null,
 )
 
 /** A syllable's position in its word: a whole word, or the begin, middle or end of a hyphenated word. */
@@ -45,9 +49,9 @@ public enum class Syllabic { SINGLE, BEGIN, MIDDLE, END }
 
 /**
  * A word extension (melisma) line. [type] marks its start, continuation or stop; null means the
- * source gave no type.
+ * source gave no type. [visual] is the line's optional position and colour.
  */
-public data class LyricExtend(val type: ExtendType? = null)
+public data class LyricExtend(val type: ExtendType? = null, val visual: VisualHints? = null)
 
 /** The role of a note in a lyric extension line. */
 public enum class ExtendType { START, CONTINUE, STOP }

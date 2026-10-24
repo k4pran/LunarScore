@@ -43,6 +43,29 @@ internal val w3cSuiteFixtures: List<W3cSuiteFixture> by lazy {
         W3cSuiteFixture("01e-Pitches-ParenthesizedAccidentals.musicxml", "F03", w3c01ePitchesParenthesizedAccidentals),
         W3cSuiteFixture("13f-KeySignatures-Visible.musicxml", "F07", w3c13fKeySignaturesVisible),
         W3cSuiteFixture("34d-Note-Attributes.musicxml", "F18", w3c34dNoteAttributes),
+        // MX-28 typography and colour, embedded in W3cTypographyFixtures.kt.
+        W3cSuiteFixture("03e-Rhythm-SecondaryBeamBreaks.musicxml", "F09", w3c03eRhythmSecondaryBeamBreaks),
+        W3cSuiteFixture("31f-Direction-Multiline-Compounds.musicxml", "F14", w3c31fDirectionMultilineCompounds),
+        W3cSuiteFixture("32b-Articulations-Texts.musicxml", "F14", w3c32bArticulationsTexts),
+        W3cSuiteFixture("51a-Header-Credits.musicxml", "F02", w3c51aHeaderCredits),
+        W3cSuiteFixture("61h-Lyrics-BeamsMelismata.musicxml", "F15", w3c61hLyricsBeamsMelismata),
+        W3cSuiteFixture("61j-Lyrics-Elisions.musicxml", "F15", w3c61jLyricsElisions),
+        W3cSuiteFixture("61k-Lyrics-SpannersExtenders.musicxml", "F15", w3c61kLyricsSpannersExtenders),
+    )
+}
+
+/**
+ * MX-28 files whose typography and colour are imported but which also hold content tracked by other
+ * issues (other direction types, technical notations, metronome parentheses, MIDI settings), so they
+ * are not accepted cleanly and are kept out of [w3cSuiteFixtures]. They are schema-valid.
+ */
+internal val w3cPartialTypographyFixtures: List<W3cSuiteFixture> by lazy {
+    listOf(
+        W3cSuiteFixture("31b-Directions-Order.musicxml", "F14", w3c31bDirectionsOrder),
+        W3cSuiteFixture("31d-Directions-Compounds.musicxml", "F14", w3c31dDirectionsCompounds),
+        W3cSuiteFixture("34b-Colors.musicxml", "F18", w3c34bColors),
+        W3cSuiteFixture("34c-Font-Size.musicxml", "F18", w3c34cFontSize),
+        W3cSuiteFixture("52a-PageLayout.musicxml", "F18", w3c52aPageLayout),
     )
 }
 

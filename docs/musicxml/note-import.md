@@ -57,7 +57,7 @@ All of these are `UNSUPPORTED_FEATURE` with `DISCARDED` retention: strict reject
 | `lyric` | S14 | Child discarded; note and exact duration kept. Lyrics are interpreted by [MX-14](lyric-import.md); `tie` and `notations` are interpreted by [MX-11](span-import.md); `time-modification`, `stem`, `beam` and `tuplet` by [MX-12](tuplet-import.md) |
 | `footnote`/`level`; `play`/`listen` | S25; S26 | Child discarded (`instrument` is interpreted since [MX-16](instrument-import.md)) |
 | `notehead`, rest display-step/octave, dot attributes | S17 | Child/attribute discarded |
-| Note attributes (`dynamics`, `attack`, …), unknown note children | S04 | Discarded. Position and colour are kept since [MX-18](layout-import.md), and `print-*` attributes since [MX-27](#visibility-and-print-attributes-mx-27) |
+| Note attributes (`dynamics`, `attack`, …), unknown note children | S04 | Discarded. Position and colour are kept since [MX-18](layout-import.md), `print-*` attributes since [MX-27](#visibility-and-print-attributes-mx-27), and the note's font and the accidental's position, colour and font since [MX-28](layout-import.md#typography-and-colour-mx-28) |
 | `time` with `number` other than 1 | S08 (S07 before MX-08) | Superseded by [MX-09](polyphony.md): the meter applies to that staff; a non-positive number or one beyond the declared staves is `INVALID_VALUE` |
 | Time attributes (`symbol`, …); additive, multiple, interchangeable or `senza-misura` time | S07 | Discarded (a simple time with an unmapped attribute still yields its signature). Key, clef, staves and staff details are interpreted by [MX-08](attribute-state.md) |
 

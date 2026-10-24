@@ -3,6 +3,7 @@ package com.ryanjames.sheetmusic.musicxml
 import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.Relationship
 import com.ryanjames.sheetmusic.score.RelationshipKind
+import com.ryanjames.sheetmusic.score.VisualHints
 
 /** A part-local musical position: one-based measure index, then measure-local onset. */
 internal data class SpanPosition(val measure: Int, val onset: Rational) : Comparable<SpanPosition> {
@@ -10,7 +11,10 @@ internal data class SpanPosition(val measure: Int, val onset: Rational) : Compar
         compareValuesBy(this, other, { it.measure }, { it.onset })
 }
 
-/** One source endpoint on an imported event. [key] pairs endpoints: pitch for ties, number for slurs, tuplets and wedges. */
+/**
+ * One source endpoint on an imported event. [key] pairs endpoints: pitch for ties, number for slurs,
+ * tuplets and wedges. [visual] is the printed mark's position and colour, kept on the relationship.
+ */
 internal data class SpanEndpoint(
     val kind: RelationshipKind,
     val key: String,
@@ -18,6 +22,7 @@ internal data class SpanEndpoint(
     val voice: String,
     val position: SpanPosition,
     val location: SourceLocation,
+    val visual: VisualHints? = null,
 )
 
 /** A resolved or unresolved span with the source locations of its endpoints, for provenance. */
@@ -120,7 +125,10 @@ internal class SpanResolver(
             val number = counters.getOrElse(span.kind) { 0 } + 1
             counters[span.kind] = number
             ResolvedSpan(
-                Relationship("$partId:${SLUGS.getValue(span.kind)}-$number", span.kind, span.start?.eventId, span.end?.eventId),
+                Relationship(
+                    "$partId:${SLUGS.getValue(span.kind)}-$number", span.kind, span.start?.eventId, span.end?.eventId,
+                    span.start?.visual, span.end?.visual,
+                ),
                 span.start?.location,
                 span.end?.location,
             )

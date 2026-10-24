@@ -38,7 +38,7 @@ later `END`).
 | `lyric` with `time-only` | S14 `DISCARDED`; the lyric is dropped, as for `tie` |
 | `end-line`, `end-paragraph` | S14 `DISCARDED`; the lyric is kept |
 | `footnote`, `level` | S25 `DISCARDED`; the lyric is kept |
-| Display and typography attributes on `lyric`, `text`, `elision` and `extend` (`justify`, `default-x`/`y`, `font-*`, `color`, `xml:lang`, `id`, …) | S14 `DISCARDED` per attribute; the lyric is kept. `lyric` `print-object` is kept as `Lyric.printObject` since [MX-27](note-import.md#visibility-and-print-attributes-mx-27) |
+| Display and typography attributes on `lyric`, `text`, `elision` and `extend` other than those kept (`xml:lang`, text decoration, `letter-spacing`, `id`, …); a later text run whose formatting differs from the syllable's first run | S14 `DISCARDED` per attribute; the lyric is kept. `lyric` `print-object` is kept as `Lyric.printObject` since [MX-27](note-import.md#visibility-and-print-attributes-mx-27); lyric position, `color` and `justify` (`Lyric.visual`), the first text run's and the elision's font and `color` (`LyricSyllable.visual`, `elisionVisual`) and `extend` position and `color` (`LyricExtend.visual`) since [MX-28](layout-import.md#typography-and-colour-mx-28) |
 | Unknown `syllabic`, extend `type` or `placement`; blank `number` | Fatal `INVALID_VALUE` |
 | Empty lyric; `elision` first or doubled; `syllabic` after text without an `elision`; `syllabic` or `elision` without a following `text`; text content after `extend`, `end-line`, `end-paragraph` or editorial content; `laughing`/`humming` with other content; trailing content before any text | Fatal `INVALID_STRUCTURE` |
 

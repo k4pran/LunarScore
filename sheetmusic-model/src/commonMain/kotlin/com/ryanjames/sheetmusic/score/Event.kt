@@ -64,7 +64,7 @@ public data class Performance(val attack: Rational = Rational.ZERO, val release:
  * One notehead, including each chord tone independently. [duration] is performed musical time in
  * quarter notes (null only for grace), separate from [notation]. Shared [chordId] groups noteheads
  * without forcing equal durations or staves. Instrument IDs resolve within the containing part.
- * [grace] details are only allowed on a [NoteRole.GRACE] note. [visual] is optional position and colour.
+ * [grace] details are only allowed on a [NoteRole.GRACE] note. [visual] is optional position, colour and font.
  * [visibility] is display only: a hidden note keeps its timing, ties and other relationships.
  */
 public data class NoteEvent(
@@ -117,7 +117,7 @@ public data class RestEvent(
 /**
  * A staff-scoped state change, applied at its exact offset rather than just at measure start.
  * [visible] is false when the change is not printed, such as a hidden key or time signature; the
- * state still changes.
+ * state still changes. [visual] is the optional position, colour and font of the printed sign.
  */
 public data class AttributeEvent(
     override val id: String,
@@ -125,6 +125,7 @@ public data class AttributeEvent(
     val attribute: Attribute,
     override val staff: Int = 1,
     val visible: Boolean = true,
+    val visual: VisualHints? = null,
 ) : Event {
     init {
         validateEvent(id, onset, staff)

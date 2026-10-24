@@ -32,8 +32,8 @@ notated value is kept, because MusicXML treats `duration` as the sounding length
 | Unknown stem value, beam type or `normal-type`; beam `number` outside 1–8; tuplet `number` outside 1–16 (for example 17); tuplet `type` other than `start`/`stop`; zero or malformed `actual-notes`/`normal-notes` | Fatal `INVALID_VALUE` |
 | Missing tuplet `type`; missing `actual-notes` or `normal-notes`; `normal-dot` without `normal-type`; duplicate `stem` or `time-modification`; two beams with the same level | Fatal `INVALID_STRUCTURE` |
 | Tuplet start without stop, stop without start, second start with the same number and voice | `UNMATCHED_SPAN`, relationship kept with a null partner (see [span import](span-import.md)) |
-| `tuplet-actual`/`tuplet-normal` display ratio; tuplet `bracket`, `show-number`, `show-type`, `line-shape`, `placement` and position attributes | S11 `DISCARDED`; the tuplet span is kept |
-| Beam `fan`, `repeater`, `color`, `id`; stem `default-y`, `relative-y`, `color` | S10 `DISCARDED` per attribute; the beam or stem is kept |
+| `tuplet-actual`/`tuplet-normal` display ratio; tuplet `bracket`, `show-number`, `show-type`, `line-shape` and `placement` | S11 `DISCARDED`; the tuplet span is kept. Tuplet position is kept on the relationship's `startVisual`/`endVisual` since [MX-28](layout-import.md#typography-and-colour-mx-28) |
+| Beam `fan`, `repeater`, `id` | S10 `DISCARDED` per attribute; the beam is kept. Beam `color` (`Beam.visual`) and stem position and `color` (`NotatedValue.stemVisual`) are kept since [MX-28](layout-import.md#typography-and-colour-mx-28) |
 | Beam, stem or tuplet on a discarded note (chord, unpitched, staff ≠ 1, after backup/forward) | Dropped with the note; a tuplet partner becomes `UNMATCHED_SPAN` |
 
 Beam continuity (a `begin` without an `end`) and agreement between `time-modification`, tuplet
