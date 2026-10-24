@@ -26,6 +26,7 @@ The local `sheetmusic-core` renderer model currently supports one treble staff a
 | M3: notation and expression | MX-11–MX-15 | Spans, tuplets, directions, lyrics and grace/cue notes with independent semantics tests. |
 | M4: broad 4.0 interchange | MX-16–MX-20 | Instruments, repeats, layout, `.mxl` and 4.0 additions. |
 | M5: compliance hardening | MX-21 | Coverage audit, compatibility/security corpus, documentation and target matrix. |
+| M6: W3C test-suite conformance | MX-22–MX-39 | One command runs the pinned W3C suite; every valid file imports under the tolerant policy without discarded content. |
 
 Complexity: S = one focused session, M = a few related components, L = split the issue into smaller PRs if it exceeds one reviewable session. An issue is complete only when its acceptance checks pass and its coverage rows and risk decisions are updated.
 
