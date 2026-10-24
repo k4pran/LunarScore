@@ -25,7 +25,8 @@ Scott Asato Cuthbert. Embedded in `W3cSuiteFixtures.kt` and asserted by `W3cSuit
 stand in for the test-plan fixtures F01–F08: their authors are independent of the importer, and each
 file states what a reader should produce. The 11c–11i time-signature files (MX-25) are embedded in
 `W3cTimeSignatureFixtures.kt`, the 13a–13e key-signature files (MX-26) in `W3cKeySignatureFixtures.kt`,
-and the MX-27 visibility files in `W3cVisibilityFixtures.kt`, asserted by `VisibilityImportTest`.
+the MX-27 visibility files in `W3cVisibilityFixtures.kt`, asserted by `VisibilityImportTest`, and the
+MX-28 typography and colour files in `W3cTypographyFixtures.kt`, asserted by `TypographyImportTest`.
 
 | Suite file | Covers | Schema | Strict / tolerant | Musical facts asserted (from the suite description) |
 |---|---|---|---|---|
@@ -59,6 +60,13 @@ and the MX-27 visibility files in `W3cVisibilityFixtures.kt`, asserted by `Visib
 | `01e-Pitches-ParenthesizedAccidentals` | F03 | Valid | Accepted / accepted | Cautionary/editorial flags, then bracket and parentheses flags, each independent of the accidental name and the written alter |
 | `13f-KeySignatures-Visible` | F07 | Valid | Accepted / accepted | Hidden A♭ major key still applies to the following notes, which have no accidentals |
 | `34d-Note-Attributes` | F18 | Valid | Accepted / accepted | `print-leger`, `print-dot`, `print-lyric` and `print-object` combinations A–H; lyric `print-object` overriding the note's `print-lyric` (I–L); hidden notes keep their dotted-quarter durations |
+| `03e-Rhythm-SecondaryBeamBreaks` | F09 | Valid | Accepted / accepted | The first measure keeps its width of 1077.49 tenths |
+| `31f-Direction-Multiline-Compounds` | F14 | Valid | Accepted / accepted | A `p`, a preserved single space and boxed three-line text with `valign` middle, in one direction; the line breaks are kept |
+| `32b-Articulations-Texts` | F14 | Valid | Accepted / accepted | Words keep their positions, CSS sizes (small, medium, large), weights and one red colour |
+| `51a-Header-Credits` | F02 | Valid | Accepted / accepted | Eight credits keep their positions, sizes, `halign`, `valign`, `justify`, italic style and the boxed title; the title's second words has no formatting |
+| `61h-Lyrics-BeamsMelismata` | F15 | Valid | Accepted / accepted | One red melisma extender |
+| `61j-Lyrics-Elisions` | F15 | Valid | Accepted / accepted | A red lyric whose elision is green and whose second syllable is blue italic; an elision without a symbol |
+| `61k-Lyrics-SpannersExtenders` | F15 | Valid | Accepted / accepted | Left-, right- and left-justified lyrics |
 
 Two structure-recovery files (MX-24) are kept apart in `w3cStructureRecoveryFixtures` because they
 are not schema-valid:
@@ -77,6 +85,19 @@ tracked by other issues. They are schema-valid and no visibility attribute is di
 | `22b-Staff-Notestyles` | F26 | Valid | `UNSUPPORTED_FEATURE` / accepted with warnings | Hidden notes in bars 4 and 5 print their two lyric lines through `print-lyric` |
 | `11b-TimeSignatures-NoTime` | F07 | Valid | `INVALID_CURSOR_MOVE` / accepted with warnings | Hidden 2/2 on both staves, then 4/4 hidden only on staff 2; both still apply |
 | `02d-Rests-Multimeasure-TimeSignatures` | F26 | Valid | `UNSUPPORTED_FEATURE` / accepted with warnings | The part name is kept and marked not printed |
+
+Five MX-28 files are kept apart in `w3cPartialTypographyFixtures` because they also hold content
+tracked by other issues. They are schema-valid, and typography and colour are discarded only on
+elements the model does not represent (`dot`, `measure-style`, technical marks, other direction types,
+tuplet display content):
+
+| Suite file | Covers | Schema | Strict / tolerant | Musical facts asserted (from the suite description) |
+|---|---|---|---|---|
+| `31b-Directions-Order` | F14 | Valid | `UNSUPPORTED_FEATURE` (metronome `parentheses`) / accepted with warnings | Imported cleanly when tolerant apart from the metronome's parentheses |
+| `31d-Directions-Compounds` | F14 | Valid | `UNSUPPORTED_FEATURE` (dashes, rehearsal, segno, coda) / accepted with warnings | Imported when tolerant; words keep their fonts, `xml:space` and enclosure |
+| `34b-Colors` | F18 | Valid | `UNSUPPORTED_FEATURE` / accepted with warnings | Red note, rest and unpitched note; red stems, accidental, beams, accent, trill mark, lyric, slur and tie; red dynamics, words and wedge; red time, keys and clef and a blue clef; red, blue and red bar styles and a red ending |
+| `34c-Font-Size` | F18 | Valid | `UNSUPPORTED_FEATURE` / accepted with warnings | Size 30 on the note, unpitched note and rest, accidental, trill marks and accent, lyric text, clefs, keys and time, dynamics and words |
+| `52a-PageLayout` | F18 | Valid | `UNSUPPORTED_FEATURE` (MIDI channel and program) / accepted with warnings | Music font Maestro 10.7 and word font Times New Roman 5.3; measure widths 441, 378, 378, 378, 819; a bold credit |
 
 The whole suite (183 files) runs as a broad corpus with `scripts/run-w3c-suite.sh`; see
 [compliance-audit.md](compliance-audit.md).

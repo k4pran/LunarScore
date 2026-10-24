@@ -10,17 +10,24 @@ import com.ryanjames.sheetmusic.score.BeamType
 import com.ryanjames.sheetmusic.score.AttributeEvent
 import com.ryanjames.sheetmusic.score.ArticulationType
 import com.ryanjames.sheetmusic.score.ClefSign
+import com.ryanjames.sheetmusic.score.CssFontSize
 import com.ryanjames.sheetmusic.score.DirectionDisplay
 import com.ryanjames.sheetmusic.score.DirectionEvent
 import com.ryanjames.sheetmusic.score.DirectionMark
 import com.ryanjames.sheetmusic.score.DirectionSound
 import com.ryanjames.sheetmusic.score.Dynamics
+import com.ryanjames.sheetmusic.score.Enclosure
 import com.ryanjames.sheetmusic.score.Ending
 import com.ryanjames.sheetmusic.score.EndingMark
 import com.ryanjames.sheetmusic.score.EndingType
 import com.ryanjames.sheetmusic.score.Event
 import com.ryanjames.sheetmusic.score.ExtendType
+import com.ryanjames.sheetmusic.score.FontHints
+import com.ryanjames.sheetmusic.score.FontSize
+import com.ryanjames.sheetmusic.score.FontStyle
+import com.ryanjames.sheetmusic.score.FontWeight
 import com.ryanjames.sheetmusic.score.Grace
+import com.ryanjames.sheetmusic.score.HorizontalAlignment
 import com.ryanjames.sheetmusic.score.Instrument
 import com.ryanjames.sheetmusic.score.InterchangeableTime
 import com.ryanjames.sheetmusic.score.KeyAlteration
@@ -73,6 +80,7 @@ import com.ryanjames.sheetmusic.score.TimeRelation
 import com.ryanjames.sheetmusic.score.TimeSeparator
 import com.ryanjames.sheetmusic.score.TimeSymbol
 import com.ryanjames.sheetmusic.score.Transposition
+import com.ryanjames.sheetmusic.score.VerticalAlignment
 import com.ryanjames.sheetmusic.score.VisualHints
 import com.ryanjames.sheetmusic.score.WedgeType
 import com.ryanjames.sheetmusic.score.WrittenPitch
@@ -98,9 +106,10 @@ import com.ryanjames.sheetmusic.score.WrittenPitch
  * notes keep only their display position. Barline styles, repeat signs and ending marks are kept
  * on their measures, ending start/stop marks are paired into part endings (orphans are
  * `UNMATCHED_SPAN`), and staff-1 measure-repeat signs mark their measures; playback order is
- * derived separately by `playbackOrder`. Scaling, page/system/staff layout defaults, measure
- * `print` breaks and layout, and position/colour of notes, rests and direction marks are kept as
- * optional engraving hints in tenths. Other musical content is not implemented yet: meaningful unmapped
+ * derived separately by `playbackOrder`. Scaling, page/system/staff layout defaults, music and
+ * word fonts, measure `print` breaks and layout, measure widths, and the position, colour, font,
+ * alignment and enclosure of printed elements the model represents are kept as optional engraving
+ * hints in tenths. Other musical content is not implemented yet: meaningful unmapped
  * content rejects strict parsing, or is discarded with warnings under tolerant policy. A part
  * defines staves 1 to its largest `staves` declaration (staff 1 when it only has events); measure
  * extent is the observed end of timed content. This is not an XSD validator.
@@ -306,6 +315,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         val path = "metadata[${metadata.size}]"
         val words = mutableListOf<String>()
+        val visuals = mutableListOf<VisualHints?>()
         val types = mutableListOf<String>()
         children { event ->
             when (event.localName()) {
@@ -315,19 +325,23 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 }
                 "credit-words" -> {
                     provenance("$path.words[${words.size}]", event)
-                    words += text(event)
+                    visuals += visualHints(event, TEXT_FORMATTING_ATTRIBUTES)
+                    words += text(event, TEXT_FORMATTING_ATTRIBUTES)
                 }
                 else -> unsupportedTree(event)
             }
         }
-        metadata += MetadataEntry.Credit(words.toList(), types.toList(), page)
+        if (!context.canContinue) return
+        val keptVisuals = if (visuals.all { it == null }) emptyList() else visuals.toList()
+        metadata += MetadataEntry.Credit(words.toList(), types.toList(), page, keptVisuals)
         provenance(path, start)
     }
 
     /**
      * Reads `concert-score`, which declares that written pitches are concert pitches apart from
-     * octave transpositions, and scaling plus page, system and staff layout as [LayoutDefaults].
-     * Appearance, fonts and lyric languages are reported as S17 discarded.
+     * octave transpositions, and scaling, page, system and staff layout and the music and word
+     * fonts as [LayoutDefaults]. Appearance, lyric fonts and lyric languages are reported as S17
+     * discarded.
      */
     private fun defaults(start: ScoreXmlEvent) {
         attributes(start, feature = "S17")
@@ -336,6 +350,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var page: PageLayout? = null
         var system: SystemLayout? = null
         val staves = mutableListOf<StaffLayout>()
+        var musicFont: FontHints? = null
+        var wordFont: FontHints? = null
+        fun font(event: ScoreXmlEvent): FontHints? {
+            attributes(event, FONT_ATTRIBUTES, "S17")
+            children { child -> unsupportedTree(child, "S17") }
+            return fontHints(event)
+        }
         children { event ->
             when (val name = event.localName()) {
                 "concert-score" -> {
@@ -347,11 +368,14 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 "page-layout" -> if (once(seen, name, event)) page = pageLayout(event)
                 "system-layout" -> if (once(seen, name, event)) system = systemLayout(event)
                 "staff-layout" -> staffLayout(event)?.let { staves += it }
+                "music-font" -> if (once(seen, name, event)) musicFont = font(event)
+                "word-font" -> if (once(seen, name, event)) wordFont = font(event)
                 else -> unsupportedTree(event, "S17")
             }
         }
-        if (!context.canContinue || (scaling == null && page == null && system == null && staves.isEmpty())) return
-        layoutDefaults = LayoutDefaults(scaling, page, system, staves.toList())
+        val defaults = LayoutDefaults(scaling, page, system, staves.toList(), musicFont, wordFont)
+        if (!context.canContinue || defaults == LayoutDefaults()) return
+        layoutDefaults = defaults
         provenance("layout", start)
     }
 
@@ -526,27 +550,88 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Reads the position (`default-x/y`, `relative-x/y` in tenths, possibly negative) and `color`
-     * attributes of a printed element; null when it has none. Callers allow [VISUAL_ATTRIBUTES].
+     * Reads the display attributes of a printed element named in [allowed], which the caller also
+     * allows in its attribute check: position (`default-x/y`, `relative-x/y` in tenths, possibly
+     * negative), `color`, font, `halign`, `valign`, `justify`, `enclosure` and `xml:space`. Null
+     * when it has none; an invalid value is `INVALID_VALUE`.
      */
-    private fun visualHints(start: ScoreXmlEvent): VisualHints? {
+    private fun visualHints(start: ScoreXmlEvent, allowed: Set<String> = VISUAL_ATTRIBUTES): VisualHints? {
+        fun allowedAttribute(name: String): String? = if (name in allowed) start.attribute(name) else null
         fun position(name: String): Rational? {
-            val text = start.attribute(name) ?: return null
-            return decimal(text, start.attributeLocation(name), name)
+            val value = allowedAttribute(name) ?: return null
+            return decimal(value, start.attributeLocation(name), name)
         }
+        fun <T> keyword(name: String, values: Map<String, T>): T? = if (name in allowed) keywordAttribute(start, name, values) else null
         val defaultX = position("default-x")
         val defaultY = position("default-y")
         val relativeX = position("relative-x")
         val relativeY = position("relative-y")
-        val color = start.attribute("color")?.let { text ->
-            text.trim { it in WHITESPACE }.uppercase().takeIf { COLOR.matches(it) } ?: run {
+        val color = allowedAttribute("color")?.let { value ->
+            value.trim { it in WHITESPACE }.uppercase().takeIf { COLOR.matches(it) } ?: run {
                 context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("color"), "Color must be #RRGGBB or #AARRGGBB")
                 null
             }
         }
+        val font = if (allowed.containsAll(FONT_ATTRIBUTES)) fontHints(start) else null
+        val halign = keyword("halign", HORIZONTAL_ALIGNMENTS)
+        val valign = keyword("valign", VERTICAL_ALIGNMENTS)
+        val justify = keyword("justify", HORIZONTAL_ALIGNMENTS)
+        val enclosure = keyword("enclosure", ENCLOSURES)
+        val preserveWhitespace = if (XML_SPACE in allowed) xmlSpace(start) else null
         if (!context.canContinue) return null
-        return VisualHints(defaultX, defaultY, relativeX, relativeY, color)
-            .takeUnless { defaultX == null && defaultY == null && relativeX == null && relativeY == null && color == null }
+        return VisualHints(defaultX, defaultY, relativeX, relativeY, color, font, halign, valign, justify, enclosure, preserveWhitespace)
+            .takeUnless { it == VisualHints() }
+    }
+
+    /**
+     * Reads `font-family` (a comma-separated list of names), `font-size` (positive points or a CSS
+     * size), `font-style` and `font-weight`; null when none is given.
+     */
+    private fun fontHints(start: ScoreXmlEvent): FontHints? {
+        val families = start.attribute("font-family")?.let { text ->
+            text.split(',').map { family -> family.trim { it in WHITESPACE } }.takeIf { names -> names.none { it.isBlank() } } ?: run {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation("font-family"), "Font families must be nonblank")
+                null
+            }
+        }
+        val size = start.attribute("font-size")?.let { text ->
+            val location = start.attributeLocation("font-size")
+            CSS_FONT_SIZES[text.trim { it in WHITESPACE }]?.let { FontSize.Css(it) }
+                ?: exact(location) { parseDecimal(text) }?.takeIf { it > Rational.ZERO }?.let { FontSize.Points(it) }
+                ?: run {
+                    if (context.canContinue) {
+                        context.report(DiagnosticCode.INVALID_VALUE, location, "Font size must be a positive decimal or a CSS font size")
+                    }
+                    null
+                }
+        }
+        val style = keywordAttribute(start, "font-style", FONT_STYLES)
+        val weight = keywordAttribute(start, "font-weight", FONT_WEIGHTS)
+        if (!context.canContinue) return null
+        return FontHints(families.orEmpty(), size, style, weight).takeUnless { it == FontHints() }
+    }
+
+    /** An optional keyword attribute; null when absent or after an `INVALID_VALUE`. */
+    private fun <T> keywordAttribute(start: ScoreXmlEvent, name: String, values: Map<String, T>): T? {
+        val text = start.attribute(name) ?: return null
+        return values[text.trim { it in WHITESPACE }] ?: run {
+            context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation(name), "Unknown $name: $text")
+            null
+        }
+    }
+
+    /** Reads `xml:space`: true for `preserve`, false for `default`, null when absent. */
+    private fun xmlSpace(start: ScoreXmlEvent): Boolean? {
+        val name = XmlName(XML_NAMESPACE, "space")
+        val text = start.attributes.firstOrNull { it.name == name }?.value ?: return null
+        return when (text) {
+            "preserve" -> true
+            "default" -> false
+            else -> {
+                context.report(DiagnosticCode.INVALID_VALUE, start.attributeLocation(name), "xml:space must be default or preserve")
+                null
+            }
+        }
     }
 
     /**
@@ -665,7 +750,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 val header = measureHeader(event) ?: return@children
                 val measurePath = "parts[${definition.index}].measures[${measures.size}]"
                 provenance(measurePath, event)
-                measures += measure(id, measurePath, measures.size + 1, header.number, header.implicit)
+                measures += measure(id, measurePath, measures.size + 1, header)
             } else {
                 unsupportedTree(event)
             }
@@ -702,7 +787,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             padMissingMeasures(body, index)
             val measurePath = "parts[${definition.index}].measures[$index]"
             provenance(measurePath, start, id)
-            body.measures += measure(id, measurePath, index + 1, header.number, header.implicit)
+            body.measures += measure(id, measurePath, index + 1, header)
         }
     }
 
@@ -744,11 +829,17 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             val index = part.measures.size
             val header = timewiseMeasures[index]
             provenance("parts[$partIndex].measures[$index]", header.source, part.id)
-            part.measures += Measure("measure-${index + 1}", header.number, Rational.ZERO, emptyList(), header.implicit, measureRepeat = part.measureRepeat)
+            part.measures += Measure(
+                "measure-${index + 1}", header.number, Rational.ZERO, emptyList(), header.implicit,
+                measureRepeat = part.measureRepeat, width = header.width,
+            )
         }
     }
 
-    /** Reads a measure's number and implicit flag; null means a fatal diagnostic was reported. */
+    /**
+     * Reads a measure's number, implicit flag and printed `width` in tenths; null means a fatal
+     * diagnostic was reported.
+     */
     private fun measureHeader(start: ScoreXmlEvent): MeasureHeader? {
         val number = start.attribute("number") ?: run {
             invalid(start.attributeLocation("number"), "A measure requires a number")
@@ -762,8 +853,17 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 return null
             }
         }
-        attributes(start, setOf("number", "implicit"), "S01")
-        return MeasureHeader(number, implicit, start)
+        val width = start.attribute("width")?.let { text ->
+            val location = start.attributeLocation("width")
+            val value = decimal(text, location, "Measure width") ?: return null
+            if (value < Rational.ZERO) {
+                context.report(DiagnosticCode.INVALID_VALUE, location, "Measure width must not be negative")
+                return null
+            }
+            value
+        }
+        attributes(start, setOf("number", "implicit", "width"), "S01")
+        return MeasureHeader(number, implicit, start, width)
     }
 
     /**
@@ -772,7 +872,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * note) and never moves the cursor; a cursor move ends the chord. Divisions, the staff count
      * and transpositions persist across the measures of the current part.
      */
-    private fun measure(partId: String, path: String, number: Int, displayNumber: String, implicit: Boolean): Measure {
+    private fun measure(partId: String, path: String, number: Int, header: MeasureHeader): Measure {
         val events = mutableListOf<Event>()
         var cursor = Rational.ZERO
         var extent = Rational.ZERO
@@ -814,8 +914,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     }
                     if (note.end > extent) extent = note.end
                 }
-                "attributes" -> attributesElement(event) { attribute, staff, visible, source ->
-                    add(AttributeEvent(eventId(), cursor, attribute, staff, visible), source)
+                "attributes" -> attributesElement(event) { change, staff ->
+                    add(AttributeEvent(eventId(), cursor, change.attribute, staff, change.visible, change.visual), change.source)
                 }
                 "direction" -> {
                     val direction = direction(event, cursor, eventId()) ?: return@children
@@ -866,7 +966,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         graces.finish()
         deriveSoundingPitches(events, noteLocations)
         return Measure(
-            "measure-$number", displayNumber, extent, events.toList(), implicit, barlines.toList(), body.measureRepeat, print,
+            "measure-$number", header.number, extent, events.toList(), header.implicit, barlines.toList(), body.measureRepeat, print,
+            header.width,
         )
     }
 
@@ -876,9 +977,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * intra-measure changes apply exactly where they occur. A change without a `number` applies to
      * every staff (one event per staff, once this element's `staves` is known), except a clef, which
      * defaults to staff 1. A `number` beyond the declared staves is `INVALID_VALUE`. A key, time or
-     * clef with `print-object="no"` still changes state; its event is only marked not visible.
+     * clef with `print-object="no"` still changes state; its event is only marked not visible. The
+     * position, colour and font of a key, time or clef are kept as its event's visual hints.
      */
-    private fun attributesElement(start: ScoreXmlEvent, add: (Attribute, Int, Boolean, ScoreXmlEvent) -> Unit) {
+    private fun attributesElement(start: ScoreXmlEvent, add: (StaffChange, Int) -> Unit) {
         attributes(start, feature = "S07")
         val changes = mutableListOf<StaffChange>()
         fun scoped(event: ScoreXmlEvent, label: String, allStaves: Boolean, parse: (ScoreXmlEvent) -> Attribute?) {
@@ -892,9 +994,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     return
                 }
             }
-            // Only key, time and clef keep print-object; staff-details reports it as discarded.
-            val visible = if (event.localName() in PRINTABLE_ATTRIBUTES) optionalYesNo(event, "print-object") ?: true else true
-            parse(event)?.let { changes += StaffChange(it, staff, event, label, visible) }
+            // Only key, time and clef keep print-object and display attributes; staff-details reports them as discarded.
+            val style = PRINTABLE_ATTRIBUTES[event.localName()]
+            val visible = if (style != null) optionalYesNo(event, "print-object") ?: true else true
+            val visual = style?.let { visualHints(event, it) }
+            parse(event)?.let { changes += StaffChange(it, staff, event, label, visible, visual) }
         }
         children { event ->
             when (val name = event.localName()) {
@@ -920,7 +1024,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 return
             }
             val staves = staff?.let { listOf(it) } ?: (1..body.staffCount).toList()
-            staves.forEach { add(change.attribute, it, change.visible, change.source) }
+            staves.forEach { add(change, it) }
             (change.attribute as? Attribute.Transpose)?.takeIf { isAmbiguous(it.transposition) }?.let {
                 unsupported(change.source.location, "S16", "A non-octave transpose in a concert score is ambiguous; sounding pitch is not derived")
             }
@@ -967,7 +1071,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * `NUMERIC_OVERFLOW`.
      */
     private fun time(start: ScoreXmlEvent): Attribute.TimeSignature? {
-        attributes(start, setOf("number", "symbol", "separator", "print-object"), "S07")
+        attributes(start, setOf("number", "symbol", "separator", "print-object") + PRINT_STYLE_ALIGN_ATTRIBUTES, "S07")
         val symbol = timeSymbol(start)
         val separator = timeSeparator(start)
         val parts = mutableListOf<Pair<String, String>>()
@@ -1068,7 +1172,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * accidental out of sequence, is `INVALID_STRUCTURE`; an unknown mode is discarded alone.
      */
     private fun key(start: ScoreXmlEvent): Attribute.KeySignature? {
-        attributes(start, setOf("number", "print-object"), "S07")
+        attributes(start, setOf("number", "print-object") + PRINT_STYLE_ATTRIBUTES, "S07")
         val seen = mutableSetOf<String>()
         var fifths: Int? = null
         var mode: KeyMode? = null
@@ -1169,7 +1273,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     /** Interprets a clef sign, line and octave change; a missing G/F/C line uses its standard line. */
     private fun clef(start: ScoreXmlEvent): Attribute.Clef? {
-        attributes(start, setOf("number", "print-object"), "S07")
+        attributes(start, setOf("number", "print-object") + PRINT_STYLE_ATTRIBUTES, "S07")
         val seen = mutableSetOf<String>()
         var sign: ClefSign? = null
         var line: Int? = null
@@ -1320,9 +1424,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * Reads a barline's location, style, repeat sign and ending mark as notated. Segno, coda,
-     * fermata and wavy-line children, playback attributes and display attributes are S15
-     * discarded. A middle barline sits at the cursor.
+     * Reads a barline's location, style (with its colour), repeat sign and ending mark as notated.
+     * Segno, coda, fermata and wavy-line children, playback attributes and other display attributes
+     * are S15 discarded. A middle barline sits at the cursor.
      */
     private fun barline(start: ScoreXmlEvent, cursor: Rational): ReadBarline? {
         val location = when (val text = start.attribute("location")) {
@@ -1337,13 +1441,15 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         attributes(start, setOf("location"), "S15")
         val seen = mutableSetOf<String>()
         var style: BarStyle? = null
+        var styleVisual: VisualHints? = null
         var repeat: Repeat? = null
         var ending: EndingMark? = null
         var endingSource: ScoreXmlEvent? = null
         children { event ->
             when (val name = event.localName()) {
                 "bar-style" -> if (once(seen, name, event)) {
-                    val text = text(event, feature = "S15").trim { it in WHITESPACE }
+                    styleVisual = visualHints(event, COLOR_ATTRIBUTES)
+                    val text = text(event, COLOR_ATTRIBUTES, "S15").trim { it in WHITESPACE }
                     style = BAR_STYLES[text]
                     if (style == null) context.report(DiagnosticCode.INVALID_VALUE, event.location, "Unknown bar-style: $text")
                 }
@@ -1359,7 +1465,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             }
         }
         if (!context.canContinue) return null
-        return ReadBarline(Barline(location, cursor.takeIf { location == BarlineLocation.MIDDLE }, style, repeat, ending), endingSource)
+        val barline = Barline(location, cursor.takeIf { location == BarlineLocation.MIDDLE }, style, repeat, ending, styleVisual)
+        return ReadBarline(barline, endingSource)
     }
 
     /** A repeat's direction and `times`; `after-jump` and `winged` are S15 discarded. */
@@ -1387,9 +1494,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return Repeat(direction, times)
     }
 
-    /** An ending's pass numbers, type and differing text; display attributes are S15 discarded. */
+    /**
+     * An ending's pass numbers, type, differing text, and position, colour and font; other display
+     * attributes are S15 discarded.
+     */
     private fun ending(start: ScoreXmlEvent): EndingMark? {
-        val text = text(start, setOf("number", "type"), "S15").trim { it in WHITESPACE }
+        val visual = visualHints(start, PRINT_STYLE_ATTRIBUTES)
+        val text = text(start, setOf("number", "type") + PRINT_STYLE_ATTRIBUTES, "S15").trim { it in WHITESPACE }
         if (!context.canContinue) return null
         val number = start.attribute("number") ?: run {
             invalid(start, "An ending requires a number")
@@ -1412,7 +1523,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 return null
             }
         }
-        return EndingMark(type, numbers, text.ifEmpty { null })
+        return EndingMark(type, numbers, text.ifEmpty { null }, visual)
     }
 
     /**
@@ -1530,8 +1641,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         id: String,
         chordId: (ChordReference) -> String,
     ): TimedNote? {
-        attributes(start, VISUAL_ATTRIBUTES + NOTE_PRINT_ATTRIBUTES, "S04")
-        val visual = visualHints(start)
+        attributes(start, PRINT_STYLE_ATTRIBUTES + NOTE_PRINT_ATTRIBUTES, "S04")
+        val visual = visualHints(start, PRINT_STYLE_ATTRIBUTES)
         val visibility = noteVisibility(start)
         if (!context.canContinue) return null
         val seen = mutableSetOf<String>()
@@ -1549,6 +1660,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var accidental: Accidental? = null
         var timeModification: TimeModification? = null
         var stem: StemDirection? = null
+        var stemVisual: VisualHints? = null
         val beams = mutableListOf<Beam>()
         var instrumentId: String? = null
         var instrumentLocation: SourceLocation? = null
@@ -1602,7 +1714,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 }
                 "accidental" -> if (once(seen, name, event)) accidental = accidental(event)
                 "time-modification" -> if (once(seen, name, event)) timeModification = timeModification(event)
-                "stem" -> if (once(seen, name, event)) stem = stem(event)
+                "stem" -> if (once(seen, name, event)) {
+                    stemVisual = visualHints(event)
+                    stem = stem(event)
+                }
                 "beam" -> beam(event)?.let { beam ->
                     if (beams.any { it.level == beam.level }) invalid(event, "Duplicate beam number ${beam.level}")
                     else beams += beam
@@ -1644,7 +1759,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             if (content is NoteContent.Rest) unsupported(start.location, "S18", "A grace rest is not interpreted; the note is discarded")
             val pitch = (content as? NoteContent.Pitch)?.pitch
             if (pitch == null || grace == null || !context.canContinue) return TimedNote(null, onset, onset, emptyList(), chord = chord, grace = true)
-            val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList(), lyrics.toList())
+            val notation = NotatedValue(
+            value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList(), lyrics.toList(), stemVisual,
+        )
             val event = NoteEvent(
                 id, onset, null, pitch, staff = staff, voice = voice, notation = notation,
                 role = NoteRole.GRACE, chordId = chordReference?.let(chordId), instrumentId = noteInstrumentId, grace = grace,
@@ -1667,7 +1784,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                     "its duration is kept and the cursor follows the reference note",
             )
         }
-        val notation = NotatedValue(value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList(), lyrics.toList())
+        val notation = NotatedValue(
+            value, dots, timeModification, accidental, stem, beams.toList(), expressions.toList(), lyrics.toList(), stemVisual,
+        )
         val event = when (val noteContent = content ?: return null) {
             is NoteContent.Rest -> {
                 instrumentLocation?.let { unsupported(it, "S16", "An instrument on a rest is not represented; it is discarded") }
@@ -1816,7 +1935,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 }
                 else -> tieKey + if (mark.number == "1") "" else " (number ${mark.number})"
             }
-            mark to SpanEndpoint(mark.kind, key, event.id, voice, SpanPosition(measure, event.onset), mark.location)
+            mark to SpanEndpoint(mark.kind, key, event.id, voice, SpanPosition(measure, event.onset), mark.location, mark.visual)
         }
         val resolver = body.spans
         val paired = pairSameNoteTuplets(endpoints)
@@ -1824,7 +1943,10 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         fun splitsContinue(mark: SpanMark) = mark.type == SpanType.CONTINUE && mark.kind != RelationshipKind.SLUR
         remaining.forEach { (mark, endpoint) -> if (mark.type == SpanType.STOP || splitsContinue(mark)) resolver.stop(endpoint) }
         remaining.forEach { (mark, endpoint) ->
-            if (mark.type == SpanType.CONTINUE && mark.kind == RelationshipKind.SLUR) resolver.continuePoint(endpoint)
+            if (mark.type == SpanType.CONTINUE && mark.kind == RelationshipKind.SLUR) {
+                resolver.continuePoint(endpoint)
+                if (mark.visual != null) unsupported(mark.location, "S09", "Display attributes of a slur continue point are not kept")
+            }
         }
         remaining.forEach { (mark, endpoint) -> if (mark.type == SpanType.START || splitsContinue(mark)) resolver.start(endpoint) }
     }
@@ -1867,14 +1989,16 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /**
      * Interprets `tied`, `slur` and `tuplet` notations as span marks, and articulations, ornaments
      * and dynamics as [expressions]; other notations are discarded under their feature group.
-     * Display attributes of the interpreted marks are reported as discarded.
+     * Position, colour and (for expressions) font of the interpreted marks are kept; their other
+     * display attributes are reported as discarded.
      */
     private fun notations(start: ScoreXmlEvent, marks: MutableList<SpanMark>, expressions: MutableList<NoteExpression>) {
         attributes(start, feature = "S12")
         children { event ->
             when (val name = event.localName()) {
                 "tied", "slur" -> {
-                    attributes(event, setOf("type", "number"), "S09")
+                    attributes(event, setOf("type", "number") + VISUAL_ATTRIBUTES, "S09")
+                    val visual = visualHints(event)
                     val label = if (name == "tied") "Tied" else "Slur"
                     val type = spanType(event, label, if (name == "tied") TIED_TYPES else SLUR_TYPES)
                     val number = numberLevel(event, label)
@@ -1883,15 +2007,15 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                         unsupported(event.location, "S09", "A let-ring tied mark is not interpreted; it is discarded")
                     } else if (type != null && number != null) {
                         val kind = if (name == "tied") RelationshipKind.NOTATED_TIE else RelationshipKind.SLUR
-                        marks += SpanMark(kind, type, number, event.location)
+                        marks += SpanMark(kind, type, number, event.location, visual)
                     }
                 }
                 "tuplet" -> tuplet(event)?.let { marks += it }
-                "articulations" -> expressionGroup(event, "Articulation", ARTICULATIONS) { type, placement ->
-                    NoteExpression.Articulation(type, placement)
+                "articulations" -> expressionGroup(event, "Articulation", ARTICULATIONS) { type, placement, visual ->
+                    NoteExpression.Articulation(type, placement, visual)
                 }.let { expressions += it }
-                "ornaments" -> expressionGroup(event, "Ornament", ORNAMENTS) { type, placement ->
-                    NoteExpression.Ornament(type, placement)
+                "ornaments" -> expressionGroup(event, "Ornament", ORNAMENTS) { type, placement, visual ->
+                    NoteExpression.Ornament(type, placement, visual)
                 }.let { expressions += it }
                 "dynamics" -> dynamics(event, "S12")?.let { expressions += it }
                 "footnote", "level" -> unsupportedTree(event, "S25")
@@ -1902,27 +2026,28 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
 
     /**
      * A tuplet bracket endpoint, paired by `number` like a slur. The note's `time-modification`
-     * carries its timing; the `tuplet-actual`/`tuplet-normal` display ratio and presentation
-     * attributes are reported as discarded.
+     * carries its timing; its position is kept, and the `tuplet-actual`/`tuplet-normal` display ratio
+     * and other presentation attributes are reported as discarded.
      */
     private fun tuplet(start: ScoreXmlEvent): SpanMark? {
-        attributes(start, setOf("type", "number"), "S11")
+        attributes(start, setOf("type", "number") + POSITION_ATTRIBUTES, "S11")
+        val visual = visualHints(start, POSITION_ATTRIBUTES)
         val type = spanType(start, "Tuplet", TIE_TYPES)
         val number = numberLevel(start, "Tuplet")
         children { event -> unsupportedTree(event, "S11", "Tuplet display content is not interpreted: ${event.name}") }
-        return if (type != null && number != null) SpanMark(RelationshipKind.TUPLET, type, number, start.location) else null
+        return if (type != null && number != null) SpanMark(RelationshipKind.TUPLET, type, number, start.location, visual) else null
     }
 
     /**
      * Reads `articulations` or `ornaments`: each child named in [types] becomes one expression with
-     * its placement; other children (for example `breath-mark` or `wavy-line`) and display or
-     * playback attributes are reported as S12 discarded.
+     * its placement, position, colour and font; other children (for example `breath-mark` or
+     * `wavy-line`) and other display or playback attributes are reported as S12 discarded.
      */
     private fun <T> expressionGroup(
         start: ScoreXmlEvent,
         label: String,
         types: Map<String, T>,
-        create: (T, Placement?) -> NoteExpression,
+        create: (T, Placement?, VisualHints?) -> NoteExpression,
     ): List<NoteExpression> {
         attributes(start, feature = "S12")
         val expressions = mutableListOf<NoteExpression>()
@@ -1931,10 +2056,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                 unsupportedTree(event, "S12", "$label is not interpreted: ${event.name}")
                 return@children
             }
-            attributes(event, setOf("placement"), "S12")
+            attributes(event, setOf("placement") + PRINT_STYLE_ATTRIBUTES, "S12")
             val placement = placement(event)
+            val visual = visualHints(event, PRINT_STYLE_ATTRIBUTES)
             children { child -> unsupportedTree(child, "S12") }
-            expressions += create(type, placement)
+            expressions += create(type, placement, visual)
         }
         return expressions
     }
@@ -1943,11 +2069,12 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * Reads a `dynamics` element in notations or a direction. Each standard marking keeps its
      * element name and `other-dynamics` its text, in source order. Without a marking it is discarded.
      * In a direction its own placement is validated but ignored, as MusicXML specifies; the direction's governs.
+     * Position, colour, font, alignment and enclosure are kept; text decoration is discarded.
      */
     private fun dynamics(start: ScoreXmlEvent, feature: String, inDirection: Boolean = false): Dynamics? {
-        attributes(start, setOf("placement") + VISUAL_ATTRIBUTES, feature)
+        attributes(start, setOf("placement") + DYNAMICS_ATTRIBUTES, feature)
         val placement = placement(start).takeUnless { inDirection }
-        val visual = visualHints(start)
+        val visual = visualHints(start, DYNAMICS_ATTRIBUTES)
         val markings = mutableListOf<String>()
         children { event ->
             val name = event.localName()
@@ -1973,17 +2100,21 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
      * Reads a `lyric` as one verse line on its note. Syllables keep their syllabic value and the
      * elision joining them, in source order; consecutive text runs without an elision form one
      * syllable. An `extend` marks a melisma line and may stand alone on a continuation note. A
-     * missing `number` leaves the verse unspecified. `laughing`, `humming`, `end-line`,
-     * `end-paragraph`, typography and display attributes are S14 discarded (`footnote`/`level` S25),
-     * and a lyric restricted by `time-only` is discarded. Out-of-order content is invalid. A null
-     * result means the lyric was discarded or a fatal diagnostic was reported.
+     * missing `number` leaves the verse unspecified. The line's position, colour and `justify`, the
+     * font and colour of each syllable's first text run and of each elision, and the extend's
+     * position and colour are kept. `laughing`, `humming`, `end-line`, `end-paragraph`, differing
+     * typography of later text runs and other display attributes are S14 discarded
+     * (`footnote`/`level` S25), and a lyric restricted by `time-only` is discarded. Out-of-order
+     * content is invalid. A null result means the lyric was discarded or a fatal diagnostic was
+     * reported.
      */
     private fun lyric(start: ScoreXmlEvent): Lyric? {
         if (start.attribute("time-only") != null) {
             unsupportedTree(start, "S14", "A lyric restricted by time-only is not interpreted; the lyric is discarded")
             return null
         }
-        attributes(start, setOf("number", "name", "placement", "print-object"), "S14")
+        attributes(start, setOf("number", "name", "placement", "print-object") + LYRIC_ATTRIBUTES, "S14")
+        val visual = visualHints(start, LYRIC_ATTRIBUTES)
         val printObject = optionalYesNo(start, "print-object")
         val verse = start.attribute("number")?.trim { it in WHITESPACE }
         // The model rejects any Unicode blank, such as a no-break space, not only XML whitespace.
@@ -1998,6 +2129,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var syllabic: Syllabic? = null
         var syllabicPending = false
         var elision: String? = null
+        var elisionVisual: VisualHints? = null
         var extend: LyricExtend? = null
         var discarded = false
         // Set once the text content is complete; only end-line, end-paragraph and editorial content may follow.
@@ -2027,18 +2159,24 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
                         invalid(event, "An elision must follow a lyric text")
                         return@children
                     }
-                    elision = text(event, feature = "S14")
+                    elisionVisual = visualHints(event, TEXT_RUN_ATTRIBUTES)
+                    elision = text(event, TEXT_RUN_ATTRIBUTES, "S14")
                 }
                 "text" -> {
-                    val text = text(event, feature = "S14")
+                    val runVisual = visualHints(event, TEXT_RUN_ATTRIBUTES)
+                    val text = text(event, TEXT_RUN_ATTRIBUTES, "S14")
                     if (syllables.isEmpty() || elision != null) {
-                        syllables += LyricSyllable("", syllabic, elision)
+                        syllables += LyricSyllable("", syllabic, elision, runVisual, elisionVisual)
                         texts += StringBuilder(text)
                         syllabic = null
                         syllabicPending = false
                         elision = null
+                        elisionVisual = null
                     } else {
                         texts.last().append(text)
+                        if (runVisual != syllables.last().visual) {
+                            unsupported(event.location, "S14", "A later text run's typography differs from the syllable's first run; it is discarded")
+                        }
                     }
                 }
                 "extend" -> {
@@ -2080,12 +2218,13 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         if (discarded) return null
         val joined = syllables.mapIndexed { index, syllable -> syllable.copy(text = texts[index].toString()) }
-        return Lyric(joined, verse, start.attribute("name"), extend, placement, printObject)
+        return Lyric(joined, verse, start.attribute("name"), extend, placement, printObject, visual)
     }
 
-    /** A lyric `extend` with its optional start/continue/stop type; display attributes are S14 discarded. */
+    /** A lyric `extend` with its optional start/continue/stop type, position and colour. */
     private fun lyricExtend(start: ScoreXmlEvent): LyricExtend? {
-        attributes(start, setOf("type"), "S14")
+        attributes(start, setOf("type") + VISUAL_ATTRIBUTES, "S14")
+        val visual = visualHints(start)
         val text = start.attribute("type")
         val type = text?.let { EXTEND_TYPES[it] }
         if (text != null && type == null) {
@@ -2094,7 +2233,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
         children { event -> unsupportedTree(event, "S14") }
         if (!context.canContinue) return null
-        return LyricExtend(type)
+        return LyricExtend(type, visual)
     }
 
     /**
@@ -2181,8 +2320,8 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             empty = false
             when (event.localName()) {
                 "words" -> {
-                    val visual = visualHints(event)
-                    marks += DirectionMark.Words(text(event, VISUAL_ATTRIBUTES, "S13"), visual)
+                    val visual = visualHints(event, TEXT_FORMATTING_ATTRIBUTES)
+                    marks += DirectionMark.Words(text(event, TEXT_FORMATTING_ATTRIBUTES, "S13"), visual)
                 }
                 "dynamics" -> dynamics(event, "S13", inDirection = true)?.let { marks += it }
                 "metronome" -> metronome(event)?.let { marks += it }
@@ -2199,11 +2338,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /**
      * Reads a `beat-unit = per-minute` metronome mark. Metric modulations, tied beat units and
      * `metronome-note` forms are reported as discarded, as are `parentheses` and display attributes
-     * other than position, colour and `print-object`.
+     * other than position, colour, font, alignment and `print-object`.
      */
     private fun metronome(start: ScoreXmlEvent): DirectionMark.Metronome? {
-        attributes(start, VISUAL_ATTRIBUTES + "print-object", "S13")
-        val visual = visualHints(start)
+        attributes(start, METRONOME_ATTRIBUTES + "print-object", "S13")
+        val visual = visualHints(start, METRONOME_ATTRIBUTES)
         val visible = optionalYesNo(start, "print-object") ?: true
         var beatUnits = 0
         var beatUnit: NoteValue? = null
@@ -2408,9 +2547,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         return TimeModification(actualNotes, normalNotes, normalValue, normalDots)
     }
 
-    /** A printed stem direction; position and color attributes are reported as discarded. */
+    /** A printed stem direction; its position and colour are read separately. */
     private fun stem(start: ScoreXmlEvent): StemDirection? {
-        val text = text(start, feature = "S10").trim { it in WHITESPACE }
+        val text = text(start, VISUAL_ATTRIBUTES, "S10").trim { it in WHITESPACE }
         if (!context.canContinue) return null
         return STEM_DIRECTIONS[text] ?: run {
             context.report(DiagnosticCode.INVALID_VALUE, start.location, "Unknown stem direction: $text")
@@ -2418,10 +2557,11 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         }
     }
 
-    /** One beam level (`number` 1 to 8, default 1) and its type; fan and display attributes are discarded. */
+    /** One beam level (`number` 1 to 8, default 1), its type and colour; fan and repeater are discarded. */
     private fun beam(start: ScoreXmlEvent): Beam? {
         val numberText = start.attribute("number")
-        val text = text(start, setOf("number"), "S10").trim { it in WHITESPACE }
+        val visual = visualHints(start, COLOR_ATTRIBUTES)
+        val text = text(start, setOf("number") + COLOR_ATTRIBUTES, "S10").trim { it in WHITESPACE }
         if (!context.canContinue) return null
         val level = if (numberText == null) 1 else positiveInt(numberText)?.takeIf { it <= 8 }
         if (level == null) {
@@ -2432,7 +2572,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
             context.report(DiagnosticCode.INVALID_VALUE, start.location, "Unknown beam type: $text")
             return null
         }
-        return Beam(level, type)
+        return Beam(level, type, visual)
     }
 
     /** Reads a required span `type`; a missing type is invalid structure and an unknown one an invalid value. */
@@ -2496,21 +2636,23 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     }
 
     /**
-     * A printed accidental with its cautionary and editorial flags and its display-only
-     * `parentheses` and `bracket`, which are kept independently of the name; other display
-     * attributes are S04 discarded.
+     * A printed accidental with its cautionary and editorial flags, its display-only `parentheses`
+     * and `bracket`, which are kept independently of the name, and its position, colour and font;
+     * other display attributes are S04 discarded.
      */
     private fun accidental(start: ScoreXmlEvent): Accidental? {
         val cautionary = yesNo(start, "cautionary") ?: return null
         val editorial = yesNo(start, "editorial") ?: return null
         val parentheses = optionalYesNo(start, "parentheses")
         val bracket = optionalYesNo(start, "bracket")
-        val name = text(start, setOf("cautionary", "editorial", "parentheses", "bracket"), "S04").trim { it in WHITESPACE }
+        val visual = visualHints(start, PRINT_STYLE_ATTRIBUTES)
+        val allowed = setOf("cautionary", "editorial", "parentheses", "bracket") + PRINT_STYLE_ATTRIBUTES
+        val name = text(start, allowed, "S04").trim { it in WHITESPACE }
         if (name.isEmpty()) {
             context.report(DiagnosticCode.INVALID_VALUE, start.location, "Accidental must be nonblank")
             return null
         }
-        return Accidental(name, cautionary, editorial, parentheses, bracket)
+        return Accidental(name, cautionary, editorial, parentheses, bracket, visual)
     }
 
     /** A yes/no attribute that stays null when omitted, unlike [yesNo]; null also after `INVALID_VALUE`. */
@@ -2594,7 +2736,9 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     private fun attributes(start: ScoreXmlEvent, allowed: Set<String> = emptySet(), feature: String = "S03") {
         for (attribute in start.attributes) {
             if (!context.canContinue) return
-            if (attribute.name.namespaceUri.isNotEmpty() || attribute.name.localName !in allowed) {
+            val kept = if (attribute.name.namespaceUri.isEmpty()) attribute.name.localName in allowed
+            else attribute.name == XmlName(XML_NAMESPACE, "space") && XML_SPACE in allowed
+            if (!kept) {
                 unsupported(start.attributeLocation(attribute.name), feature, "Unmapped attribute: ${attribute.name}")
             }
         }
@@ -2707,6 +2851,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         val source: ScoreXmlEvent,
         val label: String,
         val visible: Boolean,
+        val visual: VisualHints?,
     )
 
     /**
@@ -2773,8 +2918,14 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
     /** A wedge endpoint awaiting display-position registration, with its reserved source [order]. */
     private class WedgeEndpoint(val type: SpanType, val endpoint: SpanEndpoint, val order: Int)
 
-    /** A span endpoint read from a note, before the note's event identity is known. */
-    private class SpanMark(val kind: RelationshipKind, val type: SpanType, val number: String, val location: SourceLocation)
+    /** A span endpoint read from a note, before the note's event identity is known, with its display hints. */
+    private class SpanMark(
+        val kind: RelationshipKind,
+        val type: SpanType,
+        val number: String,
+        val location: SourceLocation,
+        val visual: VisualHints? = null,
+    )
 
     private sealed interface NoteContent {
         class Pitch(val pitch: NotePitch) : NoteContent
@@ -2802,7 +2953,7 @@ private class ScoreParser(private val reader: ScoreXmlReader) {
         var measureRepeat: MeasureRepeat? = null
     }
 
-    private class MeasureHeader(val number: String, val implicit: Boolean, val source: ScoreXmlEvent)
+    private class MeasureHeader(val number: String, val implicit: Boolean, val source: ScoreXmlEvent, val width: Rational?)
 
     private class PartDefinition(val id: String, val index: Int, val location: SourceLocation) {
         var name: String? = null
@@ -2842,14 +2993,72 @@ private val NOTE_TYPES: Map<String, NoteValue> = mapOf(
     "512th" to NoteValue.N512, "1024th" to NoteValue.N1024,
 )
 
+/** Position attributes kept as [VisualHints], in tenths. */
+private val POSITION_ATTRIBUTES: Set<String> = setOf("default-x", "default-y", "relative-x", "relative-y")
+
 /** Position and colour attributes kept as [VisualHints]. */
-private val VISUAL_ATTRIBUTES: Set<String> = setOf("default-x", "default-y", "relative-x", "relative-y", "color")
+private val VISUAL_ATTRIBUTES: Set<String> = POSITION_ATTRIBUTES + "color"
+
+/** The `color` attribute alone, for elements without a position. */
+private val COLOR_ATTRIBUTES: Set<String> = setOf("color")
+
+/** Font attributes kept as [FontHints]. */
+private val FONT_ATTRIBUTES: Set<String> = setOf("font-family", "font-size", "font-style", "font-weight")
+
+/** MusicXML's `print-style` attributes: position, font and colour. */
+private val PRINT_STYLE_ATTRIBUTES: Set<String> = VISUAL_ATTRIBUTES + FONT_ATTRIBUTES
+
+/** MusicXML's `print-style-align` attributes: `print-style` plus `halign` and `valign`. */
+private val PRINT_STYLE_ALIGN_ATTRIBUTES: Set<String> = PRINT_STYLE_ATTRIBUTES + setOf("halign", "valign")
+
+/** The `xml:space` attribute, allowed under this name by callers that keep it. */
+private const val XML_SPACE = "xml:space"
+
+private const val XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace"
+
+/**
+ * The text formatting of `words` and `credit-words` that is kept: `print-style-align`, `justify`,
+ * `enclosure` and `xml:space`. Text decoration, rotation, letter spacing, line height, language
+ * and direction are discarded.
+ */
+private val TEXT_FORMATTING_ATTRIBUTES: Set<String> = PRINT_STYLE_ALIGN_ATTRIBUTES + setOf("justify", "enclosure", XML_SPACE)
+
+/** The kept display attributes of a `lyric`: position, colour and `justify`. */
+private val LYRIC_ATTRIBUTES: Set<String> = VISUAL_ATTRIBUTES + "justify"
+
+/** The kept formatting of a lyric `text` run or `elision`: font and colour. */
+private val TEXT_RUN_ATTRIBUTES: Set<String> = FONT_ATTRIBUTES + "color"
+
+/** The kept display attributes of `dynamics`: `print-style-align` and `enclosure`. */
+private val DYNAMICS_ATTRIBUTES: Set<String> = PRINT_STYLE_ALIGN_ATTRIBUTES + "enclosure"
+
+/** The kept display attributes of `metronome`: `print-style-align` and `justify`. */
+private val METRONOME_ATTRIBUTES: Set<String> = PRINT_STYLE_ALIGN_ATTRIBUTES + "justify"
+
+private val HORIZONTAL_ALIGNMENTS: Map<String, HorizontalAlignment> = mapOf(
+    "left" to HorizontalAlignment.LEFT, "center" to HorizontalAlignment.CENTER, "right" to HorizontalAlignment.RIGHT,
+)
+
+private val VERTICAL_ALIGNMENTS: Map<String, VerticalAlignment> = mapOf(
+    "top" to VerticalAlignment.TOP, "middle" to VerticalAlignment.MIDDLE,
+    "bottom" to VerticalAlignment.BOTTOM, "baseline" to VerticalAlignment.BASELINE,
+)
+
+private val ENCLOSURES: Map<String, Enclosure> = Enclosure.entries.associateBy { it.name.lowercase().replace('_', '-') }
+
+private val CSS_FONT_SIZES: Map<String, CssFontSize> = CssFontSize.entries.associateBy { it.name.lowercase().replace('_', '-') }
+
+private val FONT_STYLES: Map<String, FontStyle> = mapOf("normal" to FontStyle.NORMAL, "italic" to FontStyle.ITALIC)
+
+private val FONT_WEIGHTS: Map<String, FontWeight> = mapOf("normal" to FontWeight.NORMAL, "bold" to FontWeight.BOLD)
 
 /** Display-only visibility attributes of a note, kept as [NoteVisibility]. */
 private val NOTE_PRINT_ATTRIBUTES: Set<String> = setOf("print-object", "print-dot", "print-leger", "print-lyric", "print-spacing")
 
-/** Attributes children whose `print-object` is kept on their [AttributeEvent]. */
-private val PRINTABLE_ATTRIBUTES: Set<String> = setOf("key", "time", "clef")
+/** Attributes children whose `print-object` and display attributes are kept on their [AttributeEvent]. */
+private val PRINTABLE_ATTRIBUTES: Map<String, Set<String>> = mapOf(
+    "key" to PRINT_STYLE_ATTRIBUTES, "time" to PRINT_STYLE_ALIGN_ATTRIBUTES, "clef" to PRINT_STYLE_ATTRIBUTES,
+)
 
 /** MusicXML 4.0 `color`, accepted case-insensitively and stored in upper case. */
 private val COLOR = Regex("#[0-9A-F]{6}([0-9A-F]{2})?")

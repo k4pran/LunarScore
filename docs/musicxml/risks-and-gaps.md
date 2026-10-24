@@ -141,6 +141,31 @@ See [mxl-import.md](mxl-import.md).
 F20 was generated with .NET `ZipArchive`; other archives come from a test-only writer. iOS runtime
 still requires macOS.
 
+## MX-28 typography and colour decisions and remaining gaps
+
+MX-28 supersedes the feature-specific discard of font, colour, alignment, enclosure, `xml:space`
+and position attributes on every element the model represents, the S17 discard of `music-font` and
+`word-font`, and the S01 discard of measure `width`. They are display hints in `VisualHints`
+(`FontHints`, `HorizontalAlignment`, `VerticalAlignment`, `Enclosure`, `preserveWhitespace`),
+`LayoutDefaults.musicFont`/`wordFont` and `Measure.width`; the renderer ignores them. See
+[layout-import.md](layout-import.md#typography-and-colour-mx-28).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Font, colour, alignment, enclosure, `xml:space` and position on credits, words, dynamics, metronome marks, notes, accidentals, stems, beams, articulations, ornaments, slurs, ties, tuplets, lyrics, key/time/clef, bar styles and endings (W3C 31f, 32b, 51a, 34b, 34c, 61h, 61j, 61k) | Kept as `visual` on the modeled element; slur, tie and tuplet hints on `Relationship.startVisual`/`endVisual` | Renderer support |
+| Multi-line `words` and `credit-words` (W3C 31f) | Text kept exactly with its line breaks; `xml:space` kept as `preserveWhitespace` | Renderer line layout |
+| `music-font`, `word-font`, measure `width` (W3C 52a, 03e, 90a) | `LayoutDefaults.musicFont`/`wordFont`, `Measure.width` in tenths | Renderer font selection and measure sizing |
+| `font-size` as points or CSS name; `font-family` list including generic names | `FontSize.Points` (positive, exact) or `FontSize.Css`; families split on commas, trimmed, in order | Mapping generic families to platform fonts |
+| A syllable's later text runs with different formatting | S14 `DISCARDED`; text joined, first run's formatting kept | Rich text runs if real files need them |
+| Slur `continue` point position/colour; wedge relationships | S09 `DISCARDED` for the continue point; wedge hints stay on the `Wedge` marks only | None |
+| Typography and colour of unmodeled elements: `dot`, `notehead`, `measure-style`, technical marks, unmodeled articulations/ornaments, other direction types, `tuplet-number`/`tuplet-type`, `line-detail`, part names and part-name displays | Feature-specific `DISCARDED` per attribute or subtree as before (S04, S11, S12, S13, S17, S24) | Model those elements first (#58, #60, #61, #63, #64, #65, #66) |
+| Text decoration, rotation, letter spacing, line height, `xml:lang`, `dir`; `lyric-font`, `lyric-language`; metronome `parentheses`; beam `fan`/`repeater`; slur/tie line style, orientation and bezier; tuplet bracket and number display | Feature-specific `DISCARDED` per attribute (S03, S09, S10, S11, S13, S14, S17) | Text decoration and lyric font model |
+| Invalid font size, family, style, weight, alignment, enclosure or `xml:space`; negative or non-decimal measure width | Fatal `INVALID_VALUE` under both policies | None |
+| Duplicate `music-font` or `word-font` | Fatal `INVALID_STRUCTURE` | None |
+
+The W3C files are schema-valid (`XsdValidationTest`); 31b, 31d, 34b, 34c and 52a are accepted only
+when tolerant, for content tracked elsewhere. iOS runtime still requires macOS.
+
 ## MX-27 visibility and print attribute decisions and remaining gaps
 
 Visibility is display only and never removes content: a hidden note, rest, attribute or mark keeps
@@ -177,7 +202,7 @@ content (`W3cSuiteImportTest`, `XsdValidationTest`).
 | `cancel` value that does not match the previous key (13e measure 5) | Kept as given; not checked against the previous key | None planned |
 | `key-octave` `number` beyond the accidentals or cancellation naturals | Kept as given; not checked | Renderer must ignore an unmatched octave |
 | `key-step` without `key-alter`, `key-alter`/`key-accidental` out of sequence, traditional and non-traditional children mixed | Fatal `INVALID_STRUCTURE` (`AttributeImportTest`) | None |
-| `key-accidental` `smufl` (needed for `other`), key `color` and other display attributes | S07 `DISCARDED`; the key and accidental name are kept. Key `print-object` superseded by MX-27 above | Display-attribute work |
+| `key-accidental` `smufl` (needed for `other`), key `color` and other display attributes | S07 `DISCARDED`; the key and accidental name are kept. Key `print-object` superseded by MX-27, key position, colour and font by MX-28 above | Display-attribute work |
 
 ## MX-25 complex time signature decisions and remaining gaps
 
@@ -193,7 +218,7 @@ content (`W3cSuiteImportTest`, `XsdValidationTest`).
 | Length beyond the `Rational` Int bounds | Fatal `NUMERIC_OVERFLOW` under both policies (`AttributeImportTest`) | None |
 | `symbol` contradicting the meter (11f `cut` on 3/8) | Kept as given; display only, never changes the meter | Renderer decides how to display it |
 | Measure length against the meter | `time.length` from `effectiveStates()`; suite measures are asserted equal to it in tests | No importer diagnostic for over/underfull measures yet (F23) |
-| `time` display attributes other than `print-object` | S07 `DISCARDED` as before; `print-object` superseded by MX-27 above | Display-attribute work |
+| `time` display attributes other than `print-object` | S07 `DISCARDED` as before; `print-object` superseded by MX-27, position, colour, font and `halign`/`valign` by MX-28 above | Display-attribute work |
 
 ## MX-22 W3C test-suite conformance decisions and remaining gaps
 
@@ -283,8 +308,8 @@ All lengths are tenths (one tenth of a staff space). See [layout-import.md](layo
 | Negative `default-x/y`, `relative-x/y` | Kept exactly, sign included (F18 note, words) | None |
 | `color` with or without alpha, either case | Upper-case `#RRGGBB` / `#AARRGGBB`; other forms fatal `INVALID_VALUE` | None |
 | Second or later `print` in one measure | S17 `DISCARDED`; the first is kept | Merge policy if real files need it |
-| `appearance`, music/word/lyric fonts, `lyric-language`, `system-dividers`, `measure-numbering`, part-name/abbreviation displays, `staff-spacing` | S17 `DISCARDED` per element or attribute; the rest of the layout is kept | Appearance and typography model |
-| Position/colour on stems, beams, accidentals, tuplets, articulations, ornaments, barlines, endings, other direction types; font, justification, enclosure and `print-object` attributes | Feature-specific `DISCARDED` as before (S04/S10/S11/S12/S13/S15/S17); `print-object` on notes, rests, key, time, clef, metronome, lyric and part name superseded by MX-27 above | Extend `VisualHints` to those elements when a renderer needs them |
+| `appearance`, music/word/lyric fonts, `lyric-language`, `system-dividers`, `measure-numbering`, part-name/abbreviation displays, `staff-spacing` | S17 `DISCARDED` per element or attribute; the rest of the layout is kept. Music and word fonts superseded by MX-28 above | Appearance and lyric font model |
+| Position/colour on stems, beams, accidentals, tuplets, articulations, ornaments, barlines, endings, other direction types; font, justification, enclosure and `print-object` attributes | Feature-specific `DISCARDED` as before (S04/S10/S11/S12/S13/S15/S17); `print-object` on notes, rests, key, time, clef, metronome, lyric and part name superseded by MX-27, and every modeled element's position, colour, font, alignment and enclosure by MX-28 above | Unmodeled elements only |
 | Invalid decimals, colours, margin types, yes/no values, `blank-page`, staff-layout `number`, non-positive scaling or page size | Fatal `INVALID_VALUE` | None |
 | Scaling missing a value, page height without width, duplicate or conflicting page margins, incomplete margins, duplicate singleton children | Fatal `INVALID_STRUCTURE` | None |
 
@@ -365,7 +390,7 @@ discard of a note's `lyric` child.
 | Melisma (`extend`) | Kept per note as `LyricExtend(type)`, including extend-only continuations (F15) | Resolve melisma lines into spans and check start/stop pairing |
 | Consecutive `text` runs | Joined into one syllable; their typography is S14 `DISCARDED` | Rich text runs if formatting is modeled (MX-18) |
 | `laughing`, `humming`; `lyric` with `time-only` | S14 `DISCARDED`; the lyric is dropped | Model non-text lyrics and repeat-pass lyrics |
-| `end-line`, `end-paragraph`; display/typography attributes (`justify`, positions, fonts, `color`, `xml:lang`, `id`) | S14 `DISCARDED`; the lyric is kept. Lyric `print-object` superseded by MX-27 above | Karaoke line breaks and layout hints (MX-18) |
+| `end-line`, `end-paragraph`; display/typography attributes (`justify`, positions, fonts, `color`, `xml:lang`, `id`) | S14 `DISCARDED`; the lyric is kept. Lyric `print-object` superseded by MX-27, and `justify`, positions, fonts and `color` by MX-28 above | Karaoke line breaks |
 | `footnote`, `level` in a lyric | S25 `DISCARDED` | Editorial model |
 | Syllabic consistency across notes (for example `begin` without `end`) | Not checked | Semantic lyric validation |
 | Lyrics on grace and unpitched notes | Kept on the note (MX-21 grace + lyric mixed pair) | None |
@@ -388,7 +413,7 @@ MX-06 S13 discard of a measure's `direction` element, MX-11's S12 discard of `ar
 | `offset` | Exact rational quarter notes, negative allowed; display only unless `sound="yes"`, which also sets `DirectionSound.offset`; offset before divisions fatal `INVALID_STRUCTURE` | None |
 | Other direction types: `rehearsal`, `segno`, `coda`, `pedal`, `octave-shift`, `dashes`, `bracket`, `damp`, `eyeglasses`, `image`, `principal-voice`, `percussion`, `accordion-registration`, `harp-pedals`, `scordatura`, `string-mute`, `staff-divide`, `symbol`, `other-direction` | S13 `DISCARDED` per element; the rest of the direction is kept, and a direction with nothing interpretable has no event | Model and import each type; `PEDAL` relationship is reserved |
 | Metric modulation, `beat-unit-tied`, `metronome-note` metronome forms | S13 `DISCARDED`; metronome dropped | Complex metronome model |
-| Display attributes (fonts, enclosure, position, color, `parentheses`, wedge `spread`/`niente`/line style, `strong-accent type`, trill-sound and mordent attributes) | S13 or S12 `DISCARDED` per attribute; mark kept. Position and color of words, dynamics, metronome marks and wedges superseded by MX-18 above | Ornament realization |
+| Display attributes (fonts, enclosure, position, color, `parentheses`, wedge `spread`/`niente`/line style, `strong-accent type`, trill-sound and mordent attributes) | S13 or S12 `DISCARDED` per attribute; mark kept. Position and color of words, dynamics, metronome marks and wedges superseded by MX-18, and fonts, alignment, enclosure and expression positions/colours by MX-28 above | Ornament realization |
 | Other notations: `fermata`, `technical`, `arpeggiate`, `glissando`, `slide`, `accidental-mark`, `non-arpeggiate`, `other-notation`; other articulations/ornaments (`breath-mark`, `caesura`, `scoop`, `plop`, `doit`, `falloff`, `wavy-line`, `tremolo`, `other-ornament`, …) | S12 `DISCARDED` per element | Fermata, tremolo and wavy-line models |
 | Other `sound` attributes and children; `listening` in a direction | S26 `DISCARDED`; tempo/dynamics kept (instrument change superseded by MX-16 below) | MX-20/21 listening and playback |
 | Unmatched wedge endpoints or `continue` without an open wedge | `UNMATCHED_SPAN`; relationship kept with a null partner | None |
@@ -410,8 +435,8 @@ imported notes and rests. This supersedes MX-07's S10/S11 discard of `stem`, `be
 | Unmatched or duplicate tuplet endpoints | `UNMATCHED_SPAN`; relationship kept with a null partner | None |
 | Unknown stem, beam type or normal type; beam number outside 1–8; nonpositive actual/normal counts | Fatal `INVALID_VALUE` | None |
 | Missing tuplet type or actual/normal notes; `normal-dot` without `normal-type`; duplicate stem/time modification/beam level | Fatal `INVALID_STRUCTURE` | None |
-| `tuplet-actual`/`tuplet-normal`; tuplet `bracket`, `show-number`, `show-type`, `line-shape`, `placement`, position | S11 `DISCARDED`; tuplet span kept | Tuplet display model (MX-18) |
-| Beam `fan`, `repeater`, `color`, `id`; stem position and color | S10 `DISCARDED` per attribute; beam or stem kept | Feathered beams and layout (MX-18) |
+| `tuplet-actual`/`tuplet-normal`; tuplet `bracket`, `show-number`, `show-type`, `line-shape`, `placement`, position | S11 `DISCARDED`; tuplet span kept. Position superseded by MX-28 above | Tuplet display model |
+| Beam `fan`, `repeater`, `color`, `id`; stem position and color | S10 `DISCARDED` per attribute; beam or stem kept. Beam colour and stem position and colour superseded by MX-28 above | Feathered beams |
 | Beam continuity (begin without end), tuplet/duration agreement | Not checked; duration stays authoritative | Optional semantic check |
 | Mixed chord values: chord tones with different type, time modification, stems or beams | Each tone keeps its own notation (MX-09); consistency is not checked | A mixed-value chord fixture |
 
@@ -432,7 +457,7 @@ supersedes MX-07's S09 discard of `tie` and its S12 discard of the whole `notati
 | Enharmonic ties; tie stop not at the tied note's end | Not paired / not checked | Optional semantic check |
 | Missing `type`; unknown `type`; `number` outside 1–16 | Fatal `INVALID_STRUCTURE`; fatal `INVALID_VALUE` | None |
 | `tie time-only`; `tied type="let-ring"`; tie or tied on a rest | S09 `DISCARDED`; mark dropped (a slur on a rest is kept) | Repeat-pass playback (MX-17); let-ring model |
-| Display attributes on `tie`/`tied`/`slur` | S09 `DISCARDED` per attribute; span kept | MX-18 layout |
+| Display attributes on `tie`/`tied`/`slur` | S09 `DISCARDED` per attribute; span kept. Position and colour superseded by MX-28 above | Line style and curve shape |
 | Other `notations` children and `notations` attributes | S12 (S25 `footnote`/`level`) `DISCARDED` per child; `tuplet` superseded by MX-12 and articulations, ornaments and dynamics by MX-13 above | Remaining notations (fermata, technical, …) |
 
 F10 is implementation-authored and schema-valid (`XsdValidationTest`); iOS runtime still requires macOS.
@@ -488,7 +513,7 @@ MX-07's S07 discard of key, clef, staves and staff details.
 | Clef without line | Standard line for G/F/C per MusicXML; null for percussion/TAB/jianpu/none | None |
 | Invalid fifths/line/octave change/sign/staves/staff-lines/attribute `number` | Fatal `INVALID_VALUE`; missing fifths or sign `INVALID_STRUCTURE` | Full XSD lexical validation remains separate |
 | `staves` > 1, `part-symbol`, key/time/clef/staff details scoped to staff ≠ 1 | Superseded by MX-09: staves and staff-scoped attributes are interpreted; `part-symbol` stays S08 `DISCARDED` | Part-symbol display |
-| Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | Non-traditional keys, `cancel` and `key-octave` superseded by MX-26 above; unknown mode and display attributes S07 `DISCARDED`, key/clef kept (unknown mode null); key/clef `print-object` superseded by MX-27 | Other display attributes |
+| Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | Non-traditional keys, `cancel` and `key-octave` superseded by MX-26 above; unknown mode and display attributes S07 `DISCARDED`, key/clef kept (unknown mode null); key/clef `print-object` superseded by MX-27, position, colour and font by MX-28 | Other display attributes |
 | `staff-tuning`/`capo`; other staff details | S23 / S17 `DISCARDED`; staff-line count kept | MX-13/MX-18/MX-21 |
 | `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` (`transpose` superseded by MX-16 and `measure-repeat` by MX-17 above) | MX-17, MX-13 |
 | State change after backup/forward | At the cursor after the move (superseded by MX-09) | None |
@@ -530,7 +555,7 @@ part/measure structures. This supersedes earlier statements that no semantic imp
 | Invalid measure implicit flag or nonpositive/out-of-Int credit page | Fatal `INVALID_VALUE` | General schema value validation remains separate work |
 | Timewise root through public score API | Superseded by MX-10: normalized to the partwise projection | None |
 | Credit images/symbols, text typography/language, encoding supports and unknown header content | S03 `UNSUPPORTED_FEATURE` / `DISCARDED`; plain supported text still retained; strict rejects, tolerant warns | Rich credit/layout and encoding capability semantics remain unimplemented |
-| Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations (defaults layout and print superseded by MX-18) | Part-name displays; source IDs/display text/multimetric measure semantics need explicit model mappings |
+| Defaults/print/part-name displays; optional measure ID/text/width/non-controlling and other unmapped structural attributes | S17 or S01 discarded-content findings at subtree/attribute locations (defaults layout and print superseded by MX-18, measure `width` and music/word fonts by MX-28) | Part-name displays; source IDs/display text/multimetric measure semantics need explicit model mappings |
 | Part groups, part links, grouping, links/bookmarks | S25 discarded-content findings; actual grouping/link importer tests; no targets fetched | Group/editorial/link semantics and full F27 remain pending |
 | Notes, backup/forward, attributes, direction, barline, score-instrument, harmony/figured-bass, sound/listening/player/MIDI, opus | Feature-specific discarded-content findings (S04/S06/S07/S13/S15/S16/S22/S26/S27); one record covers a skipped subtree (score-instrument and `midi-instrument` superseded by MX-16, barline by MX-17) | Musical feature tasks must replace these branches; no event, instrument, timing or auxiliary import is claimed |
 | Foreign subtrees or namespaced attributes resemble supported names | Expanded-name lookup prevents aliasing; `foreign-extension` subtree or owner-group attribute finding | No namespace rewriting or extension semantics |

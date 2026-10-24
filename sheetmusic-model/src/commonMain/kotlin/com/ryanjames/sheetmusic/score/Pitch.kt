@@ -48,7 +48,8 @@ public data class TimeModification(
 /**
  * Printed accidental name and cautionary/editorial flags, independent of [WrittenPitch.alter].
  * [parentheses] and [bracket] say whether the accidental is printed in parentheses or brackets,
- * independently of its name and of each other; null is unspecified.
+ * independently of its name and of each other; null is unspecified. [visual] is its optional
+ * position, colour and font.
  */
 public data class Accidental(
     val name: String,
@@ -56,6 +57,7 @@ public data class Accidental(
     val editorial: Boolean = false,
     val parentheses: Boolean? = null,
     val bracket: Boolean? = null,
+    val visual: VisualHints? = null,
 )
 
 /** Printed stem direction; [NONE] is an explicitly stemless note, unlike an unspecified (null) stem. */
@@ -64,8 +66,11 @@ public enum class StemDirection { UP, DOWN, DOUBLE, NONE }
 /** The role of one beam level on a note: a segment endpoint, a middle point or a partial hook. */
 public enum class BeamType { BEGIN, CONTINUE, END, FORWARD_HOOK, BACKWARD_HOOK }
 
-/** One printed beam on a note; [level] 1 is the eighth-note beam, up to 8 for 1024th notes. */
-public data class Beam(val level: Int, val type: BeamType) {
+/**
+ * One printed beam on a note; [level] 1 is the eighth-note beam, up to 8 for 1024th notes. [visual]
+ * is its optional colour.
+ */
+public data class Beam(val level: Int, val type: BeamType, val visual: VisualHints? = null) {
     init {
         require(level in 1..8)
     }
@@ -77,6 +82,7 @@ public data class Beam(val level: Int, val type: BeamType) {
  * [beams] are listed in source order with distinct levels; an empty list means no printed beam.
  * [expressions] are articulations, ornaments and dynamics attached to the note, in source order.
  * [lyrics] are the lyric lines sung on the note or rest, in source order; the event's ID links them.
+ * [stemVisual] is the optional position and colour of the stem.
  */
 public data class NotatedValue(
     val value: NoteValue? = null,
@@ -87,6 +93,7 @@ public data class NotatedValue(
     val beams: List<Beam> = emptyList(),
     val expressions: List<NoteExpression> = emptyList(),
     val lyrics: List<Lyric> = emptyList(),
+    val stemVisual: VisualHints? = null,
 ) {
     init {
         require(dots >= 0)

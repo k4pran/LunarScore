@@ -140,7 +140,7 @@ class LayoutImportTest {
     fun testUnsupportedLayoutContentIsDiscardedWithS17() {
         val defaults = "<defaults><scaling><millimeters>7</millimeters><tenths>40</tenths></scaling>" +
             "<system-layout><system-distance>100</system-distance><system-dividers/></system-layout>" +
-            "<appearance><line-width type='stem'>1</line-width></appearance><music-font font-family='Bravura'/></defaults>"
+            "<appearance><line-width type='stem'>1</line-width></appearance><lyric-font font-family='Times'/></defaults>"
         val xml = document(
             "<print staff-spacing='60' new-system='yes'><measure-numbering>system</measure-numbering>" +
                 "<part-name-display><display-text>Fl.</display-text></part-name-display></print><print new-page='yes'/>",

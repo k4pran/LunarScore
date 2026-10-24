@@ -168,7 +168,7 @@ class NoteImportTest {
                 "<note><rest><display-step>B</display-step></rest><duration>1</duration><notations><fermata/></notations></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S04", "S10", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S04", "S17", "S12"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.severity == DiagnosticSeverity.WARNING && it.unsupported?.retention == ContentRetention.DISCARDED })
         val events = events(result)
         // The chord tone shares the C's onset and does not advance the cursor.

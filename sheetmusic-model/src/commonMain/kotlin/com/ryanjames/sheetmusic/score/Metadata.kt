@@ -19,14 +19,21 @@ public sealed interface MetadataEntry {
         val qualifier: String? = null,
     ) : MetadataEntry
 
-    /** Ordered visible credit text and its semantic types, associated with a one-based page. */
+    /**
+     * Ordered visible credit text and its semantic types, associated with a one-based page. Each
+     * of the [words] keeps its text exactly, including line breaks. [visuals] holds the position,
+     * colour and text formatting of each of the [words] at the same index, or is empty when none
+     * has any.
+     */
     public data class Credit(
         val words: List<String>,
         val types: List<String> = emptyList(),
         val page: Int = 1,
+        val visuals: List<VisualHints?> = emptyList(),
     ) : MetadataEntry {
         init {
             require(page > 0)
+            require(visuals.isEmpty() || visuals.size == words.size)
         }
     }
 }

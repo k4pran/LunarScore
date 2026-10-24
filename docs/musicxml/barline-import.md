@@ -73,8 +73,8 @@ Navigation findings are returned as `PlaybackDiagnostic`s, separate from parser 
 
 | Source content | Outcome |
 |---|---|
-| Barline `segno`, `coda`, `divisions` and `id` attributes; `segno`, `coda`, `fermata`, `wavy-line` children; `bar-style color` | S15 `DISCARDED` |
-| `repeat after-jump`, `winged`; ending `print-object`, `end-length`, `system`, position and font attributes | S15 `DISCARDED`; the repeat or ending is kept |
+| Barline `segno`, `coda`, `divisions` and `id` attributes; `segno`, `coda`, `fermata`, `wavy-line` children | S15 `DISCARDED`. `bar-style` `color` is kept as `Barline.styleVisual` since [MX-28](layout-import.md#typography-and-colour-mx-28) |
+| `repeat after-jump`, `winged`; ending `print-object`, `end-length`, `system`, `text-x`, `text-y` | S15 `DISCARDED`; the repeat or ending is kept. Ending position, colour and font are kept as `EndingMark.visual` since [MX-28](layout-import.md#typography-and-colour-mx-28) |
 | Barline `footnote`, `level` | S25 `DISCARDED` |
 | Middle barline after `backup`/`forward` | At the cursor after the move since [MX-09](polyphony.md) |
 | `measure-style` for staff ≠ 1 | S08 `DISCARDED` |

@@ -232,7 +232,7 @@ class DirectionImportTest {
     @Test
     fun testUnsupportedVariantsAreDiscardedWithFeatureIds() {
         val xml = document(
-            direction("<rehearsal>A</rehearsal><words font-weight='bold'>cresc.</words>") +
+            direction("<rehearsal>A</rehearsal><words letter-spacing='2'>cresc.</words>") +
                 direction(
                     "<metronome><beat-unit>quarter</beat-unit><beat-unit>half</beat-unit></metronome>",
                     "<sound tempo='60' damper-pedal='yes'><swing/></sound><listening/>",

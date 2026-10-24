@@ -27,9 +27,15 @@ public enum class EndingType { START, STOP, DISCONTINUE }
 /**
  * An ending mark exactly as notated on one barline. [numbers] are the passes the ending is played
  * on, in source order; an empty list means no pass number was given. [text] is printed text that
- * differs from the numbers, if any. Marks are paired into part-level [Ending]s.
+ * differs from the numbers, if any. Marks are paired into part-level [Ending]s. [visual] is the
+ * optional position, colour and font of the bracket and its text.
  */
-public data class EndingMark(val type: EndingType, val numbers: List<Int>, val text: String? = null) {
+public data class EndingMark(
+    val type: EndingType,
+    val numbers: List<Int>,
+    val text: String? = null,
+    val visual: VisualHints? = null,
+) {
     init {
         require(numbers.all { it > 0 })
     }
@@ -38,7 +44,8 @@ public data class EndingMark(val type: EndingType, val numbers: List<Int>, val t
 /**
  * A notated barline: style, repeat sign and ending mark are kept as printed, separately from any
  * playback order derived from them. [onset] is the measure-local quarter-note position of a
- * [BarlineLocation.MIDDLE] barline and null otherwise.
+ * [BarlineLocation.MIDDLE] barline and null otherwise. [styleVisual] is the optional colour of the
+ * bar style.
  */
 public data class Barline(
     val location: BarlineLocation = BarlineLocation.RIGHT,
@@ -46,6 +53,7 @@ public data class Barline(
     val style: BarStyle? = null,
     val repeat: Repeat? = null,
     val ending: EndingMark? = null,
+    val styleVisual: VisualHints? = null,
 ) {
     init {
         require((location == BarlineLocation.MIDDLE) == (onset != null))

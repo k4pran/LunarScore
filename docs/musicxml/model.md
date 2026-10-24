@@ -63,8 +63,10 @@ does not depend on that module.
   [barlines, repeats and endings](barline-import.md).
 - MX-18 adds optional engraving hints in tenths: `Score.layout` (`LayoutDefaults` with `Scaling`,
   `PageLayout`, `SystemLayout`, `StaffLayout`), `Measure.print` (`PrintHints` breaks and layout
-  overrides) and `VisualHints` position/colour on notes, rests and direction marks. They never
-  change musical meaning. See [layout and visual hints](layout-import.md).
+  overrides) and `VisualHints` position/colour on notes, rests and direction marks. MX-28 adds
+  fonts, alignment, enclosure and `xml:space` to `VisualHints` on every modeled printed element,
+  `LayoutDefaults.musicFont`/`wordFont` and `Measure.width`. They never change musical meaning. See
+  [layout and visual hints](layout-import.md).
 - Relationships have their own IDs and typed endpoint event IDs. Sound ties, printed ties and slurs
   remain independent; multiple/nested spans may share endpoints. Missing endpoints remain null.
   IDs must be assigned independently of source XML IDs so anonymous elements remain addressable.

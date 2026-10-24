@@ -23,22 +23,22 @@ class CorpusRunnerTest {
     @Test
     fun testReportsBothPoliciesFirstErrorAndDiscardedFeatures() {
         val files = listOf(
-            file("c-width.musicxml", f20Score.replace("<measure number=\"1\">", "<measure number=\"1\" width=\"200\">")),
+            file("c-measure-text.musicxml", f20Score.replace("<measure number=\"1\">", "<measure number=\"1\" text=\"1a\">")),
             file("a-clean.musicxml", f20Score),
             file("b-packed.mxl", f20MxlHex.decodeHex().toByteArray()),
             file("d-blank-part-id.invalid.musicxml", f20Score.replace("<part id=\"P1\">", "<part id=\"\">")),
         )
         val report = runCorpus("fixture corpus", files)
 
-        assertEquals(listOf("a-clean.musicxml", "b-packed.mxl", "c-width.musicxml", "d-blank-part-id.invalid.musicxml"), report.files.map { it.name })
+        assertEquals(listOf("a-clean.musicxml", "b-packed.mxl", "c-measure-text.musicxml", "d-blank-part-id.invalid.musicxml"), report.files.map { it.name })
         assertEquals(emptyList(), report.problems)
-        val (clean, packed, width, blankPartId) = report.files
+        val (clean, packed, measureText, blankPartId) = report.files
         listOf(clean, packed).forEach { file ->
             assertTrue(file.outcomes.values.all { it.outcome == "accepted" && it.discarded.isEmpty() }, file.name)
         }
-        assertEquals("rejected: UNSUPPORTED_FEATURE", width.outcomes.getValue(ParsePolicy.STRICT).outcome)
-        assertEquals("accepted with warnings", width.outcomes.getValue(ParsePolicy.TOLERANT).outcome)
-        assertEquals(mapOf("S01" to 1), width.outcomes.getValue(ParsePolicy.TOLERANT).discarded)
+        assertEquals("rejected: UNSUPPORTED_FEATURE", measureText.outcomes.getValue(ParsePolicy.STRICT).outcome)
+        assertEquals("accepted with warnings", measureText.outcomes.getValue(ParsePolicy.TOLERANT).outcome)
+        assertEquals(mapOf("S01" to 1), measureText.outcomes.getValue(ParsePolicy.TOLERANT).discarded)
         assertTrue(blankPartId.expectedDiagnosed)
         assertTrue(blankPartId.outcomes.values.all { it.firstError?.code == DiagnosticCode.INVALID_STRUCTURE })
 
@@ -50,7 +50,7 @@ class CorpusRunnerTest {
         assertTrue("4 files; 1 expected to be diagnosed." in markdown)
         assertTrue(
             markdown.lines().any {
-                it.startsWith("| `c-width.musicxml` | valid | rejected: UNSUPPORTED_FEATURE | UNSUPPORTED_FEATURE `/score-partwise[1]/part[1]/measure[1]/@width`") &&
+                it.startsWith("| `c-measure-text.musicxml` | valid | rejected: UNSUPPORTED_FEATURE | UNSUPPORTED_FEATURE `/score-partwise[1]/part[1]/measure[1]/@text`") &&
                     it.endsWith("| accepted with warnings |  | S01 1 |")
             },
             markdown,

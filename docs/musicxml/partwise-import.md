@@ -68,7 +68,8 @@ qualifier. It retains:
 - Identification creators/rights (including their `type`), source, repeated relations, and named
   miscellaneous fields.
 - Encoding date, encoder/type, software and description in encounter order, including repeats.
-- Visible credits as `MetadataEntry.Credit`: ordered credit types and word runs, page default 1.
+- Visible credits as `MetadataEntry.Credit`: ordered credit types and word runs, page default 1,
+  with each word run's position, colour and text formatting in `visuals` since [MX-28](layout-import.md#typography-and-colour-mx-28).
   Page values must fit a positive `Int`; invalid/out-of-range values produce `INVALID_VALUE`.
 
 Work/identification/encoding containers are flattened into semantic fields, preserving leaf order.

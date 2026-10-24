@@ -1,6 +1,10 @@
 package com.ryanjames.sheetmusic.musicxml
 
 import com.ryanjames.sheetmusic.score.ExtendType
+import com.ryanjames.sheetmusic.score.FontHints
+import com.ryanjames.sheetmusic.score.FontSize
+import com.ryanjames.sheetmusic.score.FontStyle
+import com.ryanjames.sheetmusic.score.HorizontalAlignment
 import com.ryanjames.sheetmusic.score.Lyric
 import com.ryanjames.sheetmusic.score.LyricExtend
 import com.ryanjames.sheetmusic.score.LyricSyllable
@@ -10,6 +14,7 @@ import com.ryanjames.sheetmusic.score.Rational
 import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.Syllabic
+import com.ryanjames.sheetmusic.score.VisualHints
 import com.ryanjames.sheetmusic.score.validate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,13 +102,23 @@ class LyricImportTest {
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(
-            listOf("S14", "S14", "S14", "S14", "S14", "S14", "S14", "S14", "S25", "S14", "S14", "S14", "S14"),
+            listOf("S14", "S14", "S14", "S25", "S14", "S14", "S14", "S14"),
             result.diagnostics.map { it.unsupported?.featureId },
         )
         assertTrue(result.diagnostics.all { it.unsupported?.retention == ContentRetention.DISCARDED })
         val note = assertIs<NoteEvent>(result.value.parts.single().measures.single().events.single())
         assertEquals(
-            listOf(Lyric(listOf(LyricSyllable("la"), LyricSyllable("a", elision = "_")), "1", extend = LyricExtend(ExtendType.START))),
+            listOf(
+                Lyric(
+                    listOf(
+                        LyricSyllable("la", visual = VisualHints(font = FontHints(style = FontStyle.ITALIC))),
+                        LyricSyllable("a", elision = "_", elisionVisual = VisualHints(font = FontHints(size = FontSize.Points(Rational.of(8))))),
+                    ),
+                    "1",
+                    extend = LyricExtend(ExtendType.START, VisualHints(defaultX = Rational.of(4))),
+                    visual = VisualHints(defaultY = Rational.of(-80), justify = HorizontalAlignment.LEFT),
+                ),
+            ),
             note.notation.lyrics,
         )
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)

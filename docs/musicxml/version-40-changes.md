@@ -70,7 +70,7 @@ coverage group shown at the path given.
 |---|---|---|
 | `smufl-accidental-glyph-name` (early-music and Kievan glyphs) | `accidental/@smufl` is S04 discarded; the accidental text is kept | F21 |
 | `credit-type` `part name` | **Supported:** kept in order as credit-type text | F21 |
-| `enclosure-shape` `inverted-bracket` | `@enclosure` is S13 discarded on `words` | F21 |
+| `enclosure-shape` `inverted-bracket` | Implemented ([MX-28](layout-import.md#typography-and-colour-mx-28)): kept as `Enclosure.INVERTED_BRACKET` in the words' `VisualHints` | F21 |
 | Eight new `sounds.xml` IDs | `instrument-sound` is S16 discarded | F21 (`wind.flutes.whistle.tin.c`) |
 | `ipa` updated to IPA 2015 | `play` is S26 discarded on notes | F21 |
 | `number-level` maximum 16 | **Supported:** slur, tied and tuplet numbers 1–16 pair; 17 is fatal `INVALID_VALUE` | F21, F11 |

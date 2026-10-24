@@ -228,7 +228,7 @@ class MusicXmlParserTest {
             <defaults><appearance/></defaults>
             <credit><link href='file:///never-read'/><credit-image source='https://example.invalid/never-fetch'/></credit>
         """).replace("<part-name>Flute", "<part-name justify='left'>Flute")
-            .replace("<measure number='1'/>", "<measure number='1' width='20'/>")
+            .replace("<measure number='1'/>", "<measure number='1' non-controlling='yes'/>")
             .replace("<part-name justify='left'>", "<score-instrument id='I1'><instrument-name>Flute</instrument-name><solo/></score-instrument><part-name justify='left'>")
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
         assertEquals(listOf("S27", "S03", "S17", "S25", "S03", "S16", "S03", "S01"),

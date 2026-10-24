@@ -56,7 +56,7 @@ public data class Instrument(val id: String, val name: String? = null, val percu
  * pickup measures are legal. Event order is retained; it need not be sorted by onset or voice.
  * [barlines] are the notated barlines in source order. [measureRepeat] marks a measure displayed
  * as a measure-repeat sign; its events are still the music it sounds. [print] holds optional
- * breaks and layout requested at the measure.
+ * breaks and layout requested at the measure. [width] is its optional printed width in tenths.
  */
 public data class Measure(
     val id: String,
@@ -67,19 +67,27 @@ public data class Measure(
     val barlines: List<Barline> = emptyList(),
     val measureRepeat: MeasureRepeat? = null,
     val print: PrintHints? = null,
+    val width: Rational? = null,
 ) {
     init {
         require(id.isNotBlank())
         require(extent >= Rational.ZERO)
+        require(width == null || width >= Rational.ZERO)
     }
 }
 
-/** A cross-event span; null endpoints preserve unresolved spans for explicit validation. */
+/**
+ * A cross-event span; null endpoints preserve unresolved spans for explicit validation.
+ * [startVisual] and [endVisual] are the optional position and colour of the printed start and end
+ * marks, such as a slur's endpoints or a tuplet bracket's ends.
+ */
 public data class Relationship(
     val id: String,
     val kind: RelationshipKind,
     val startEventId: String?,
     val endEventId: String?,
+    val startVisual: VisualHints? = null,
+    val endVisual: VisualHints? = null,
 ) {
     init {
         require(id.isNotBlank())

@@ -12,6 +12,7 @@ import com.ryanjames.sheetmusic.score.RestEvent
 import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.StemDirection
 import com.ryanjames.sheetmusic.score.TimeModification
+import com.ryanjames.sheetmusic.score.VisualHints
 import com.ryanjames.sheetmusic.score.validate
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -167,13 +168,13 @@ class TupletImportTest {
         val xml = document(
             note(
                 "C",
-                "<tuplet type='start' bracket='yes'><tuplet-actual><tuplet-number>3</tuplet-number></tuplet-actual></tuplet>",
+                "<tuplet type='start' bracket='yes' default-y='20'><tuplet-actual><tuplet-number>3</tuplet-number></tuplet-actual></tuplet>",
                 stem = "<stem default-y='10'>double</stem>",
                 beams = "<beam fan='accel'>begin</beam>",
             ) + note("D", "<tuplet type='start' number='2'/>", stem = "<stem>none</stem>", beams = "<beam>forward hook</beam>"),
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S10", "S10", "S11", "S11"), result.diagnostics.mapNotNull { it.unsupported?.featureId })
+        assertEquals(listOf("S10", "S11", "S11"), result.diagnostics.mapNotNull { it.unsupported?.featureId })
         assertTrue(result.diagnostics.filter { it.unsupported != null }.all { it.unsupported?.retention == ContentRetention.DISCARDED })
         // Both tuplets stay open, so each start is reported as unmatched and kept with a null end.
         assertEquals(List(2) { DiagnosticCode.UNMATCHED_SPAN }, result.diagnostics.filter { it.unsupported == null }.map { it.code })
@@ -181,6 +182,9 @@ class TupletImportTest {
         assertEquals(listOf(StemDirection.DOUBLE, StemDirection.NONE), notes.map { it.notation.stem })
         assertEquals(listOf(listOf(Beam(1, BeamType.BEGIN)), listOf(Beam(1, BeamType.FORWARD_HOOK))), notes.map { it.notation.beams })
         assertEquals(listOf(event(1) to null, event(2) to null), result.value.relationships.map { it.startEventId to it.endEventId })
+        // Stem and tuplet positions are kept as display hints.
+        assertEquals(VisualHints(defaultY = Rational.of(10)), notes[0].notation.stemVisual)
+        assertEquals(VisualHints(defaultY = Rational.of(20)), result.value.relationships[0].startVisual)
         failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
     }
 
