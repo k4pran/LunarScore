@@ -37,11 +37,12 @@ public data class PlaybackOrder(val measures: List<PlaybackMeasure>, val diagnos
  * endings, and `times` is ignored. An ending is skipped on passes it does not name; leaving an
  * ending that does not repeat completes the section. A forward repeat inside an ending, including
  * one at its first measure, starts a nested section that is played `times` times on each pass
- * through the ending; when it completes, the enclosing section and its pass resume, so a backward
- * repeat closing the ending returns to the enclosing section's start. An ending without numbers
- * stands for the pass after the highest number of the earlier endings in its group (so a first
- * unnumbered ending is pass 1 and a second is pass 2). Da capo, dal segno, coda and fine are not
- * interpreted. At most [maxMeasures] measures are returned.
+ * through the ending; when it completes within the ending, the enclosing section and its pass
+ * resume, so a backward repeat closing the ending returns to the enclosing section's start. When it
+ * completes after its ending, the enclosing section restarts after it, as after any completed
+ * repeat. An ending without numbers stands for the pass after the highest number of the earlier
+ * endings in its group (so a first unnumbered ending is pass 1 and a second is pass 2). Da capo,
+ * dal segno, coda and fine are not interpreted. At most [maxMeasures] measures are returned.
  */
 public fun Part.playbackOrder(maxMeasures: Int = 10_000): PlaybackOrder {
     require(maxMeasures >= 0)
@@ -100,7 +101,12 @@ public fun Part.playbackOrder(maxMeasures: Int = 10_000): PlaybackOrder {
             }
             jumps.remove(index)
             sections.removeAt(sections.lastIndex)
-            if (section.ending == null) sections += Section(index + 1, null)
+            if (section.ending == null) {
+                sections += Section(index + 1, null)
+            } else if (containing[index] !== section.ending) {
+                // A nested repeat that finished past its ending completes the enclosing stretch up to here.
+                sections[sections.lastIndex] = Section(index + 1, sections.last().ending)
+            }
         }
         val closing = containing[index]?.takeIf { it.stop == index }
         if (closing != null) {

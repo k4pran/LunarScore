@@ -109,6 +109,20 @@ class PlaybackOrderTest {
     }
 
     @Test
+    fun testRepeatFinishingAfterItsEndingCompletesTheEnclosingSection() {
+        // |: A [1. B :| [2. |: C ] D :| E :|
+        val part = part(
+            measure(forward()),
+            measure(backward()),
+            measure(forward()),
+            measure(backward()),
+            measure(backward()),
+            endings = listOf(Ending("e1", listOf(1), "m2", "m2"), Ending("e2", listOf(2), "m3", "m3", discontinued = true)),
+        )
+        assertEquals(listOf(0, 1, 0, 2, 3, 2, 3, 4, 4), indices(part))
+    }
+
+    @Test
     fun testUnnumberedEndingsAreNumberedByPosition() {
         // Suite 45e: A [ B :| [ C ] D
         val part = part(
