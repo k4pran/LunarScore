@@ -141,6 +141,25 @@ See [mxl-import.md](mxl-import.md).
 F20 was generated with .NET `ZipArchive`; other archives come from a test-only writer. iOS runtime
 still requires macOS.
 
+## MX-22 W3C test-suite conformance decisions and remaining gaps
+
+`scripts/run-w3c-suite.sh` runs the pinned [W3C test suite](https://github.com/w3c-cg/musicxmlTestSuite)
+under both policies; results and the per-file issue links are in the
+[compliance audit](compliance-audit.md#w3c-musicxml-test-suite-mx-22). The runner adds no parser
+behaviour, so no new unsupported case arises; every loss it reports is an existing structured
+diagnostic.
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Suite files are not committed | Downloaded per run and deleted afterwards, also on failure; the revision is overridable | Copy fixtures with the MIT notice only in MX-04 (#5) |
+| Expected-diagnosed files (`.invalid` 41g, 74b, 75b; 11b) | The run fails if either policy accepts one without a diagnostic (`CorpusRunnerTest`). 41g is `INVALID_STRUCTURE`, 11b `INVALID_CURSOR_MOVE` under strict | 74b and 75b are diagnosed only through discarded content; detecting their invalidity needs XSD validation (#5) or MX-30/MX-34 (#59, #63) |
+| 41h, parts missing from the part list | Rejected under both policies; the only valid file the tolerant policy rejects | MX-24 (#53) |
+| Missing `divisions` (03e, 51b, 51c) | `RECOVERED_VALUE`, which rejects strict parsing | Strict policy decided in MX-24 (#53) |
+| 33i unended tie, 45f ending stop without start | `UNMATCHED_SPAN`; strict rejection is intended | Kept as regressions in MX-38 (#67) and MX-23 (#52) |
+| 101 strict `UNSUPPORTED_FEATURE` rejections | Each file is linked to its open MX-23–MX-39 issues in the audit table | Re-run after each issue lands until every valid file imports without discarded content |
+| Playback order of 45e, 45i | Imported cleanly; order differs from the suite description, which no diagnostic reports | MX-23 (#52) |
+| Semantic oracle | The runner checks structured outcomes and `playbackOrder()` only, not musical correctness | Independent expectations in MX-04 (#5) and each tracked issue |
+
 ## MX-21 compliance audit decisions and remaining gaps
 
 The [compliance audit](compliance-audit.md) runs every executable fixture, the mixed-feature pairs
@@ -152,7 +171,7 @@ outcome was structured: no exception escaped and no failure lacked an error.
 | Standard Recordare DOCTYPE header written by exporters | Blanked before the reader and never resolved; other DOCTYPEs stay `UNSAFE_XML` (`ScoreXmlReaderTest`; whole LilyPond suite) | None |
 | Missing `divisions` before a duration or direction offset | `RECOVERED_VALUE` once per part, divisions 1; tolerant warning, strict failure (`NoteImportTest`, `DirectionImportTest`; LilyPond 03e, 51a–d) | None |
 | Voice or part ID made only of, or containing, a no-break space | `INVALID_VALUE` at the voice / `INVALID_STRUCTURE` at `@id`; previously the model threw (`ComplianceAuditTest`) | None |
-| Undeclared part in the part list (LilyPond 41h) | Fatal `INVALID_STRUCTURE` under both policies, deliberately | Optional tolerant recovery is not planned |
+| Undeclared part in the part list (LilyPond 41h) | Fatal `INVALID_STRUCTURE` under both policies | Tolerant recovery is planned in MX-24 (#53); see MX-22 below |
 | Repeated `accidental` on a note (MusicXML 4.1 drafts, W3C `accidentals.musicxml`) | Fatal `INVALID_STRUCTURE`, correct for 4.0 | Revisit once 4.1 is published |
 | Non-score XML with a DOCTYPE (`catalog.xml`) | Fatal `UNSAFE_XML` | None |
 | Most frequent tolerant losses in the LilyPond suite: `time/@symbol` (S07; now kept as `TimeSymbol`), voices/backup/chords (S06), lyrics (S14), `part-group`/staves (S08), credits and part-name display (S03) | `UNSUPPORTED_FEATURE` with group and path (`PublicCorpusTest` summary); counts predate MX-09 and MX-14, which now import voices, chords, staves and lyrics, and have not been re-run | The owning domain tasks; strict parsing rejects 148 of 165 files until they land |
