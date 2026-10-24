@@ -20,7 +20,7 @@ notes.map { Triple(it.onset, it.voice, it.staff) } // exact quarter-note onsets 
 
 - Each measure starts its cursor at 0. A non-chord note starts at the cursor and advances it by
   its duration. Divisions apply to backup/forward durations exactly as to notes, including the
-  MX-21 recovery of missing divisions as 1 (`RECOVERED_VALUE`).
+  default of 1 for missing divisions (MX-24).
 - `backup` moves the cursor back and `forward` moves it ahead by `duration / divisions`. A forward
   gap is the absence of events, never a fake rest; its optional `voice`/`staff` are validated but
   not stored. A forward counts towards `Measure.extent`; a backup never does.

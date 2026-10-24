@@ -31,8 +31,13 @@ implies full MusicXML coverage, XSD validation or a renderable/playable score.
 - Exactly one nonempty `part-list` must precede the part bodies. Each `score-part` requires a
   nonblank, unique `id` and a `part-name` (empty text is allowed). The corresponding body must
   exist exactly once. Missing/blank/whitespace-bearing IDs, duplicate declarations or bodies,
-  unknown body references and declarations without bodies produce fatal `INVALID_STRUCTURE`
-  under **both** policies. No IDs are invented and no parts are merged or silently removed.
+  and declarations without bodies produce fatal `INVALID_STRUCTURE` under **both** policies. No
+  parts are merged or silently removed.
+- Since MX-24, a body whose ID the part-list does not declare (W3C 41h) is skipped as S01
+  `UNSUPPORTED_FEATURE` / `DISCARDED`: tolerant parsing keeps the listed parts with a warning,
+  strict parsing fails. When the part-list declares a single score-part, a first body without an
+  `id` (W3C 41g) is bound to it with `RECOVERED_VALUE`, a warning when tolerant and a failure when
+  strict; no other ID is inferred.
 - XML whitespace surrounding a part ID is normalized before lookup. Complete XSD ID lexical
   validation and document-wide checking of optional IDs are not implemented.
 - Neutral parts follow **part-list order**, even if the body order differs. Names, abbreviations

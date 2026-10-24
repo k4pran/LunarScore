@@ -133,18 +133,16 @@ class NoteImportTest {
     }
 
     @Test
-    fun testMissingDivisionsAssumesOneWhenTolerant() {
-        // Exporters omit divisions; the agreed default of 1 is assumed once per part (lilypond 03e).
+    fun testMissingDivisionsDefaultToOneUnderBothPolicies() {
+        // Exporters omit divisions; MusicXML 4.1 documents the agreed default of 1 (lilypond 03e).
         val noDivisions = "<score-partwise version='4.0'><part-list><score-part id='P1'><part-name>V</part-name></score-part>" +
             "</part-list><part id='P1'><measure number='1'><note><rest/><duration>1</duration></note>" +
             "<note><rest/><duration>2</duration></note></measure></part></score-partwise>"
-        val strict = failure(noDivisions, DiagnosticCode.RECOVERED_VALUE)
-        assertTrue(strict.diagnostics.single().location.path.orEmpty().endsWith("/note[1]/duration[1]"))
-        val tolerant = success(noDivisions, ParseOptions(ParsePolicy.TOLERANT))
-        val warning = tolerant.diagnostics.single()
-        assertEquals(DiagnosticCode.RECOVERED_VALUE to DiagnosticSeverity.WARNING, warning.code to warning.severity)
-        assertTrue(warning.location.path.orEmpty().endsWith("/note[1]/duration[1]"))
-        assertEquals(listOf(Rational.ONE, Rational.of(2)), events(tolerant).map { assertIs<RestEvent>(it).duration })
+        for (policy in ParsePolicy.entries) {
+            val result = success(noDivisions, ParseOptions(policy))
+            assertEquals(emptyList(), result.diagnostics, "$policy")
+            assertEquals(listOf(Rational.ONE, Rational.of(2)), events(result).map { assertIs<RestEvent>(it).duration })
+        }
     }
 
     @Test

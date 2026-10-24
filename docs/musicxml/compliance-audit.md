@@ -29,13 +29,12 @@ Files were downloaded to a temporary directory and not redistributed.
 | Corpus | Files | Strict | Tolerant |
 |---|---|---|---|
 | [Unofficial MusicXML test suite](https://gitlab.com/lilypond/lilypond/-/tree/master/input/regression/musicxml) (Reinhold Kainhofer, MIT), LilyPond `master` on 2026-10-23 | 165 | 14 accepted; 148 `UNSUPPORTED_FEATURE`; 3 `RECOVERED_VALUE` | 14 accepted; 150 accepted with warnings; 1 `INVALID_STRUCTURE` |
-| [W3C MusicXML test suite](https://github.com/w3c-cg/musicxmlTestSuite) (MIT), pinned `77c19f7`, run on 2026-10-24 after time symbols were kept | 182 + 1 `.mxl` | 75 accepted; 101 `UNSUPPORTED_FEATURE`; 4 `RECOVERED_VALUE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` | 75 accepted; 106 accepted with warnings; 2 `INVALID_STRUCTURE` (41g, 41h) |
+| [W3C MusicXML test suite](https://github.com/w3c-cg/musicxmlTestSuite) (MIT), pinned `77c19f7`, run on 2026-10-24 after MX-24 structure recovery | 182 + 1 `.mxl` | 79 accepted; 101 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` | 79 accepted; 104 accepted with warnings |
 | [W3C MusicXML repository](https://github.com/w3c/musicxml) `gh-pages`, `tests/files` (MusicXML 4.1 drafts) | 18 + `catalog.xml` | 18 `UNSUPPORTED_FEATURE`; `catalog.xml` `UNSAFE_XML` | 17 accepted with warnings; 1 `INVALID_STRUCTURE`; `catalog.xml` `UNSAFE_XML` |
 | W3C `docs/src/data/examples/musicxml` tutorials | 11 | 11 `UNSUPPORTED_FEATURE` | 11 accepted with warnings |
 
 No file threw and no failure lacked an error. Remaining tolerant rejections are intended:
 
-- `41h-TooManyParts.xml` declares a part that is not in the part list; `INVALID_STRUCTURE`, as the suite expects of a strict reader.
 - `accidentals.musicxml` repeats `<accidental>` on one note, which only MusicXML 4.1 allows; under 4.0 this is `INVALID_STRUCTURE` (recorded as a gap).
 - `catalog.xml` is an OASIS catalog with its own DOCTYPE, not a score.
 
@@ -62,19 +61,21 @@ It needs `curl`, `tar` and a POSIX shell (Git Bash on Windows). The report goes 
 contains `.invalid.` (41g, 74b, 75b) and 11b, whose `backup` moves before the start of its measure,
 are expected to be diagnosed: the run fails if either policy accepts one without a diagnostic.
 
-Results on 2026-10-24 at `fe69988`, 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
+Results on 2026-10-24 after MX-24 (#53), 183 files (182 `.musicxml` and `90a-Compressed-MusicXML.mxl`):
 
 | Policy | Outcome |
 |---|---|
-| Strict | 75 accepted; 101 `UNSUPPORTED_FEATURE`; 4 `RECOVERED_VALUE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` |
-| Tolerant | 75 accepted; 106 accepted with warnings; 2 `INVALID_STRUCTURE` (41g `.invalid`, 41h) |
+| Strict | 79 accepted; 101 `UNSUPPORTED_FEATURE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` |
+| Tolerant | 79 accepted; 104 accepted with warnings |
 
-No file threw, no failure lacked an error and every expected-diagnosed file was diagnosed. 41h is
-the only valid file the tolerant policy rejects (#53). 74b and 75b are diagnosed only because their
-`figured-bass` and `accordion-registration` content is discarded; the invalidity itself is not
-detected without XSD validation (#5).
+No file threw, no failure lacked an error and every expected-diagnosed file was diagnosed. The
+tolerant policy accepts every file: since MX-24, 41h's two parts missing from the part list are
+discarded (S01) and 41g's part without an `id` is bound to the only score-part (`RECOVERED_VALUE`).
+Missing `divisions` (03e, 51b, 51c) default to 1 under both policies, so those files are accepted
+cleanly. 74b and 75b are diagnosed only because their `figured-bass` and `accordion-registration`
+content is discarded; the invalidity itself is not detected without XSD validation (#5).
 
-Tolerant files discarding content, per group: S01 3, S03 21, S04 8, S07 17, S08 2, S09 9, S10 1,
+Tolerant files discarding content, per group: S01 4, S03 21, S04 8, S07 17, S08 2, S09 9, S10 1,
 S11 7, S12 17, S13 17, S14 6, S15 3, S16 1, S17 17, S22 10, S23 1, S24 7, S25 9, S26 1.
 
 Each file that is not accepted cleanly under both policies is listed below with the open MX issues
@@ -93,7 +94,6 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | `02d-Rests-Multimeasure-TimeSignatures.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1, S24 4 | #56, #64 |
 | `02f-Rests-Placement.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/rest/display-step` | warnings | S17 24 | #65 |
 | `03d-Rhythm-DottedDurations-Factors.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/measure-style/multiple-rest` | warnings | S24 8 | #64 |
-| `03e-Rhythm-No-Divisions.musicxml` | RECOVERED_VALUE `part/measure/note/duration` | warnings | none | #53; strict policy decided in #53 |
 | `03e-Rhythm-SecondaryBeamBreaks.musicxml` | UNSUPPORTED_FEATURE `part/measure/@width` | warnings | S01 1 | #57 |
 | `11b-TimeSignatures-NoTime.musicxml` | INVALID_CURSOR_MOVE `part/measure/backup` | warnings | S07 2 | #56; intended: backup before measure start |
 | `11c-TimeSignatures-Complex.musicxml` | UNSUPPORTED_FEATURE `part/measure/attributes/time` | warnings | S07 2 | #54 |
@@ -152,9 +152,9 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | `41d-StaffGroups-Nested.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 4 | #58 |
 | `41e-StaffGroups-InstrumentNames-Linebroken.musicxml` | accepted | accepted | none | #58  |
 | `41f-StaffGroups-Overlapping.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 4 | #58 |
-| `41g-PartNoId.invalid.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | rejected INVALID_STRUCTURE | S03 1 | #53, #56; intended: `.invalid`, part without `id` |
+| `41g-PartNoId.invalid.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56; intended: `.invalid`, part without `id` bound to the only score-part with a `RECOVERED_VALUE` warning (#53) |
 | `41g-StaffGroups-NestingOrder.musicxml` | UNSUPPORTED_FEATURE `part-list/part-group` | warnings | S25 14 | #58 |
-| `41h-TooManyParts.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | rejected INVALID_STRUCTURE | S03 1 | #53, #56, #58 |
+| `41h-TooManyParts.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S01 2, S03 1 | #56, #58; parts missing from the part list discarded (#53) |
 | `41i-PartNameDisplay-Override.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name-display` | warnings | S17 2 | #58 |
 | `41j-PartNameDisplay-Multiple-DisplayText-Children.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name-display` | warnings | S17 1 | #58 |
 | `41k-PartName-Print.musicxml` | UNSUPPORTED_FEATURE `part/measure/print/part-name-display` | warnings | S17 2 | #58 |
@@ -179,11 +179,8 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | `45k-Repeats-Chords-FiguredBass.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 8 | #52, #59 |
 | `46g-PickupMeasure-Chordnames-FiguredBass.musicxml` | UNSUPPORTED_FEATURE `part/measure/harmony` | warnings | S22 4 | #59 |
 | `46h-Barline-Fermata.musicxml` | UNSUPPORTED_FEATURE `part/measure/barline/fermata` | warnings | S15 3 | #60 |
-| `51a-Header-Credits.musicxml` | UNSUPPORTED_FEATURE `credit/credit-words/@default-x` | warnings | S03 40 | #53, #57 |
-| `51b-Header-Quotes.musicxml` | RECOVERED_VALUE `part/measure/note/duration` | warnings | none | #53; strict policy decided in #53 |
-| `51c-MultipleMetadata.musicxml` | RECOVERED_VALUE `part/measure/note/duration` | warnings | none | #53; strict policy decided in #53 |
-| `51c-MultipleRights.musicxml` | RECOVERED_VALUE `part/measure/note/duration` | warnings | none | #53; strict policy decided in #53 |
-| `51d-EmptyTitle.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #53 |
+| `51a-Header-Credits.musicxml` | UNSUPPORTED_FEATURE `credit/credit-words/@default-x` | warnings | S03 40 | #57 |
+| `51d-EmptyTitle.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56 |
 | `52a-PageLayout.musicxml` | UNSUPPORTED_FEATURE `defaults/music-font` | warnings | S01 5, S03 7, S13 4, S17 2, S26 2 | #57, #68 |
 | `52b-Breaks.musicxml` | UNSUPPORTED_FEATURE `part-list/score-part/part-name/@print-object` | warnings | S03 1 | #56 |
 | `61h-Lyrics-BeamsMelismata.musicxml` | UNSUPPORTED_FEATURE `part/measure/note/lyric/extend/@color` | warnings | S14 1 | #57 |
@@ -213,7 +210,7 @@ are kept as regressions. Re-run the command after each tracked issue lands and u
 | Finding | Before | After |
 |---|---|---|
 | Every exporter-written file starts with the standard `<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML x.y Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">` header | All 165 LilyPond files and 11 of the 29 W3C files failed with `UNSAFE_XML` | The exact Recordare public header (any version, partwise or timewise consistently, optional XML declaration first, no internal subset) is blanked before the reader and never resolved. Any other DOCTYPE, a second header, an internal subset, another host, a declaration after a comment or inside content stays `UNSAFE_XML`; entity references remain `MALFORMED_XML`. Line numbers are kept. |
-| Exporters omit `divisions` (LilyPond 03e, 41h, 51a–d); the suite notes the agreed default is 1 | Fatal `INVALID_STRUCTURE` under both policies | `RECOVERED_VALUE` at the first duration or offset, once per part, with divisions 1: a warning when tolerant, a failure when strict. |
+| Exporters omit `divisions` (LilyPond 03e, 41h, 51a–d); the suite notes the agreed default is 1 | Fatal `INVALID_STRUCTURE` under both policies | Divisions 1, MusicXML 4.1's documented default, under both policies without a diagnostic (MX-24; first a `RECOVERED_VALUE` that strict parsing rejected). |
 | A voice of only a no-break space (U+00A0) passed the XML-whitespace check | The model constructor threw `IllegalArgumentException` | `INVALID_VALUE` at the voice, on notes and directions |
 | A part ID of, or containing, a no-break space | The model constructor threw | `INVALID_STRUCTURE` at `@id` |
 

@@ -95,6 +95,17 @@ class TimewiseImportTest {
     }
 
     @Test
+    fun testUnlistedTimewisePartsAreDiscardedWhenTolerant() {
+        val xml = timewise("<measure number='1'><part id='P1'/><part id='P3'/><part id='P2'/></measure>")
+        failure(xml, DiagnosticCode.UNSUPPORTED_FEATURE)
+        val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
+        assertEquals(listOf("P1", "P2"), result.value.parts.map { it.id })
+        val warning = result.diagnostics.single()
+        assertEquals(UnsupportedContent("S01", ContentRetention.DISCARDED), warning.unsupported)
+        assertEquals("/score-timewise[1]/measure[1]/part[2]" to "P3", warning.location.path to warning.location.partId)
+    }
+
+    @Test
     fun testUnmappedTimewiseContentIsReportedWithPartContext() {
         val xml = timewise(
             "<part id='P1'/><measure number='1' width='90'><direction/><part id='P1' extra='x'/><part id='P2'/></measure>",

@@ -32,13 +32,58 @@ class W3cSuiteImportTest {
             val score = assertIs<ParseResult.Success<Score>>(tolerant, "${fixture.file}: ${tolerant.diagnostics}").value
             assertTrue(score.validate().isEmpty(), fixture.file)
             val strict = parseMusicXml(fixture.xml.encodeToByteArray(), ParseOptions(ParsePolicy.STRICT), fixture.file)
-            if (fixture.file in RECOVERED_STRICT_FAILURES) {
-                val failure = assertIs<ParseResult.Failure>(strict, fixture.file)
-                assertEquals(DiagnosticCode.RECOVERED_VALUE, failure.diagnostics.first { it.severity == DiagnosticSeverity.ERROR }.code)
-            } else {
-                assertIs<ParseResult.Success<Score>>(strict, "${fixture.file}: ${strict.diagnostics}")
-                assertTrue(strict.diagnostics.isEmpty(), "${fixture.file}: ${strict.diagnostics}")
-            }
+            assertIs<ParseResult.Success<Score>>(strict, "${fixture.file}: ${strict.diagnostics}")
+            assertTrue(strict.diagnostics.isEmpty(), "${fixture.file}: ${strict.diagnostics}")
+        }
+    }
+
+    // F04, 03e: "No <divisions> element. The generally agreed default value is 1, and MusicXML version
+    // 4.1 will mention this explicitly. This test holds a single whole note."
+    @Test
+    fun testF04MissingDivisionsDefaultToOne() {
+        val note = notes(part(w3c03eRhythmNoDivisions)).single()
+        assertEquals(NoteValue.WHOLE, note.notation.value)
+        assertEquals(Rational.of(4), note.duration)
+    }
+
+    // F02, 41h: "This piece has two more <part> elements than the <part-list> section contains. One can
+    // either convert all the parts present but not listed in the part list, or simply not import or
+    // ignore them." Tolerant parsing ignores them with a diagnostic each; strict parsing rejects the loss.
+    @Test
+    fun testF02PartsMissingFromThePartListAreDiscardedWhenTolerant() {
+        val tolerant = parseMusicXml(w3c41hTooManyParts.encodeToByteArray(), ParseOptions(ParsePolicy.TOLERANT))
+        val score = assertIs<ParseResult.Success<Score>>(tolerant, tolerant.diagnostics.toString()).value
+        assertEquals(listOf("P1"), score.parts.map { it.id })
+        assertEquals(Rational.of(4), score.parts.single().measures.single().extent)
+        val discarded = tolerant.diagnostics.filter { it.unsupported?.featureId == "S01" }
+        assertEquals(listOf("P3", "P4"), discarded.map { it.location.partId })
+        assertTrue(discarded.all { it.unsupported?.retention == ContentRetention.DISCARDED })
+        val strict = assertIs<ParseResult.Failure>(parseMusicXml(w3c41hTooManyParts.encodeToByteArray(), ParseOptions(ParsePolicy.STRICT)))
+        assertTrue(strict.diagnostics.filter { it.code == DiagnosticCode.UNSUPPORTED_FEATURE }.map { it.location.partId }.containsAll(listOf("P3", "P4")))
+    }
+
+    // F02, 41g (.invalid): "A part with no id attribute. Since this piece has only one part, it is clear
+    // which part is described by the one part element." Tolerant parsing binds it with a warning.
+    @Test
+    fun testF02PartWithoutIdBindsToTheOnlyScorePartWhenTolerant() {
+        val tolerant = parseMusicXml(w3c41gPartNoId.encodeToByteArray(), ParseOptions(ParsePolicy.TOLERANT))
+        val score = assertIs<ParseResult.Success<Score>>(tolerant, tolerant.diagnostics.toString()).value
+        assertEquals("P1", score.parts.single().id)
+        assertEquals(Rational.of(4), assertIs<RestEvent>(score.parts.single().measures.single().events.single()).duration)
+        val recovered = tolerant.diagnostics.single { it.code == DiagnosticCode.RECOVERED_VALUE }
+        assertEquals(DiagnosticSeverity.WARNING to "P1", recovered.severity to recovered.location.partId)
+        val strict = assertIs<ParseResult.Failure>(parseMusicXml(w3c41gPartNoId.encodeToByteArray(), ParseOptions(ParsePolicy.STRICT)))
+        assertTrue(strict.diagnostics.any { it.code == DiagnosticCode.RECOVERED_VALUE && it.severity == DiagnosticSeverity.ERROR })
+    }
+
+    @Test
+    fun testStructureRecoveryFixturesStayDiagnosed() {
+        w3cStructureRecoveryFixtures.forEach { fixture ->
+            val tolerant = parseMusicXml(fixture.xml.encodeToByteArray(), ParseOptions(ParsePolicy.TOLERANT), fixture.file)
+            val score = assertIs<ParseResult.Success<Score>>(tolerant, "${fixture.file}: ${tolerant.diagnostics}").value
+            assertTrue(score.validate().isEmpty(), fixture.file)
+            assertTrue(tolerant.diagnostics.isNotEmpty(), fixture.file)
+            assertIs<ParseResult.Failure>(parseMusicXml(fixture.xml.encodeToByteArray(), ParseOptions(ParsePolicy.STRICT), fixture.file))
         }
     }
 
@@ -186,9 +231,4 @@ class W3cSuiteImportTest {
     private fun part(xml: String): Part = score(xml).parts.single()
 
     private fun notes(part: Part): List<NoteEvent> = part.measures.flatMap { it.events }.filterIsInstance<NoteEvent>()
-
-    private companion object {
-        /** Files without `divisions`: 1 is recovered (MusicXML 4.1's default), which strict parsing rejects (MX-24). */
-        val RECOVERED_STRICT_FAILURES = setOf("51b-Header-Quotes.musicxml")
-    }
 }
