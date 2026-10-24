@@ -57,7 +57,7 @@ coverage group shown at the path given.
 | `ending/@system` | S15 discarded attribute; the ending is kept | F21 |
 | `harmony/@system` | S22 discarded with `harmony` | F21 |
 | `release/@offset`, `bend/@shape` | S12 discarded with `technical` | F21 |
-| `metronome/@print-object` | S13 discarded attribute; the mark is kept, so a hidden metronome would be imported as visible | F21 |
+| `metronome/@print-object` | `DirectionMark.Metronome.visible` since MX-27 | F21 |
 | `staff-size/@scaling` | S17 discarded with `staff-size` | F21 |
 | `@smufl` on `effect`, `membrane`, `metal`, `timpani`, `wood` | S13 discarded with `percussion` | F21 (`membrane`) |
 | `wavy-line/@smufl` | S12 discarded with `wavy-line` | F21 |

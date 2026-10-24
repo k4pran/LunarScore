@@ -48,7 +48,7 @@ measure, as partwise MusicXML repeats it in each part. Timewise padding measures
 | `print` `measure-numbering`, `part-name-display`, `part-abbreviation-display`; `staff-spacing` and `id` attributes | S17 `DISCARDED`; the rest of the print is kept |
 | A second or later `print` in one measure | S17 `DISCARDED`; the first is kept |
 | Position and colour of stems, beams, accidentals, articulations, ornaments, barlines, endings, other direction types and other elements; font, justification and enclosure attributes everywhere | Feature-specific `DISCARDED` as before (S10, S12, S13, S15, S17 …) |
-| Note `print-object`, `print-dot`, `print-spacing`, `print-leger`; `rest` display position; `notehead`; `staff-details` display content | S04 / S17 `DISCARDED` |
+| `rest` display position; `notehead`; `staff-details` display content | S17 `DISCARDED`. Note `print-object`, `print-dot`, `print-spacing` and `print-leger` are kept as `NoteVisibility` since [MX-27](note-import.md#visibility-and-print-attributes-mx-27) |
 | Invalid decimal, colour, margin type, `new-system`/`new-page`, non-positive `blank-page`, staff-layout `number`, scaling or page size | Fatal `INVALID_VALUE` |
 | Scaling missing a value, page height without width, duplicate or conflicting page margins, incomplete page or system margins, duplicate singleton children | Fatal `INVALID_STRUCTURE` |
 

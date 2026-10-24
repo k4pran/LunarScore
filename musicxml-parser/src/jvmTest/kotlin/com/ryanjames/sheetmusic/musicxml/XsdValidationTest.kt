@@ -20,8 +20,8 @@ class XsdValidationTest {
 
     @Test
     fun testIndependentSuiteFixturesAreSchemaValid() {
-        assertEquals(27, w3cSuiteFixtures.size)
-        w3cSuiteFixtures.forEach { fixture ->
+        assertEquals(30, w3cSuiteFixtures.size)
+        (w3cSuiteFixtures + w3cPartialVisibilityFixtures).forEach { fixture ->
             assertEquals(emptyList(), MusicXmlSchema.validate(fixture.xml), fixture.file)
         }
     }

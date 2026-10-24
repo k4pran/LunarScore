@@ -53,12 +53,14 @@ public sealed interface DirectionMark {
     /**
      * A printed metronome mark: [beatUnit] with [beatUnitDots] equals [perMinute], which is kept as
      * text because it may be a range or approximation such as "c. 120". Playback tempo is separate.
+     * [visible] is false for a mark that is not printed.
      */
     public data class Metronome(
         val beatUnit: NoteValue,
         val perMinute: String,
         val beatUnitDots: Int = 0,
         override val visual: VisualHints? = null,
+        val visible: Boolean = true,
     ) : DirectionMark {
         init {
             require(beatUnitDots >= 0)

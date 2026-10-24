@@ -39,6 +39,24 @@ internal val w3cSuiteFixtures: List<W3cSuiteFixture> by lazy {
         W3cSuiteFixture("13c-KeySignatures-NonTraditional.musicxml", "F07", w3c13cKeySignaturesNonTraditional),
         W3cSuiteFixture("13d-KeySignatures-Microtones.musicxml", "F07", w3c13dKeySignaturesMicrotones),
         W3cSuiteFixture("13e-KeySignatures-Cancel.musicxml", "F07", w3c13eKeySignaturesCancel),
+        // MX-27 visibility and print attributes, embedded in W3cVisibilityFixtures.kt.
+        W3cSuiteFixture("01e-Pitches-ParenthesizedAccidentals.musicxml", "F03", w3c01ePitchesParenthesizedAccidentals),
+        W3cSuiteFixture("13f-KeySignatures-Visible.musicxml", "F07", w3c13fKeySignaturesVisible),
+        W3cSuiteFixture("34d-Note-Attributes.musicxml", "F18", w3c34dNoteAttributes),
+    )
+}
+
+/**
+ * MX-27 files whose visibility content is imported but which also hold content tracked by other
+ * issues (spanner kinds, slash and multiple-rest styles, 11b's backup before the measure start), so
+ * they are not accepted cleanly and are kept out of [w3cSuiteFixtures]. They are schema-valid.
+ */
+internal val w3cPartialVisibilityFixtures: List<W3cSuiteFixture> by lazy {
+    listOf(
+        W3cSuiteFixture("34a-Print-Object-Spanners.musicxml", "F18", w3c34aPrintObjectSpanners),
+        W3cSuiteFixture("22b-Staff-Notestyles.musicxml", "F26", w3c22bStaffNotestyles),
+        W3cSuiteFixture("11b-TimeSignatures-NoTime.musicxml", "F07", w3c11bTimeSignaturesNoTime),
+        W3cSuiteFixture("02d-Rests-Multimeasure-TimeSignatures.musicxml", "F26", w3c02dRestsMultimeasureTimeSignatures),
     )
 }
 

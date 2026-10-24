@@ -5,7 +5,8 @@ package com.ryanjames.sheetmusic.score
  * means the source did not number it, which is not assumed to be verse 1. [name] is an optional
  * label such as "chorus". [syllables] are in source order; more than one means they are joined by
  * elisions. A melisma continuation has no syllables and only an [extend]. [placement] is
- * presentation only.
+ * presentation only. [printObject] overrides whether this line is printed; null follows the note's
+ * [NoteVisibility.lyricsPrinted].
  */
 public data class Lyric(
     val syllables: List<LyricSyllable>,
@@ -13,6 +14,7 @@ public data class Lyric(
     val name: String? = null,
     val extend: LyricExtend? = null,
     val placement: Placement? = null,
+    val printObject: Boolean? = null,
 ) {
     init {
         require(verse == null || verse.isNotBlank())

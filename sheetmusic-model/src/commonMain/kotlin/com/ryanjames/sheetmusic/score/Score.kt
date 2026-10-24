@@ -15,6 +15,8 @@ public data class Score(
 /**
  * Ordered measures and staff/instrument definitions; IDs are stable, not display names. [endings]
  * are resolved ending brackets in start order; see [playbackOrder] for derived navigation.
+ * [nameVisible] and [abbreviationVisible] are false when the [name] or [abbreviation] is kept but
+ * not printed.
  */
 public data class Part(
     val id: String,
@@ -25,6 +27,8 @@ public data class Part(
     val abbreviation: String? = null,
     val metadata: List<MetadataEntry.Text> = emptyList(),
     val endings: List<Ending> = emptyList(),
+    val nameVisible: Boolean = true,
+    val abbreviationVisible: Boolean = true,
 ) {
     init {
         require(id.isNotBlank())

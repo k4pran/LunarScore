@@ -3,6 +3,8 @@ package com.ryanjames.sheetmusic.musicxml
 import com.ryanjames.sheetmusic.score.Attribute
 import com.ryanjames.sheetmusic.score.AttributeEvent
 import com.ryanjames.sheetmusic.score.ClefSign
+import com.ryanjames.sheetmusic.score.DirectionEvent
+import com.ryanjames.sheetmusic.score.DirectionMark
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.NoteEvent
 import com.ryanjames.sheetmusic.score.RelationshipKind
@@ -10,6 +12,7 @@ import com.ryanjames.sheetmusic.score.Score
 import com.ryanjames.sheetmusic.score.validate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -38,7 +41,6 @@ class VersionFourImportTest {
                 "S26" to "$measure/listening[1]",
                 "S26" to "$measure/sound[1]",
                 "S13" to "$measure/direction[1]/@system",
-                "S13" to "$measure/direction[1]/direction-type[1]/metronome[1]/@print-object",
                 "S13" to "$measure/direction[1]/direction-type[2]/words[1]/@enclosure",
                 "S13" to "$measure/direction[1]/direction-type[3]/pedal[1]",
                 "S13" to "$measure/direction[1]/direction-type[4]/pedal[1]",
@@ -74,6 +76,9 @@ class VersionFourImportTest {
         val clef = assertIs<Attribute.Clef>(events.filterIsInstance<AttributeEvent>().first().attribute)
         assertEquals(ClefSign.NONE, clef.sign)
         assertNull(clef.line)
+        // A hidden metronome mark is kept and marked not visible.
+        val metronome = events.filterIsInstance<DirectionEvent>().flatMap { it.marks }.filterIsInstance<DirectionMark.Metronome>().single()
+        assertFalse(metronome.visible)
         // A note with several instruments keeps its first; a slur may use the 4.0 maximum number-level 16.
         val notes = events.filterIsInstance<NoteEvent>()
         assertEquals(listOf("P1-I1", "P1-I1"), notes.map { it.instrumentId })
@@ -85,7 +90,7 @@ class VersionFourImportTest {
     @Test
     fun testF21AdditionsFailUnderStrictPolicy() {
         val result = assertIs<ParseResult.Failure>(parseMusicXml(f21VersionFourAdditions.encodeToByteArray()))
-        assertEquals(31, result.diagnostics.size)
+        assertEquals(30, result.diagnostics.size)
         assertTrue(result.diagnostics.all { it.code == DiagnosticCode.UNSUPPORTED_FEATURE && it.severity == DiagnosticSeverity.ERROR })
     }
 
