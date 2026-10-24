@@ -12,12 +12,25 @@ Audit date: 2026-10-23. Scope: the `musicxml-parser` score importer after MX-10�
 | `ComplianceAuditTest` (`AuditCorpus.kt`) | Every executable fixture (F01–F19, F21, the F12 pair, the F21 concert-score subset and the six mixed-feature fixtures) imports under both policies. Deterministic mutants of each fixture: every non-blank text node and attribute value replaced by boundary values (empty, blanks, no-break space, zero, negative, `Int` overflow, exponent, `NaN`, 17, enumeration words), every element removed, duplicated and swapped with its sibling, a foreign-namespace element inserted in every element, and a truncation every 7 characters. Each outcome must be well formed: no exception escapes, a failure carries an error, a strict success carries no findings, every unsupported finding names an S01–S27 group or `foreign-extension`, and a successful score passes model `validate()`, `effectiveStates()` and `playbackOrder()`. Every truncation fails, every foreign element produces a diagnostic, each resource budget fails with its typed code and cancellation at every check fails with `CANCELLED`. | Common: JVM, Android host; iOS compiled |
 | `MixedFeatureImportTest` (`MixedFeatureFixtures.kt`) | Test-plan pairs: divisions change + backup, tied chord + changing staff, grace + lyric, mid-measure transposition + divisions change, timewise + two staves (equal to its partwise twin). Repeat ending + pickup is F16. Supported content keeps exact timing, links and sounding pitch; the other feature gets exactly the expected `UNSUPPORTED_FEATURE` paths, and strict parsing rejects it. Since MX-09 the backup, tied-chord and two-staff pairs import fully with no diagnostics. | Common |
 | `ScoreXmlReaderTest`, `NoteImportTest`, `DirectionImportTest` regressions | Standard DOCTYPE header, missing divisions (see below). | Common |
-| `PublicCorpusTest` | Opt-in. With `MUSICXML_CORPUS_DIR` set, parses every `.xml`/`.musicxml` file under both policies, fails on an escaped exception or an error-free failure, and prints per-file outcomes, the first error, and per-feature unsupported counts. Corpus files are not committed. | JVM only |
+| `PublicCorpusTest` | Opt-in. With `MUSICXML_CORPUS_DIR` set, parses every `.xml`/`.musicxml`/`.mxl` file under both policies, fails on an escaped exception or an error-free failure, and prints per-file outcomes, the first error, and per-feature unsupported counts. Corpus files are not committed. | JVM only |
 
-Run the corpus with, for example:
+Run the pinned [W3C MusicXML test suite](https://github.com/w3c-cg/musicxmlTestSuite) with:
 
 ```bash
-MUSICXML_CORPUS_DIR=/path/to/musicxml ./gradlew :musicxml-parser:jvmTest --tests '*PublicCorpusTest*' --rerun -i
+scripts/run-w3c-suite.sh
+```
+
+The script shallow-fetches the suite at the pinned commit (or the revision given as its first
+argument, such as `main`) into a temporary directory, runs `PublicCorpusTest`, writes a per-file
+report to `build/w3c-suite/report.tsv` (strict and tolerant outcome, first error and discarded
+feature groups per file) and deletes the download. Set `W3C_SUITE_REPORT` to change the report
+path and `W3C_SUITE_KEEP=1` to keep the files. It needs git, bash (Git Bash on Windows) and a JDK.
+Progress against the suite is tracked in [MX-22](https://github.com/k4pran/LunarScore/issues/51).
+
+Run any other corpus directly with, for example:
+
+```bash
+MUSICXML_CORPUS_DIR=/path/to/musicxml MUSICXML_CORPUS_REPORT=/path/to/report.tsv ./gradlew :musicxml-parser:jvmTest --tests '*PublicCorpusTest*' --rerun -i
 ```
 
 ## Public corpus results
@@ -27,6 +40,7 @@ Files were downloaded to a temporary directory and not redistributed.
 | Corpus | Files | Strict | Tolerant |
 |---|---|---|---|
 | [Unofficial MusicXML test suite](https://gitlab.com/lilypond/lilypond/-/tree/master/input/regression/musicxml) (Reinhold Kainhofer, MIT), LilyPond `master` on 2026-10-23 | 165 | 14 accepted; 148 `UNSUPPORTED_FEATURE`; 3 `RECOVERED_VALUE` | 14 accepted; 150 accepted with warnings; 1 `INVALID_STRUCTURE` |
+| [W3C MusicXML test suite](https://github.com/w3c-cg/musicxmlTestSuite) (MIT), pinned `77c19f7`, run on 2026-10-24 after time symbols were kept | 182 + 1 `.mxl` | 75 accepted; 101 `UNSUPPORTED_FEATURE`; 4 `RECOVERED_VALUE`; 2 `UNMATCHED_SPAN`; 1 `INVALID_CURSOR_MOVE` | 75 accepted; 106 accepted with warnings; 2 `INVALID_STRUCTURE` (41g, 41h) |
 | [W3C MusicXML repository](https://github.com/w3c/musicxml) `gh-pages`, `tests/files` (MusicXML 4.1 drafts) | 18 + `catalog.xml` | 18 `UNSUPPORTED_FEATURE`; `catalog.xml` `UNSAFE_XML` | 17 accepted with warnings; 1 `INVALID_STRUCTURE`; `catalog.xml` `UNSAFE_XML` |
 | W3C `docs/src/data/examples/musicxml` tutorials | 11 | 11 `UNSUPPORTED_FEATURE` | 11 accepted with warnings |
 
