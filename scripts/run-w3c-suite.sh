@@ -33,7 +33,7 @@ status=0
 MUSICXML_CORPUS_DIR=$suite \
 MUSICXML_CORPUS_REPORT=$report \
 MUSICXML_CORPUS_LABEL="W3C musicxmlTestSuite $revision" \
-    ./gradlew :musicxml-parser:jvmTest --tests '*PublicCorpusTest*' --rerun -i > "$download/gradle.log" 2>&1 ||
+    sh ./gradlew :musicxml-parser:jvmTest --tests '*PublicCorpusTest*' --rerun -i > "$download/gradle.log" 2>&1 ||
     status=$?
 grep 'CORPUS SUMMARY' "$download/gradle.log" || true
 if [ "$status" -ne 0 ]; then
