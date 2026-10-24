@@ -17,6 +17,11 @@ report=${W3C_SUITE_REPORT:-$root/musicxml-parser/build/reports/w3c-suite/$revisi
 download=$(mktemp -d)
 trap 'rm -rf "$download"' EXIT INT TERM
 
+# Gradle runs on the JVM, which needs native paths on Windows.
+native_path() {
+    if command -v cygpath > /dev/null; then cygpath -w "$1"; else echo "$1"; fi
+}
+
 echo "Downloading musicxmlTestSuite $revision"
 curl -fsSL -o "$download/suite.tar.gz" \
     "https://github.com/w3c-cg/musicxmlTestSuite/archive/$revision.tar.gz"
@@ -30,8 +35,8 @@ fi
 
 cd "$root"
 status=0
-MUSICXML_CORPUS_DIR=$suite \
-MUSICXML_CORPUS_REPORT=$report \
+MUSICXML_CORPUS_DIR=$(native_path "$suite") \
+MUSICXML_CORPUS_REPORT=$(native_path "$report") \
 MUSICXML_CORPUS_LABEL="W3C musicxmlTestSuite $revision" \
     sh ./gradlew :musicxml-parser:jvmTest --tests '*PublicCorpusTest*' --rerun -i > "$download/gradle.log" 2>&1 ||
     status=$?
