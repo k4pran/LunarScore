@@ -79,3 +79,17 @@ the old parent branch, which nothing merges any more.
 its parent merges. Check with `git merge-base --is-ancestor origin/<branch> origin/master` before
 closing an issue. The three branches were ported onto MX-21 as `lunar-score-10-…`, `-15-…` and
 `-20-…`.
+
+## Repeats nested inside endings lose the enclosing repeat (issue #52)
+
+**Symptom**: W3C suite 45i (a repeat inside a first ending) and 45e (a second ending that starts
+a repeat) unfolded in the wrong order: the ending's backward repeat targeted the nested repeat,
+or the second ending was skipped.
+
+**Cause**: `Part.playbackOrder()` tracked a single repeat start and pass, so a forward repeat
+inside an ending replaced the section the ending belongs to and reset its pass before the
+ending's pass was checked.
+
+**Fix**: Keep a stack of sections. A forward repeat inside an ending pushes a nested section that
+is popped when it completes, and an ending is checked against the enclosing section's pass. See
+[playback navigation](musicxml/barline-import.md#playback-navigation).

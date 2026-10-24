@@ -79,7 +79,8 @@ S11 7, S12 17, S13 17, S14 6, S15 3, S16 1, S17 17, S22 10, S23 1, S24 7, S25 9,
 
 Each file that is not accepted cleanly under both policies is listed below with the open MX issues
 whose fixture list or scope covers its losses; the strict column shows only the first error. 45a–45k
-are listed because their playback order is tracked by #52 even when they import cleanly. The other
+are listed because their playback order was tracked by #52 even when they import cleanly; since
+MX-23 all of them unfold as their descriptions state. The other
 accepted files are omitted. Strict rejections marked intended are correct for strict parsing and
 are kept as regressions. Re-run the command after each tracked issue lands and update this table.
 

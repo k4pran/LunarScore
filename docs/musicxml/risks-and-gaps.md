@@ -157,7 +157,7 @@ diagnostic.
 | Missing `divisions` (03e, 51b, 51c) | `RECOVERED_VALUE`, which rejects strict parsing | Strict policy decided in MX-24 (#53) |
 | 33i unended tie, 45f ending stop without start | `UNMATCHED_SPAN`; strict rejection is intended | Kept as regressions in MX-38 (#67) and MX-23 (#52) |
 | 101 strict `UNSUPPORTED_FEATURE` rejections | Each file is linked to its open MX-23–MX-39 issues in the audit table | Re-run after each issue lands until every valid file imports without discarded content |
-| Playback order of 45e, 45i | Imported cleanly; order differs from the suite description, which no diagnostic reports | MX-23 (#52) |
+| Playback order of 45e, 45i | Fixed in MX-23 (#52): orders match the suite descriptions; 45a–45d, 45j and 45k unchanged | None |
 | Semantic oracle | The runner checks structured outcomes and `playbackOrder()` only, not musical correctness | Independent expectations in MX-04 (#5) and each tracked issue |
 
 ## MX-21 compliance audit decisions and remaining gaps
@@ -238,9 +238,9 @@ See [barline-import.md](barline-import.md).
 | Backward repeat without forward repeat; consecutive backward repeats | Returns to the measure after the previous completed repeat, or the first measure (the pickup is replayed) | Engraving conventions differ; no alternative policy is offered |
 | Orphan ending stop; stop whose numbers differ from the open ending | `UNMATCHED_SPAN` at the `ending`; the mark stays on its barline and no `Ending` is created | None |
 | Ending never stopped; nested ending start | `UNMATCHED_SPAN`; `Ending` kept with a null stop (model `MISSING_ENDPOINT`, playback `OPEN_ENDING` covering only its start measure) | None |
-| Ending without numbers | Kept with empty numbers; playback `UNNUMBERED_ENDING`, played on every pass | Text-only endings for D.S./D.C. passes |
+| Ending without numbers | Kept with empty numbers; playback `UNNUMBERED_ENDING`, numbered by position: the pass after the highest number of the earlier endings in its group (MX-23, suite 45e) | Text-only endings for D.S./D.C. passes |
 | Forward repeat not on a left barline, backward repeat not on a right barline, repeat on a middle barline | Kept as notated; playback `MISPLACED_REPEAT`, ignored | None |
-| Nested repeat sections | Not standard notation: the inner repeat completes its section, so an outer backward repeat returns to the measure after it | Explicit nested-repeat policy if real files need it |
+| Nested repeat sections | Outside endings, not standard notation: the inner repeat completes its section, so an outer backward repeat returns to the measure after it. Inside an ending (MX-23, suite 45i), a forward repeat starts a nested section and the enclosing section resumes when it completes | Explicit nested-repeat policy outside endings if real files need it |
 | Very large `times` | Playback truncated at `maxMeasures` with `LENGTH_LIMIT` | None |
 | Segno, coda, fermata and wavy-line on barlines; barline `segno`/`coda`/`divisions`/`id`; `after-jump`, `winged`; ending display attributes | S15 `DISCARDED`; repeat/ending kept | Da capo, dal segno, coda and fine navigation (MX-20/MX-21 playback) |
 | Middle barline after `backup`/`forward` | At the cursor after the move (MX-09) | None |
