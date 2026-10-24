@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F05 source, authored from the MusicXML 4.0 backup/forward references. Expected XSD
- * result: valid (not validated by these tests). Divisions 2. Measure 1: voice 1 has two halves at
+ * result: valid (checked by `XsdValidationTest`). Divisions 2. Measure 1: voice 1 has two halves at
  * 0 and 2; a backup returns to 0 for a voice-2 quarter at 0, then a forward leaves a voice-2 gap
  * from 1 to 2 before a half at 2. Measure 2: a voice-1 whole rest, then voice 2 starts after a
  * forward of three quarters.
@@ -36,7 +36,7 @@ internal val f05BackupAndForward: String = """
 
 /**
  * Original F06 source, authored from the MusicXML 4.0 chord reference. Expected XSD result: valid
- * (not validated by these tests). A two-staff part with divisions 2: a C4 half reference note at 0
+ * (checked by `XsdValidationTest`). A two-staff part with divisions 2: a C4 half reference note at 0
  * on staff 1, a shorter E4 quarter and an equal G4 half chord tone, and a cross-staff C3 half chord
  * tone on staff 2. The following D4 starts at 2, the end of the reference note.
  */
@@ -62,7 +62,7 @@ internal val f06ChordsAndCrossStaff: String = """
 """.trimIndent()
 
 /**
- * Original F08 source. Expected XSD result: valid (not validated by these tests). A one-staff
+ * Original F08 source. Expected XSD result: valid (checked by `XsdValidationTest`). A one-staff
  * flute and a two-staff piano with different measure content. The piano's unnumbered key and time
  * apply to both staves, declared later in the same attributes element; its clefs are numbered.
  * Piano staff 1 (voice 1) and staff 2 (voice 5) both start at 0 via backup.

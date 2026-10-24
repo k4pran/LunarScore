@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F07 source, authored for this repository from the MusicXML 4.0 attributes reference.
- * Expected XSD result: valid (not validated by these tests). Divisions=2. Measure 1 starts in
+ * Expected XSD result: valid (checked by `XsdValidationTest`). Divisions=2. Measure 1 starts in
  * C major, 4/4, treble clef; at offset 2 it changes to G major, 2/4 and bass clef. The F3 sounding
  * sharp from the key has alter 1 and no printed accidental; the next F3 is natural with a printed
  * natural. Measure 2 inherits that state and ends with a treble clef at its end offset, which

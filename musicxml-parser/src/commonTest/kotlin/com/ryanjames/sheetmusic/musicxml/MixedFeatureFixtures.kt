@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original MX-21 mixed-feature pairs from the test plan, authored for this repository from the
- * MusicXML 4.0 reference. Expected XSD result: valid (not validated by these tests). Each pair
+ * MusicXML 4.0 reference. Expected XSD result: valid (checked by `XsdValidationTest`). Each pair
  * combines a supported feature with another feature, supported or not, to check that one does not
  * corrupt the other. The repeat ending + pickup pair is F16 itself.
  */

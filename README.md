@@ -224,7 +224,13 @@ The JVM rendering test writes PNGs to `sheetmusic-compose/build/render/` so you 
     before it creates the scene. `karma.config.d/` serves the Compose resources and raises Mocha's
     2 s timeout.
 
-## Font licence
+## Licence
+
+LunarScore is free and open source under the [MIT License](LICENSE). Bundled third-party material
+(the Bravura font, and the MusicXML schemas and W3C test-suite files used only in tests) keeps its own
+licence; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+### Font licence
 
 Bravura is © Steinberg Media Technologies GmbH and licensed under the SIL Open Font License 1.1. The
 licence is distributed with the font in the library's resources:

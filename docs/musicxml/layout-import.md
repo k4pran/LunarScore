@@ -61,4 +61,4 @@ staff distance; a forced page break after one blank page with a page number; a n
 crescendo wedge with an alpha colour. `LayoutImportTest` covers F18, omitted defaults and print,
 `concert-score`-only defaults, positions of metronome marks and note/direction dynamics, discarded
 content under both policies, and invalid values and structure. All fixtures are
-implementation-authored and not XSD-validated.
+implementation-authored; F18 is validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)).

@@ -42,28 +42,34 @@ corpus or offline XSD harness. See [reader policy and target evidence](xml-reade
 MX-06 adds original F02 XML in `PartwiseFixtures.kt` and 18 `MusicXmlParserTest` assertions for
 metadata, part-list order versus body order, measures, source mappings, broken IDs/references,
 missing part-list, unsupported content and security/resource finalization. These are implementation-
-authored common tests, not the independent MX-04 corpus; F02 is intended schema-valid but has not
-been XSD-validated. See [mapping, limits and target evidence](partwise-import.md).
+authored common tests, not the independent MX-04 corpus; F02 is schema-valid
+(`XsdValidationTest`). See [mapping, limits and target evidence](partwise-import.md).
 
 MX-07 adds original F01, F03 basic and F04 XML in `NoteFixtures.kt` and 12 `NoteImportTest`
 assertions for exact onsets/durations, divisions changes and persistence, pitch alter versus printed
 accidental, zero/negative/malformed/overflow durations, missing structure, unsupported note content
 and cursor-move discarding. These are implementation-authored, not the independent MX-04 corpus,
-and have not been XSD-validated. See [note/rest scope](note-import.md).
+and schema-valid (`XsdValidationTest`). See [note/rest scope](note-import.md).
 
 MX-08 adds original F07 XML in `AttributeFixtures.kt` and 7 `AttributeImportTest` assertions for
 key/time/clef/staff-line changes at exact offsets (including mid-measure and end-of-measure),
 effective state per event, missing state left unknown, key changes that leave written alter and
 printed accidentals untouched, invalid values and staff-scoped/unsupported attribute content.
 `AttributeStateTest` checks the model resolver directly. These are implementation-authored and
-not XSD-validated. See [attribute state](attribute-state.md).
+schema-valid (`XsdValidationTest`). See [attribute state](attribute-state.md).
 
 MX-09 adds original F05, F06 and F08 XML in `PolyphonyFixtures.kt` and 11 `PolyphonyImportTest`
 assertions for backup/forward onsets and voice gaps, chord tones with shorter, equal, longer and
 cross-staff durations, two parts with a two-staff piano, backup before zero under both policies,
 invalid cursor moves, staff numbers beyond the declared staves and the declared staff limit. Tests
 that asserted earlier discards after a cursor move or on staff ≠ 1 now assert the interpreted
-result. These are implementation-authored and not XSD-validated. See [polyphony](polyphony.md).
+result. These are implementation-authored and schema-valid (`XsdValidationTest`). See [polyphony](polyphony.md).
+
+MX-04 adds the independent corpus and schema harness ([fixture manifest](fixture-manifest.md)). Eleven unmodified W3C
+test-suite files (MIT) stand in for F01–F08, with musical expectations taken from the suite's own descriptions
+in `W3cSuiteImportTest` (common targets). `XsdValidationTest` (JVM) validates them and every implementation-authored
+fixture against the pinned 4.0 XSD with no network access; schema validity, parse outcome and semantics are
+separate assertions. `scripts/run-w3c-suite.sh` runs the whole suite as a broad corpus (MX-22).
 
 1. Run independent XSD validation on JVM/CI using the official `musicxml.xsd` and its local catalog/imports, with network access disabled. This proves schema conformance only. Android/iOS tests need not run the validator.
 2. Run importer success/failure and diagnostic assertions on Android, iOS and JVM. Verify ordered error codes and source locations, not prose messages.

@@ -46,7 +46,7 @@ example `/score-timewise[1]/measure[2]/part[2]/note[1]`.
 `TimewiseFixtures.kt` adds original F12, authored from the MusicXML 4.0 score-timewise
 reference: a flute and a piano with different divisions, a measure that lists the piano
 first, and an implicit measure 3 with no flute part. It is paired with a partwise equivalent. Both
-are intended to be schema-valid but have not been XSD-validated.
+are validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)).
 
 `TimewiseImportTest` adds 6 common tests: equal F12 scores and model-path sets for both roots
 with no timewise diagnostics; timewise provenance; a part missing from leading measures; padding

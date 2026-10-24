@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F18 source, authored for this repository from the MusicXML 4.0 defaults, print and
- * position references. Expected XSD result: valid (not validated by these tests). Defaults give
+ * position references. Expected XSD result: valid (checked by `XsdValidationTest`). Defaults give
  * 7.2 mm per 40 tenths, an A4-like page with separate odd/even margins, system margins and
  * distances, and a staff distance. Measure 1 opens a page with a measure distance; its note is
  * placed with default-x and a negative relative-y, a colored rest follows, and a words direction has
@@ -47,7 +47,7 @@ internal val f18LayoutHints: String = """
             <direction-type><words default-y="-80" relative-x="-5">dolce</words></direction-type>
           </direction>
           <note default-x="83" relative-y="-3.5"><pitch><step>A</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
-          <note color="#ff0000"><rest/><duration>1</duration><type>quarter</type></note>
+          <note color="#FF0000"><rest/><duration>1</duration><type>quarter</type></note>
         </measure>
         <measure number="2">
           <print new-system="yes">

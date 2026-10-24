@@ -48,7 +48,7 @@ backup/forward ([MX-09](polyphony.md)) keep their lyrics like other notes.
 ## Fixtures and verification
 
 `LyricFixtures.kt` adds original F15, authored from the MusicXML 4.0 lyric, syllabic, elision, text
-and extend references and not XSD-validated: verse 1 "A-ve" with a melisma over two more notes
+and extend references and validated against the pinned 4.0 XSD by `XsdValidationTest` ([MX-04](fixture-manifest.md)): verse 1 "A-ve" with a melisma over two more notes
 (extend start, an extend-only continue and an extend-only stop), verse 2 named "refrain" placed below
 with "fa‿un" elided on one note followed by "glo-ria", and in measure 2 an unnumbered lyric whose text
 is split into two runs, plus a rest without lyrics.

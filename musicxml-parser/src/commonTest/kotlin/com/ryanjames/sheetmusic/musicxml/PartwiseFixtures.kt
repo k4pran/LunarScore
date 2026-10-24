@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F02 source, authored for this repository from the MusicXML 4.0 structure reference.
- * Expected XSD result: valid (not validated by these tests). Reversing body order is intentional:
+ * Expected XSD result: valid (checked by `XsdValidationTest`). Reversing body order is intentional:
  * part-list order defines score order; body references supply each part's measures.
  */
 internal val f02PartwiseScore: String = """

@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F19 source, authored for this repository from the MusicXML 4.0 note, grace and cue
- * references. Expected XSD result: valid (not validated by these tests). In 4/4 with divisions=2,
+ * references. Expected XSD result: valid (checked by `XsdValidationTest`). In 4/4 with divisions=2,
  * measure 1 has a slashed G4 eighth grace note slurred to its principal A4 quarter, taking 33% of
  * the A4's time; two beamed 16th grace notes B4 and C5 before a D5 quarter; an E5 half-note cue;
  * and an F5 after-grace that ends the measure and takes 25% of the cue note's time. None of the

@@ -110,8 +110,8 @@ the [MusicXML 4.0 structure reference](https://www.w3.org/2021/06/musicxml40/tut
 `MusicXmlParserTest` adds 18 tests for explicit semantic expectations, empty structures,
 ID/reference/required-field failures under both policies, source mappings, explicit loss outcomes,
 namespaces, malformed tails, security, cancellation and diagnostic/provenance budgets.
-These implementation-authored fixtures are not the independent MX-04 corpus; XSD validation
-has **not** been run on F02 or its variants.
+These implementation-authored fixtures are not the independent MX-04 corpus (see the
+[fixture manifest](fixture-manifest.md)); F02 is schema-valid (`XsdValidationTest`), its inline variants are not schema-validated.
 
 Windows verification on 2026-10-22:
 

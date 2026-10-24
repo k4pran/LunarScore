@@ -2,7 +2,7 @@ package com.ryanjames.sheetmusic.musicxml
 
 /**
  * Original F12 timewise source, authored from the MusicXML 4.0 score-timewise reference. Expected
- * XSD result: valid (not validated by these tests). A flute (divisions 1) and a piano (divisions 2)
+ * XSD result: valid (checked by `XsdValidationTest`). A flute (divisions 1) and a piano (divisions 2)
  * whose divisions carry from measure 1 into later measures. Measure 2 lists the piano before the
  * flute, and pickup measure 3 has no flute part at all.
  */
