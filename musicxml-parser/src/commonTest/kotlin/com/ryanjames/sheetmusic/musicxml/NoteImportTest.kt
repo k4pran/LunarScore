@@ -199,12 +199,15 @@ class NoteImportTest {
     fun testUnsupportedTimeFormsAreDiscarded() {
         val xml = document(
             "<attributes><key><fifths>0</fifths></key><time symbol='common'><beats>4</beats><beat-type>4</beat-type></time>" +
-                "<time><beats>3+2</beats><beat-type>8</beat-type></time><time><senza-misura/></time>" +
+                "<time><beats>3.5</beats><beat-type>8</beat-type></time><time><beats>3+</beats><beat-type>8</beat-type></time>" +
+                "<time><beats>3</beats><beat-type>4+8</beat-type></time><time><beats>3</beats></time>" +
+                "<time><beat-type>4</beat-type><beats>3</beats></time><time><senza-misura/><beats>3</beats><beat-type>4</beat-type></time>" +
+                "<time><senza-misura/><senza-misura/></time>" +
                 "<clef><sign>G</sign><line>2</line></clef></attributes><note><rest/><duration>1</duration></note>",
         )
         val result = success(xml, ParseOptions(ParsePolicy.TOLERANT))
-        // The common-time symbol is kept; the additive and senza-misura forms are discarded.
-        assertEquals(listOf("S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
+        // The common-time symbol is kept; forms that are not positive integer fractions are discarded.
+        assertEquals(List(7) { "S07" }, result.diagnostics.map { it.unsupported?.featureId })
         val events = events(result)
         assertEquals(Attribute.TimeSignature(4, 4, TimeSymbol.COMMON), assertIs<AttributeEvent>(events[1]).attribute)
         assertEquals(4, events.size)

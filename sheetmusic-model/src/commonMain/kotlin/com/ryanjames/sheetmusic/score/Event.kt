@@ -117,12 +117,33 @@ public data class DirectionEvent(
 /** Initial neutral state vocabulary; additional domains can be added without XML/UI types. */
 public sealed interface Attribute {
     /**
-     * A simple meter; additive/interchangeable meters remain future model work. [symbol] is how the
-     * signature is displayed and never changes the meter; null means none was given (numbers).
+     * A meter of one or more [fractions] in display order, such as 3/4, (3+2)/8 or 3/8+2/8+3/4, or
+     * an explicit absence of meter when [senzaMisura] is set (then [fractions] is empty).
+     *
+     * [symbol] and [separator] are how the signature is displayed and never change the meter; null
+     * means none was given. [interchangeable] is a displayed alternate of the same meter, such as
+     * the 6/8 in 3/4 (6/8); it never changes [length].
      */
-    public data class TimeSignature(val beats: Int, val beatUnit: Int, val symbol: TimeSymbol? = null) : Attribute {
+    public data class TimeSignature(
+        val fractions: List<TimeFraction>,
+        val symbol: TimeSymbol? = null,
+        val separator: TimeSeparator? = null,
+        val interchangeable: InterchangeableTime? = null,
+        val senzaMisura: SenzaMisura? = null,
+    ) : Attribute {
+        /** A simple meter of [beats] [beatUnit] notes, such as 3/4. */
+        public constructor(beats: Int, beatUnit: Int, symbol: TimeSymbol? = null) :
+            this(listOf(TimeFraction(listOf(beats), beatUnit)), symbol)
+
+        /**
+         * The total measure length in quarter notes, summed over every fraction, or null without a
+         * meter (senza misura). Construction fails with [RationalException] if it overflows.
+         */
+        val length: Rational? = if (senzaMisura == null) fractions.fold(Rational.ZERO) { sum, it -> sum + it.length } else null
+
         init {
-            require(beats > 0 && beatUnit > 0)
+            require(fractions.isEmpty() == (senzaMisura != null))
+            require(senzaMisura == null || interchangeable == null)
         }
     }
 
@@ -157,6 +178,50 @@ public sealed interface Attribute {
  * of the denominator (plain or dotted), or the usual pair of numbers.
  */
 public enum class TimeSymbol { COMMON, CUT, SINGLE_NUMBER, NOTE, DOTTED_NOTE, NORMAL }
+
+/**
+ * One fraction of a time signature: the additive numerator [beats] (one entry for 3/8, three for
+ * (5+3+1)/4) over [beatType].
+ */
+public data class TimeFraction(val beats: List<Int>, val beatType: Int) {
+    init {
+        require(beats.isNotEmpty() && beats.all { it > 0 } && beatType > 0)
+    }
+
+    /** This fraction's length in quarter notes. Fails with [RationalException] if it overflows. */
+    val length: Rational get() = beats.fold(Rational.ZERO) { sum, beat -> sum + Rational.of(beat) } * Rational.of(4, beatType)
+}
+
+/** How the fractions of a compound time signature are separated when displayed. */
+public enum class TimeSeparator { NONE, HORIZONTAL, DIAGONAL, VERTICAL, ADJACENT }
+
+/** How an interchangeable alternate is displayed beside the main time signature. */
+public enum class TimeRelation { PARENTHESES, BRACKET, EQUALS, SLASH, SPACE, HYPHEN }
+
+/**
+ * A displayed alternate meter, such as the 6/8 in 3/4 (6/8), with its own display [symbol] and
+ * [separator]; null means none was given.
+ */
+public data class InterchangeableTime(
+    val fractions: List<TimeFraction>,
+    val relation: TimeRelation? = null,
+    val symbol: TimeSymbol? = null,
+    val separator: TimeSeparator? = null,
+) {
+    init {
+        require(fractions.isNotEmpty())
+    }
+}
+
+/**
+ * An explicit absence of meter. [symbol] is the text displayed in place of a time signature, such
+ * as `X`; null means nothing is displayed.
+ */
+public data class SenzaMisura(val symbol: String? = null) {
+    init {
+        require(symbol == null || symbol.isNotBlank())
+    }
+}
 
 /** Conventional and non-pitched clef signs. */
 public enum class ClefSign { G, F, C, PERCUSSION, TAB, JIANPU, NONE }

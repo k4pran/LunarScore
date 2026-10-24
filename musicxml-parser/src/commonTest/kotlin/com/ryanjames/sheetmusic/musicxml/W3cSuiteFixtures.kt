@@ -22,6 +22,17 @@ internal val w3cSuiteFixtures: List<W3cSuiteFixture> by lazy {
         W3cSuiteFixture("46c-Midmeasure-Clef.musicxml", "F07", w3c46cMidmeasureClef),
         W3cSuiteFixture("13e-KeySignatures-MidMeasure-Change.musicxml", "F07", w3c13eKeySignaturesMidMeasureChange),
         W3cSuiteFixture("43b-MultiStaff-DifferentKeys.musicxml", "F08", w3c43bMultiStaffDifferentKeys),
+        // MX-25 time signatures, embedded in W3cTimeSignatureFixtures.kt.
+        W3cSuiteFixture("11c-TimeSignatures-Complex.musicxml", "F07", w3c11cTimeSignaturesComplex),
+        W3cSuiteFixture("11c-TimeSignatures-CompoundSimple.musicxml", "F07", w3c11cTimeSignaturesCompoundSimple),
+        W3cSuiteFixture("11d-TimeSignatures-ComplexMultiple.musicxml", "F07", w3c11dTimeSignaturesComplexMultiple),
+        W3cSuiteFixture("11d-TimeSignatures-CompoundMultiple.musicxml", "F07", w3c11dTimeSignaturesCompoundMultiple),
+        W3cSuiteFixture("11e-TimeSignatures-ComplexMixed.musicxml", "F07", w3c11eTimeSignaturesComplexMixed),
+        W3cSuiteFixture("11e-TimeSignatures-CompoundMixed.musicxml", "F07", w3c11eTimeSignaturesCompoundMixed),
+        W3cSuiteFixture("11f-TimeSignatures-SymbolMeaning.musicxml", "F07", w3c11fTimeSignaturesSymbolMeaning),
+        W3cSuiteFixture("11g-TimeSignatures-SingleNumber.musicxml", "F07", w3c11gTimeSignaturesSingleNumber),
+        W3cSuiteFixture("11h-TimeSignatures-SenzaMisura.musicxml", "F07", w3c11hTimeSignaturesSenzaMisura),
+        W3cSuiteFixture("11i-TimeSignatures-Alternate.musicxml", "F07", w3c11iTimeSignaturesAlternate),
     )
 }
 

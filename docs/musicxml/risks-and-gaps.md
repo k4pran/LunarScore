@@ -141,6 +141,22 @@ See [mxl-import.md](mxl-import.md).
 F20 was generated with .NET `ZipArchive`; other archives come from a test-only writer. iOS runtime
 still requires macOS.
 
+## MX-25 complex time signature decisions and remaining gaps
+
+`Attribute.TimeSignature` now holds component fractions with additive numerators, a derived total
+`length`, display `symbol`/`separator`, an `interchangeable` alternate and `senza-misura`
+([scope](attribute-state.md#complex-time-signatures-mx-25)). Suite 11c–11i import without discarded
+content (`W3cSuiteImportTest`, `XsdValidationTest`).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Non-integer or empty numerators/beat types (`3.5`, `3+`, a `4+8` beat type), unpaired `beats`/`beat-type`, `senza-misura` mixed with fractions or repeated | S07 `DISCARDED` at `time`; the whole time is dropped, so the staff keeps its previous meter (`NoteImportTest`) | None planned: MusicXML allows such `beats` strings but defines no meaning for them |
+| Unreadable `interchangeable` fractions | S07 `DISCARDED` at `interchangeable`; the main meter is kept (`AttributeImportTest`) | None |
+| Length beyond the `Rational` Int bounds | Fatal `NUMERIC_OVERFLOW` under both policies (`AttributeImportTest`) | None |
+| `symbol` contradicting the meter (11f `cut` on 3/8) | Kept as given; display only, never changes the meter | Renderer decides how to display it |
+| Measure length against the meter | `time.length` from `effectiveStates()`; suite measures are asserted equal to it in tests | No importer diagnostic for over/underfull measures yet (F23) |
+| `time` `print-object` and other display attributes | S07 `DISCARDED` as before | Display-attribute work (#56) |
+
 ## MX-22 W3C test-suite conformance decisions and remaining gaps
 
 `scripts/run-w3c-suite.sh` runs the pinned [W3C test suite](https://github.com/w3c-cg/musicxmlTestSuite)
@@ -156,7 +172,7 @@ diagnostic.
 | 41h, parts missing from the part list | Fixed in MX-24 (#53): each extra part is S01 `DISCARDED`; tolerant imports the listed part, strict rejects the loss. Every suite file is now accepted under the tolerant policy | None |
 | Missing `divisions` (03e, 51b, 51c) | Decided in MX-24 (#53): divisions 1 under both policies without a diagnostic; the three files are accepted cleanly | None |
 | 33i unended tie, 45f ending stop without start | `UNMATCHED_SPAN`; strict rejection is intended | Kept as regressions in MX-38 (#67) and MX-23 (#52) |
-| 101 strict `UNSUPPORTED_FEATURE` rejections | Each file is linked to its open MX-23–MX-39 issues in the audit table | Re-run after each issue lands until every valid file imports without discarded content |
+| 91 strict `UNSUPPORTED_FEATURE` rejections (101 before MX-25) | Each file is linked to its open MX-23–MX-39 issues in the audit table | Re-run after each issue lands until every valid file imports without discarded content |
 | Playback order of 45e, 45i | Fixed in MX-23 (#52): orders match the suite descriptions; 45a–45d, 45j and 45k unchanged | None |
 | Semantic oracle | The runner checks structured outcomes and `playbackOrder()` only, not musical correctness | Independent expectations in MX-04 (#5) and each tracked issue |
 

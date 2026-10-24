@@ -2,6 +2,8 @@ package com.ryanjames.sheetmusic.score
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class AttributeStateTest {
     private val treble = Attribute.Clef(ClefSign.G, 2)
@@ -51,6 +53,32 @@ class AttributeStateTest {
                 Attribute.Transpose(Transposition(Rational.of(-2), -1)), Attribute.InstrumentChange("clarinet")),
             state,
         )
+    }
+
+    @Test
+    fun testTimeSignatureLengthSumsEveryFraction() {
+        val simple = Attribute.TimeSignature(3, 4)
+        assertEquals(Attribute.TimeSignature(listOf(TimeFraction(listOf(3), 4))), simple)
+        assertEquals(Rational.of(3), simple.length)
+        val mixed = Attribute.TimeSignature(listOf(TimeFraction(listOf(3, 2), 8), TimeFraction(listOf(3), 4)))
+        assertEquals(Rational.of(11, 2), mixed.length)
+        val alternate = simple.copy(interchangeable = InterchangeableTime(listOf(TimeFraction(listOf(6), 8)), TimeRelation.PARENTHESES))
+        assertEquals(Rational.of(3), alternate.length)
+        assertNull(Attribute.TimeSignature(emptyList(), senzaMisura = SenzaMisura()).length)
+    }
+
+    @Test
+    fun testTimeSignatureInvariants() {
+        assertFailsWith<IllegalArgumentException> { Attribute.TimeSignature(0, 4) }
+        assertFailsWith<IllegalArgumentException> { TimeFraction(emptyList(), 4) }
+        assertFailsWith<IllegalArgumentException> { TimeFraction(listOf(3, 0), 8) }
+        assertFailsWith<IllegalArgumentException> { Attribute.TimeSignature(emptyList()) }
+        assertFailsWith<IllegalArgumentException> {
+            Attribute.TimeSignature(listOf(TimeFraction(listOf(3), 4)), senzaMisura = SenzaMisura())
+        }
+        assertFailsWith<IllegalArgumentException> { SenzaMisura(" ") }
+        assertFailsWith<IllegalArgumentException> { InterchangeableTime(emptyList()) }
+        assertFailsWith<RationalException> { Attribute.TimeSignature(listOf(TimeFraction(listOf(Int.MAX_VALUE, Int.MAX_VALUE), 1))) }
     }
 
     private fun note(id: String, onset: Rational, staff: Int = 1) =

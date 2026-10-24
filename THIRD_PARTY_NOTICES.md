@@ -29,8 +29,8 @@ each under its own licence. Keep these notices when copying or redistributing th
 
 ## W3C MusicXML test suite fixtures (tests only)
 
-- **Files:** `musicxml-parser/src/commonTest/kotlin/com/ryanjames/sheetmusic/musicxml/W3cSuiteFixtures.kt`,
-  which embeds unmodified files from
+- **Files:** `musicxml-parser/src/commonTest/kotlin/com/ryanjames/sheetmusic/musicxml/W3cSuiteFixtures.kt` and
+  `W3cTimeSignatureFixtures.kt` in the same directory, which embed unmodified files from
   [w3c-cg/musicxmlTestSuite `77c19f7e`](https://github.com/w3c-cg/musicxmlTestSuite/tree/77c19f7e819154c70ca1a1992e80dcda8ff82fea).
   Each embedded file is listed in [`docs/musicxml/fixture-manifest.md`](docs/musicxml/fixture-manifest.md).
 - **Copyright:** © 2010–2016 Reinhold Kainhofer and the GNU LilyPond project; © 2016–2026 Michael
