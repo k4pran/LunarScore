@@ -60,7 +60,7 @@ Model-only F01/F05/F10/F17 projections now exist; no XML importer or source diag
 | Invalid fraction or division by zero | `ZERO_DENOMINATOR` / `DIVISION_BY_ZERO`; independent codes tested | Parser must distinguish malformed input from a resource/numeric limit |
 | Orphan or forward relationship endpoints | Retained IDs/nulls; `MISSING_ENDPOINT` / `UNKNOWN_EVENT` model diagnostics; F10 projection | Source resolution, pitch pairing, locations and strict/tolerant policy done in MX-11 (see below) |
 | Duplicate IDs, unknown staff/instrument | `DUPLICATE_ID`, `UNKNOWN_STAFF`, `UNKNOWN_INSTRUMENT` with neutral paths; graph tests | MX-03 source locations; the importer rejects staff numbers beyond the declared staves (MX-09) |
-| Simple meter/state vocabulary only | No source import or implicit loss; additive meters/keys/other domains remain unimplemented | Their feature adapters must retain data or emit structured unsupported diagnostics before claiming support |
+| Simple meter/state vocabulary only | No source import or implicit loss; additive meters (MX-25) and non-traditional keys (MX-26) are now modeled; other domains remain unimplemented | Their feature adapters must retain data or emit structured unsupported diagnostics before claiming support |
 | Rich model cannot yet be rendered | Existing renderer-to-neutral adapter preserves its complete current subset; legacy tests retained | Later neutral-to-layout adapter must report each unsupported case; no reverse adapter is exposed now |
 | Transposition, spans and chord consistency | Separate fields represent facts exactly; model does not infer sounding pitches or repair spans | The MX-16 importer derives sounding pitch per staff; MX-09 reports chord tones longer than their reference; further chord consistency checks remain |
 
@@ -140,6 +140,22 @@ See [mxl-import.md](mxl-import.md).
 
 F20 was generated with .NET `ZipArchive`; other archives come from a test-only writer. iOS runtime
 still requires macOS.
+
+## MX-26 key signature decisions and remaining gaps
+
+`Attribute.KeySignature` now holds a traditional key (fifths, mode and an optional `cancel` with its
+location) or a non-traditional key (ordered step/exact alter/printed accidental alterations), both
+with optional `key-octave` placements ([scope](attribute-state.md#key-display-and-non-traditional-keys-mx-26)).
+`fifths` is null for a non-traditional key. Suite 13a–13e (both 13e files) import without discarded
+content (`W3cSuiteImportTest`, `XsdValidationTest`).
+
+| Case | Implemented structured outcome / evidence | Remaining work |
+|---|---|---|
+| Non-traditional key versus written pitch | Alterations are key data only; note alter, printed accidental and sounding pitch are unchanged (`AttributeImportTest`, 13d) | Renderer decides how to display them |
+| `cancel` value that does not match the previous key (13e measure 5) | Kept as given; not checked against the previous key | None planned |
+| `key-octave` `number` beyond the accidentals or cancellation naturals | Kept as given; not checked | Renderer must ignore an unmatched octave |
+| `key-step` without `key-alter`, `key-alter`/`key-accidental` out of sequence, traditional and non-traditional children mixed | Fatal `INVALID_STRUCTURE` (`AttributeImportTest`) | None |
+| `key-accidental` `smufl` (needed for `other`), key `print-object`/`color` and other display attributes | S07 `DISCARDED`; the key and accidental name are kept | Display-attribute work (#56) |
 
 ## MX-25 complex time signature decisions and remaining gaps
 
@@ -450,7 +466,7 @@ MX-07's S07 discard of key, clef, staves and staff details.
 | Clef without line | Standard line for G/F/C per MusicXML; null for percussion/TAB/jianpu/none | None |
 | Invalid fifths/line/octave change/sign/staves/staff-lines/attribute `number` | Fatal `INVALID_VALUE`; missing fifths or sign `INVALID_STRUCTURE` | Full XSD lexical validation remains separate |
 | `staves` > 1, `part-symbol`, key/time/clef/staff details scoped to staff ≠ 1 | Superseded by MX-09: staves and staff-scoped attributes are interpreted; `part-symbol` stays S08 `DISCARDED` | Part-symbol display |
-| Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | S07 `DISCARDED`; non-traditional key dropped, otherwise key/clef kept (unknown mode null) | Non-traditional key model |
+| Non-traditional keys; unknown mode; key `cancel`/`key-octave`; key/clef display attributes | Non-traditional keys, `cancel` and `key-octave` superseded by MX-26 above; unknown mode and display attributes S07 `DISCARDED`, key/clef kept (unknown mode null) | Display attributes (#56) |
 | `staff-tuning`/`capo`; other staff details | S23 / S17 `DISCARDED`; staff-line count kept | MX-13/MX-18/MX-21 |
 | `transpose`, `instruments`, `for-part`; `measure-style`; `directive` | S16 / S24 / S07 `DISCARDED` (`transpose` superseded by MX-16 and `measure-repeat` by MX-17 above) | MX-17, MX-13 |
 | State change after backup/forward | At the cursor after the move (superseded by MX-09) | None |

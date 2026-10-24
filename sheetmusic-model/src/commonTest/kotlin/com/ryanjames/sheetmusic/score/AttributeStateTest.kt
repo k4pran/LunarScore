@@ -2,8 +2,10 @@ package com.ryanjames.sheetmusic.score
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class AttributeStateTest {
     private val treble = Attribute.Clef(ClefSign.G, 2)
@@ -79,6 +81,21 @@ class AttributeStateTest {
         assertFailsWith<IllegalArgumentException> { SenzaMisura(" ") }
         assertFailsWith<IllegalArgumentException> { InterchangeableTime(emptyList()) }
         assertFailsWith<RationalException> { Attribute.TimeSignature(listOf(TimeFraction(listOf(Int.MAX_VALUE, Int.MAX_VALUE), 1))) }
+    }
+
+    @Test
+    fun testKeySignatureInvariants() {
+        val nonTraditional = Attribute.KeySignature.nonTraditional(listOf(KeyAlteration(Step.F, Rational.ONE)), listOf(KeyOctave(1, 5)))
+        assertTrue(nonTraditional.isNonTraditional)
+        assertNull(nonTraditional.fifths)
+        assertFalse(Attribute.KeySignature(-2, KeyMode.MINOR, KeyCancel(3, KeyCancelLocation.RIGHT)).isNonTraditional)
+        assertFailsWith<IllegalArgumentException> { Attribute.KeySignature(null) }
+        assertFailsWith<IllegalArgumentException> { Attribute.KeySignature(1, alterations = listOf(KeyAlteration(Step.F, Rational.ONE))) }
+        assertFailsWith<IllegalArgumentException> { nonTraditional.copy(mode = KeyMode.MAJOR) }
+        assertFailsWith<IllegalArgumentException> { nonTraditional.copy(cancel = KeyCancel(1)) }
+        assertFailsWith<IllegalArgumentException> { KeyAlteration(Step.F, Rational.ONE, " ") }
+        assertFailsWith<IllegalArgumentException> { KeyOctave(0, 4) }
+        assertFailsWith<IllegalArgumentException> { KeyOctave(1, 10) }
     }
 
     private fun note(id: String, onset: Rational, staff: Int = 1) =

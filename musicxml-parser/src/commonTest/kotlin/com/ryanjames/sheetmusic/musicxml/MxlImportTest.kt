@@ -226,7 +226,7 @@ class MxlImportTest {
 
     @Test
     fun testArchiveWarningsShareTheDiagnosticCap() {
-        val keyCancel = f20Score.replace("<divisions>1</divisions>", "<divisions>1</divisions><key><cancel>2</cancel><fifths>0</fifths></key>")
+        val keyCancel = f20Score.replace("<divisions>1</divisions>", "<divisions>1</divisions><key><fifths>0</fifths><mode>hypodorian</mode></key>")
         val mimetype = TestZipEntry("mimetype", "application/vnd.recordare.musicxml")
         val archive = buildZip(listOf(mimetype) + scoreEntries(keyCancel))
         val tolerant = success(archive, ParseOptions(ParsePolicy.TOLERANT))

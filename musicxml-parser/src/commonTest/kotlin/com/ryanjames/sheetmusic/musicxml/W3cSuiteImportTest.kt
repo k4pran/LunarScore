@@ -4,6 +4,11 @@ import com.ryanjames.sheetmusic.score.Attribute
 import com.ryanjames.sheetmusic.score.AttributeEvent
 import com.ryanjames.sheetmusic.score.ClefSign
 import com.ryanjames.sheetmusic.score.InterchangeableTime
+import com.ryanjames.sheetmusic.score.KeyAlteration
+import com.ryanjames.sheetmusic.score.KeyCancel
+import com.ryanjames.sheetmusic.score.KeyCancelLocation
+import com.ryanjames.sheetmusic.score.KeyMode
+import com.ryanjames.sheetmusic.score.KeyOctave
 import com.ryanjames.sheetmusic.score.MetadataEntry
 import com.ryanjames.sheetmusic.score.MetadataKind
 import com.ryanjames.sheetmusic.score.NoteEvent
@@ -217,6 +222,75 @@ class W3cSuiteImportTest {
         assertEquals(listOf(0, 1, 2, 3).map(Rational::of), notes(part).map { it.onset })
     }
 
+    // F07, 13a: "Various key signatures: from 11 flats to 11 sharps. Each signature is shown twice,
+    // with one measure in major and the other measure in minor."
+    @Test
+    fun testF07TraditionalKeysFromElevenFlatsToElevenSharps() {
+        val expected = (-11..11).flatMap { listOf(Attribute.KeySignature(it, KeyMode.MAJOR), Attribute.KeySignature(it, KeyMode.MINOR)) }
+        assertEquals(expected, keys(part(w3c13aKeySignatures)))
+    }
+
+    // F07, 13b: "All different modes: 'major', 'minor', 'ionian', 'dorian', 'phrygian', 'lydian',
+    // 'mixolydian', 'aeolian', 'locrian', and 'none'. All modes are given with two sharps."
+    @Test
+    fun testF07ChurchModesKeepTheirMode() {
+        val modes = listOf(
+            KeyMode.MAJOR, KeyMode.MINOR, KeyMode.IONIAN, KeyMode.DORIAN, KeyMode.PHRYGIAN, KeyMode.LYDIAN,
+            KeyMode.MIXOLYDIAN, KeyMode.AEOLIAN, KeyMode.LOCRIAN, KeyMode.NONE,
+        )
+        assertEquals(modes.map { Attribute.KeySignature(2, it) }, keys(part(w3c13bKeySignaturesChurchModes)))
+    }
+
+    // F07, 13c: "Non-traditional key signatures, where each alteration is separately given. The first
+    // signature is [f sharp, a flat, b flat]. The second one is [c flat-flat, g sharp-sharp, d flat,
+    // b sharp, f natural], with explicitly selected octaves for each alteration."
+    @Test
+    fun testF07NonTraditionalKeysKeepAlterationsAndOctaves() {
+        fun alteration(step: Step, alter: Int) = KeyAlteration(step, Rational.of(alter))
+        assertEquals(
+            listOf(
+                Attribute.KeySignature.nonTraditional(listOf(alteration(Step.F, 1), alteration(Step.A, -1), alteration(Step.B, -1))),
+                Attribute.KeySignature.nonTraditional(
+                    listOf(alteration(Step.C, -2), alteration(Step.G, 2), alteration(Step.D, -1), alteration(Step.B, 1), alteration(Step.F, 0)),
+                    (1..5).map { KeyOctave(it, it + 1) },
+                ),
+            ),
+            keys(part(w3c13cKeySignaturesNonTraditional)),
+        )
+    }
+
+    // F07, 13d: "Non-traditional key signatures with microtone alterations: [g flat-and-a-half, a flat,
+    // b half-flat, c natural, d half-sharp, e sharp, f sharp-and-a-half]."
+    @Test
+    fun testF07MicrotonalKeyAltersAreExact() {
+        val part = part(w3c13dKeySignaturesMicrotones)
+        val alters = listOf(Rational.of(-3, 2), Rational.of(-1), Rational.of(-1, 2), Rational.ZERO, Rational.of(1, 2), Rational.ONE, Rational.of(3, 2))
+        val steps = listOf(Step.G, Step.A, Step.B, Step.C, Step.D, Step.E, Step.F)
+        assertEquals(listOf(Attribute.KeySignature.nonTraditional(steps.zip(alters) { step, alter -> KeyAlteration(step, alter) })), keys(part))
+        notes(part).forEach { assertEquals(Rational.ZERO, assertIs<NotePitch.Pitched>(it.pitch).written.alter) }
+    }
+
+    // F07, 13e: "Tests of key signature cancellation: in measure 2 it is positioned at the default
+    // location (which usually means that the cancellation comes immediately after the bar line), in
+    // measure 3 it uses the attribute 'location="right"' ... measure 4 'location="before-barline"' ...
+    // measure 5 'location="left"'. The <cancel> element's value (4) in the last measure intentionally
+    // doesn't correspond to the value of the previous <fifths> value (2)." It is kept as given.
+    @Test
+    fun testF07KeyCancellationKeepsItsLocation() {
+        val part = part(w3c13eKeySignaturesCancel)
+        assertEquals(
+            listOf(
+                Attribute.KeySignature(3, KeyMode.MAJOR),
+                Attribute.KeySignature(-5, KeyMode.MAJOR, KeyCancel(3)),
+                Attribute.KeySignature(-3, KeyMode.MAJOR, KeyCancel(-5, KeyCancelLocation.RIGHT)),
+                Attribute.KeySignature(2, KeyMode.MAJOR, KeyCancel(-3, KeyCancelLocation.BEFORE_BARLINE)),
+                Attribute.KeySignature(-2, KeyMode.MAJOR, KeyCancel(4, KeyCancelLocation.LEFT)),
+            ),
+            keys(part),
+        )
+        notes(part).forEach { assertEquals(Rational.ZERO, assertIs<NotePitch.Pitched>(it.pitch).written.alter) }
+    }
+
     // F08, 43b: "A piano staff with different keys and clefs for each of its staves."
     @Test
     fun testF08EachStaffKeepsItsOwnKeyAndClef() {
@@ -352,6 +426,10 @@ class W3cSuiteImportTest {
     /** The time signatures in source order, one per attribute change. */
     private fun meters(part: Part): List<Attribute.TimeSignature> =
         part.measures.flatMap { it.events }.filterIsInstance<AttributeEvent>().mapNotNull { it.attribute as? Attribute.TimeSignature }
+
+    /** The key signatures in source order, one per attribute change. */
+    private fun keys(part: Part): List<Attribute.KeySignature> =
+        part.measures.flatMap { it.events }.filterIsInstance<AttributeEvent>().mapNotNull { it.attribute as? Attribute.KeySignature }
 
     private fun time(vararg fractions: Pair<List<Int>, Int>): Attribute.TimeSignature =
         Attribute.TimeSignature(fractions.map { (beats, type) -> TimeFraction(beats, type) })

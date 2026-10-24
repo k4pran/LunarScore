@@ -7,7 +7,11 @@ import com.ryanjames.sheetmusic.score.AttributeState
 import com.ryanjames.sheetmusic.score.ClefSign
 import com.ryanjames.sheetmusic.score.Event
 import com.ryanjames.sheetmusic.score.InterchangeableTime
+import com.ryanjames.sheetmusic.score.KeyAlteration
+import com.ryanjames.sheetmusic.score.KeyCancel
+import com.ryanjames.sheetmusic.score.KeyCancelLocation
 import com.ryanjames.sheetmusic.score.KeyMode
+import com.ryanjames.sheetmusic.score.KeyOctave
 import com.ryanjames.sheetmusic.score.NoteEvent
 import com.ryanjames.sheetmusic.score.NotePitch
 import com.ryanjames.sheetmusic.score.Rational
@@ -80,6 +84,86 @@ class AttributeImportTest {
     }
 
     @Test
+    fun testKeyCancelAndOctavesAreDisplayOnly() {
+        val result = success(document(
+            "<attributes><key><cancel location='before-barline'>-3</cancel><fifths>2</fifths>" +
+                "<key-octave number='1' cancel='yes'>5</key-octave><key-octave number='2'>4</key-octave></key></attributes>" +
+                "<note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration></note>",
+        ))
+        assertTrue(result.diagnostics.isEmpty())
+        val key = Attribute.KeySignature(
+            2, cancel = KeyCancel(-3, KeyCancelLocation.BEFORE_BARLINE), octaves = listOf(KeyOctave(1, 5, cancel = true), KeyOctave(2, 4)),
+        )
+        assertEquals(key, assertIs<AttributeEvent>(events(result)[0]).attribute)
+        val note = assertIs<NoteEvent>(events(result)[1])
+        assertEquals(NotePitch.Pitched(WrittenPitch(Step.F, 4), SoundingPitch(Rational.of(65))), note.pitch)
+        assertEquals(key, result.value.parts.single().effectiveStates().getValue(note.id).key)
+        failure(document("<attributes><key><cancel location='middle'>1</cancel><fifths>0</fifths></key></attributes>"), DiagnosticCode.INVALID_VALUE)
+        failure(document("<attributes><key><cancel>x</cancel><fifths>0</fifths></key></attributes>"), DiagnosticCode.INVALID_VALUE)
+        failure(document("<attributes><key><cancel>1</cancel><cancel>2</cancel><fifths>0</fifths></key></attributes>"), DiagnosticCode.INVALID_STRUCTURE)
+        failure(document("<attributes><key><cancel>1</cancel></key></attributes>"), DiagnosticCode.INVALID_STRUCTURE)
+        failure(document("<attributes><key><fifths>0</fifths><key-octave>4</key-octave></key></attributes>"), DiagnosticCode.INVALID_VALUE)
+        failure(document("<attributes><key><fifths>0</fifths><key-octave number='0'>4</key-octave></key></attributes>"), DiagnosticCode.INVALID_VALUE)
+        failure(document("<attributes><key><fifths>0</fifths><key-octave number='1'>10</key-octave></key></attributes>"), DiagnosticCode.INVALID_VALUE)
+        failure(document("<attributes><key><fifths>0</fifths><key-octave number='1' cancel='maybe'>4</key-octave></key></attributes>"), DiagnosticCode.INVALID_VALUE)
+    }
+
+    @Test
+    fun testNonTraditionalKeysKeepEveryAlterationInOrder() {
+        val result = success(document(
+            "<attributes><key><key-step>B</key-step><key-alter>-0.5</key-alter><key-accidental>slash-flat</key-accidental>" +
+                "<key-step>E</key-step><key-alter>-1</key-alter><key-step>F</key-step><key-alter>1.5</key-alter>" +
+                "<key-octave number='3'>5</key-octave></key></attributes>" +
+                "<note><pitch><step>B</step><octave>4</octave></pitch><duration>1</duration></note>",
+        ))
+        assertTrue(result.diagnostics.isEmpty())
+        val key = Attribute.KeySignature.nonTraditional(
+            listOf(
+                KeyAlteration(Step.B, Rational.of(-1, 2), "slash-flat"),
+                KeyAlteration(Step.E, Rational.of(-1)),
+                KeyAlteration(Step.F, Rational.of(3, 2)),
+            ),
+            listOf(KeyOctave(3, 5)),
+        )
+        assertEquals(key, assertIs<AttributeEvent>(events(result)[0]).attribute)
+        assertTrue(key.isNonTraditional)
+        assertNull(key.fifths)
+        val note = assertIs<NoteEvent>(events(result)[1])
+        assertEquals(NotePitch.Pitched(WrittenPitch(Step.B, 4), SoundingPitch(Rational.of(71))), note.pitch)
+        assertNull(note.notation.accidental)
+    }
+
+    @Test
+    fun testMalformedNonTraditionalKeys() {
+        fun key(content: String) = document("<attributes><key>$content</key></attributes>")
+        failure(key("<key-step>F</key-step>"), DiagnosticCode.INVALID_STRUCTURE)
+        failure(key("<key-step>F</key-step><key-step>G</key-step><key-alter>1</key-alter>"), DiagnosticCode.INVALID_STRUCTURE)
+        failure(key("<key-alter>1</key-alter>"), DiagnosticCode.INVALID_STRUCTURE)
+        failure(key("<key-accidental>sharp</key-accidental><key-step>F</key-step><key-alter>1</key-alter>"), DiagnosticCode.INVALID_STRUCTURE)
+        failure(key("<key-step>F</key-step><key-alter>1</key-alter><key-octave number='1'>4</key-octave><key-accidental>sharp</key-accidental>"),
+            DiagnosticCode.INVALID_STRUCTURE)
+        failure(key("<fifths>1</fifths><key-step>F</key-step><key-alter>1</key-alter>"), DiagnosticCode.INVALID_STRUCTURE)
+        failure(key("<key-step>H</key-step><key-alter>1</key-alter>"), DiagnosticCode.INVALID_VALUE)
+        failure(key("<key-step>F</key-step><key-alter>sharp</key-alter>"), DiagnosticCode.INVALID_VALUE)
+        failure(key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental> </key-accidental>"), DiagnosticCode.INVALID_VALUE)
+        failure(key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental>&#xA0;</key-accidental>"), DiagnosticCode.INVALID_VALUE)
+        failure(
+            key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental>&#xA0;</key-accidental>"),
+            DiagnosticCode.INVALID_VALUE,
+            ParseOptions(ParsePolicy.TOLERANT),
+        )
+        val smufl = success(
+            key("<key-step>F</key-step><key-alter>1</key-alter><key-accidental smufl='accSagittal5v7KleismaUp'>other</key-accidental>"),
+            ParseOptions(ParsePolicy.TOLERANT),
+        )
+        assertEquals(listOf("S07"), smufl.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(
+            Attribute.KeySignature.nonTraditional(listOf(KeyAlteration(Step.F, Rational.ONE, "other"))),
+            assertIs<AttributeEvent>(events(smufl).single()).attribute,
+        )
+    }
+
+    @Test
     fun testKeyFormsAndUnsupportedKeyContent() {
         val result = success(document(
             "<attributes><key print-object='no'><cancel>2</cancel><fifths>-2</fifths><mode>minor</mode>" +
@@ -87,10 +171,14 @@ class AttributeImportTest {
                 "<key><fifths>3</fifths><mode>hypodorian</mode></key>" +
                 "<key><key-step>F</key-step><key-alter>1</key-alter></key></attributes>",
         ), ParseOptions(ParsePolicy.TOLERANT))
-        assertEquals(listOf("S07", "S07", "S07", "S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
+        assertEquals(listOf("S07", "S07"), result.diagnostics.map { it.unsupported?.featureId })
         assertTrue(result.diagnostics.all { it.unsupported?.retention == ContentRetention.DISCARDED })
         assertEquals(
-            listOf(Attribute.KeySignature(-2, KeyMode.MINOR), Attribute.KeySignature(3)),
+            listOf(
+                Attribute.KeySignature(-2, KeyMode.MINOR, KeyCancel(2), octaves = listOf(KeyOctave(1, 4))),
+                Attribute.KeySignature(3),
+                Attribute.KeySignature.nonTraditional(listOf(KeyAlteration(Step.F, Rational.ONE))),
+            ),
             events(result).map { assertIs<AttributeEvent>(it).attribute },
         )
         failure(document("<attributes><key><mode>major</mode></key></attributes>"), DiagnosticCode.INVALID_STRUCTURE)

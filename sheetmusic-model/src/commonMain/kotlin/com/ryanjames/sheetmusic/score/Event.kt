@@ -154,10 +154,36 @@ public sealed interface Attribute {
     public data class Clef(val sign: ClefSign, val line: Int?, val octaveChange: Int = 0) : Attribute
 
     /**
-     * A traditional key signature: [fifths] counts sharps (positive) or flats (negative) around the
-     * circle of fifths. A null [mode] is unspecified. Keys never change a note's written alter.
+     * A key signature, either traditional or non-traditional. Keys never change a note's written
+     * alter.
+     *
+     * A traditional key has [fifths], counting sharps (positive) or flats (negative) around the
+     * circle of fifths, an optional [mode] (null is unspecified) and an optional [cancel] of the
+     * previous key. A non-traditional key has no fifths and lists its [alterations] in display
+     * order. [octaves] optionally place individual accidentals of either form; they are display
+     * data only.
      */
-    public data class KeySignature(val fifths: Int, val mode: KeyMode? = null) : Attribute
+    public data class KeySignature(
+        val fifths: Int?,
+        val mode: KeyMode? = null,
+        val cancel: KeyCancel? = null,
+        val alterations: List<KeyAlteration> = emptyList(),
+        val octaves: List<KeyOctave> = emptyList(),
+    ) : Attribute {
+        init {
+            require((fifths == null) != alterations.isEmpty())
+            require(fifths != null || (mode == null && cancel == null))
+        }
+
+        /** Whether this key lists its own [alterations] rather than a number of [fifths]. */
+        val isNonTraditional: Boolean get() = fifths == null
+
+        public companion object {
+            /** A non-traditional key of [alterations] in display order, with optional [octaves]. */
+            public fun nonTraditional(alterations: List<KeyAlteration>, octaves: List<KeyOctave> = emptyList()): KeySignature =
+                KeySignature(null, alterations = alterations, octaves = octaves)
+        }
+    }
 
     /** Number of staff lines in effect; zero is legal. */
     public data class StaffLines(val count: Int) : Attribute {
@@ -228,6 +254,36 @@ public enum class ClefSign { G, F, C, PERCUSSION, TAB, JIANPU, NONE }
 
 /** Key modes named by MusicXML 4.0; [NONE] means explicitly modeless. */
 public enum class KeyMode { MAJOR, MINOR, DORIAN, PHRYGIAN, LYDIAN, MIXOLYDIAN, AEOLIAN, IONIAN, LOCRIAN, NONE }
+
+/**
+ * One accidental of a non-traditional key: [step] altered by [alter] semitones (exact, including
+ * microtones), with an optional printed [accidental] name such as `slash-flat`.
+ */
+public data class KeyAlteration(val step: Step, val alter: Rational, val accidental: String? = null) {
+    init {
+        require(accidental == null || accidental.isNotBlank())
+    }
+}
+
+/**
+ * Display of the naturals cancelling the previous key's [fifths] before a key change; a null
+ * [location] is unspecified (MusicXML's default is [KeyCancelLocation.LEFT]).
+ */
+public data class KeyCancel(val fifths: Int, val location: KeyCancelLocation? = null)
+
+/** Where key cancellation naturals are displayed relative to the new key. */
+public enum class KeyCancelLocation { LEFT, RIGHT, BEFORE_BARLINE }
+
+/**
+ * The displayed [octave] (0–9) of one key accidental, where [number] counts accidentals from 1 in
+ * display order; with [cancel] it counts the cancellation naturals instead.
+ */
+public data class KeyOctave(val number: Int, val octave: Int, val cancel: Boolean = false) {
+    init {
+        require(number > 0)
+        require(octave in 0..9)
+    }
+}
 
 private fun validateEvent(id: String, onset: Rational, staff: Int) {
     require(id.isNotBlank())
