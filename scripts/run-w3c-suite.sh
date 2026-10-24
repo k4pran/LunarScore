@@ -13,6 +13,11 @@ pinned_revision=77c19f7e819154c70ca1a1992e80dcda8ff82fea
 revision=${1:-${W3C_SUITE_REVISION:-$pinned_revision}}
 root=$(cd "$(dirname "$0")/.." && pwd)
 report=${W3C_SUITE_REPORT:-$root/musicxml-parser/build/reports/w3c-suite/$revision.md}
+# Gradle runs the test from the module directory, so a relative path is taken from here instead.
+case $report in
+    /* | [A-Za-z]:[/\\]*) ;;
+    *) report=$PWD/$report ;;
+esac
 
 download=$(mktemp -d)
 trap 'rm -rf "$download"' EXIT INT TERM
